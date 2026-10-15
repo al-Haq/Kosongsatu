@@ -1517,3 +1517,22 @@ dialog.wide {
     padding: 14px 6px;
   }
 }
+.sidebar {
+  overflow-y: auto;
+}
+.bar.outflow {
+  background: var(--orange);
+}
+.csv-example {
+  padding: 12px;
+  border-radius: 6px;
+  background: var(--bg);
+  font-size: 11px;
+  overflow: auto;
+}
+.finance-note {
+  white-space: pre-line;
+}
+select:disabled {
+  background: var(--bg);
+}

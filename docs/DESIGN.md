@@ -27,9 +27,9 @@ Reusable fields, tables, status badges, dialogs and panels share one stylesheet.
 
 ## Deliberate simplifications
 
-This first implementation uses Node.js 24, SQLite and standard browser modules rather than introducing a build pipeline, multiple services or an external database for a single-owner tool. Financial and authorization rules live on the server. Client forms/preview are convenience only and never authoritative. Integer sen are used for all stored totals. Issuance, conversion, payment recording and recurring generation are transactional.
+This implementation uses Node.js 24, SQLite and standard browser modules rather than introducing a build pipeline, multiple services or an external database for a single-owner tool. Financial and authorization rules live on the server. Client forms/preview are convenience only and never authoritative. Integer sen are used for all stored totals. Issuance, conversion, payment recording and recurring generation are transactional.
 
-Keep the data layer separated if a future PostgreSQL migration is required. Add migrations and integration tests before expanding the schema. Do not turn this single-owner implementation into multi-tenant hosting merely by adding an organization field.
+Keep the data layer separated if a future PostgreSQL migration is required. Schema v2 migrations retain legacy payments as cash receipts, quarantine ambiguous duplicates and preserve rollback snapshots. Do not turn this single-owner implementation into multi-tenant hosting merely by adding an organization field.
 
 ### Official workflow references
 
@@ -41,3 +41,11 @@ Reviewed 15 October 2026:
 - [Node SQLite API](https://nodejs.org/api/sqlite.html) and [Node crypto API](https://nodejs.org/docs/latest-v24.x/api/crypto.html).
 
 This is an original Nawlogic interface. No partner status or vendor integration is implied by these references.
+
+## Financial state in v0.2
+
+Cash receipts represent money received. Payments are invoice allocations against those receipts, with separate releases and reversal history. Credit/debit notes adjust the invoice value; refunds consume unallocated cash. Dashboard cash is receipts less refunds by event date, independent of invoice allocation. See [the release matrix](RELEASE-0.2.md).
+
+Financial writes run in SQLite transactions. Optional idempotency keys bind a scope and request payload to one result; keys reused with different input are rejected. Secret-bearing link and MFA responses are excluded from this cache. Browser retries retain request keys in memory after transport/server failures.
+
+MFA secrets use AES-256-GCM with a server key outside the database; recovery codes are hashed and consumed transactionally. Backups use a separate encryption key and a private temporary directory for the online SQLite snapshot. Request-scoped audit actors distinguish owner, client-link and system actions. Audit entries have database update/delete guards, not a cryptographic tamper-evidence claim.

@@ -9,3 +9,5 @@ coverage/
 playwright-report/
 test-results/
 .DS_Store
+*.mfa-key
+*.nwlbackup

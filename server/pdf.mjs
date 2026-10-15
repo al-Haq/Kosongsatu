@@ -12,6 +12,14 @@ const logo = fileURLToPath(
 );
 export function renderPdf(invoice, payment = null) {
   return new Promise((resolve, reject) => {
+    const documentLabel =
+      {
+        invoice: "Invoice",
+        quote: "Quotation",
+        credit: "Credit note",
+        debit: "Debit note",
+        refund: "Refund note",
+      }[invoice.kind] || "Document";
     const pdf = new PDFDocument({
       size: "A4",
       margin: 42,
@@ -19,7 +27,7 @@ export function renderPdf(invoice, payment = null) {
       info: {
         Title: payment
           ? "Nawlogic payment receipt"
-          : `${invoice.kind === "quote" ? "Quotation" : "Invoice"} ${invoice.number || "DRAFT"}`,
+          : `${documentLabel} ${invoice.number || "DRAFT"}`,
         Author: invoice.business.company,
       },
     });
@@ -67,11 +75,7 @@ export function renderPdf(invoice, payment = null) {
     };
     pdf.image(logo, 37, 32, { width: 165 });
     line(
-      payment
-        ? "PAYMENT RECEIPT"
-        : invoice.kind === "quote"
-          ? "QUOTATION"
-          : "INVOICE",
+      payment ? "PAYMENT RECEIPT" : documentLabel.toUpperCase(),
       337,
       49,
       17,
@@ -81,7 +85,7 @@ export function renderPdf(invoice, payment = null) {
     );
     line(
       payment
-        ? `Receipt ${payment.id.slice(0, 8).toUpperCase()}`
+        ? `Receipt ${payment.number || payment.id.slice(0, 8).toUpperCase()}`
         : invoice.number || "DRAFT - NOT ISSUED",
       337,
       79,
@@ -137,7 +141,7 @@ export function renderPdf(invoice, payment = null) {
       275,
     );
     const details = payment
-      ? `Invoice: ${invoice.number}\nReceived: ${payment.paid_date}\nMethod: ${payment.method}\nReference: ${payment.reference}`
+      ? `${payment.receiptMode ? "Receipt" : "Invoice"}: ${invoice.number}\nReceived: ${payment.paid_date}\nMethod: ${payment.method}\nReference: ${payment.reference}`
       : `Issued: ${invoice.issue_date}\n${invoice.kind === "quote" ? "Valid until" : "Due"}: ${invoice.due_date}\nCurrency: MYR\nStatus: ${invoice.status}`;
     const detailEnd = line(details, 337, y, 9, "Body", muted, 216);
     y = Math.max(clientEnd, detailEnd) + 26;
@@ -161,7 +165,9 @@ export function renderPdf(invoice, payment = null) {
       line("This receipt acknowledges the recorded payment above.", 42, y, 10);
       y = pdf.y + 18;
       line(
-        `Invoice total: ${currency(invoice.total)} | Current balance: ${currency(invoice.balance)}`,
+        payment.receiptMode
+          ? `Allocated: ${currency(invoice.paid)} | Unallocated: ${currency(invoice.balance)} | Refunded: ${currency(payment.refunded || 0)}`
+          : `Invoice total: ${currency(invoice.total)} | Current balance: ${currency(invoice.balance)}`,
         42,
         y,
         10,
@@ -195,12 +201,20 @@ export function renderPdf(invoice, payment = null) {
         y += height;
         rule(y - 6);
       }
-      room(155);
+      room(215);
       y += 10;
       for (const [label, value] of [
         ["Subtotal", invoice.subtotal],
         ["Discount", invoice.discount],
-        ["Total", invoice.total],
+        [
+          invoice.kind === "invoice" ? "Original total" : "Total",
+          invoice.total,
+        ],
+        ...(invoice.credit ? [["Credit notes", -invoice.credit]] : []),
+        ...(invoice.debit ? [["Debit notes", invoice.debit]] : []),
+        ...(invoice.credit || invoice.debit
+          ? [["Adjusted total", invoice.adjusted_total]]
+          : []),
         ...(invoice.kind === "invoice"
           ? [
               ["Paid", invoice.paid],
@@ -232,6 +246,15 @@ export function renderPdf(invoice, payment = null) {
     }
     for (const [heading, value] of [
       [
+        "Adjustments",
+        (invoice.adjustments || [])
+          .map(
+            (a) =>
+              `${a.number} / ${a.kind}: ${currency(a.amount)} / ${a.reason}`,
+          )
+          .join("\n"),
+      ],
+      [
         "Payment information",
         payment
           ? ""
@@ -252,14 +275,39 @@ export function renderPdf(invoice, payment = null) {
       ["Notes", invoice.notes],
     ]) {
       if (!value) continue;
-      pdf.font("Body").fontSize(9);
-      const height = pdf.heightOfString(value, { width: 511 }) + 42;
-      room(height);
+      room(55);
       y += 13;
       line(heading, 42, y, 10, "Bold");
       y += 19;
-      line(value, 42, y, 9, "Body", muted);
-      y = pdf.y + 8;
+      // Wrap long audit/note blocks explicitly so every page retains its footer margin.
+      pdf.font("Body").fontSize(9);
+      const lines = [];
+      for (const paragraph of String(value).split("\n")) {
+        let current = "";
+        for (const word of paragraph.split(/\s+/)) {
+          const candidate = current ? current + " " + word : word;
+          if (pdf.widthOfString(candidate) <= 511) {
+            current = candidate;
+            continue;
+          }
+          if (current) lines.push(current);
+          current = "";
+          for (const char of word) {
+            if (pdf.widthOfString(current + char) > 511) {
+              lines.push(current);
+              current = "";
+            }
+            current += char;
+          }
+        }
+        lines.push(current);
+      }
+      for (const text of lines) {
+        room(18);
+        line(text || " ", 42, y, 9, "Body", muted);
+        y += 16;
+      }
+      y += 8;
     }
     const pages = pdf.bufferedPageRange();
     for (let i = 0; i < pages.count; i++) {
@@ -277,5 +325,65 @@ export function renderPdf(invoice, payment = null) {
       line(`${i + 1} / ${pages.count}`, 511, 788, 7, "Body", muted, 42);
     }
     pdf.end();
+  });
+}
+
+export function renderReceiptPdf(receipt) {
+  const invoice = {
+    kind: "invoice",
+    number: receipt.number,
+    business: receipt.business,
+    client: receipt.client,
+    issue_date: receipt.paid_date,
+    due_date: receipt.paid_date,
+    status: receipt.voided ? "Void" : "Received",
+    items: [],
+    total: receipt.amount,
+    subtotal: receipt.amount,
+    discount: 0,
+    paid: receipt.allocated,
+    balance: receipt.available,
+    terms: "",
+    notes:
+      "Allocations are recorded separately from cash received. A payment allocation reversal is not a bank refund.",
+  };
+  return renderPdf(invoice, {
+    ...receipt,
+    receiptMode: true,
+    refunded: receipt.refunded,
+  });
+}
+export function renderAdjustmentPdf(invoice, note) {
+  const name = {
+    credit: "Credit note",
+    debit: "Debit note",
+    refund: "Refund note",
+  }[note.kind];
+  return renderPdf({
+    ...invoice,
+    kind: note.kind,
+    number: note.number,
+    issue_date: note.issue_date || note.paid_date,
+    due_date: note.issue_date || note.paid_date,
+    status: "Issued",
+    items: [
+      {
+        description: note.reason,
+        quantity: 1,
+        rate: note.amount,
+        amount: note.amount,
+      },
+    ],
+    subtotal: note.amount,
+    discount: 0,
+    total: note.amount,
+    adjusted_total: note.amount,
+    credit: 0,
+    debit: 0,
+    adjustments: [],
+    paid: 0,
+    balance: 0,
+    terms: "",
+    notes: `${name} referencing ${invoice.number}.\n${note.reference ? "Transaction reference: " + note.reference : ""}`,
   });
 }

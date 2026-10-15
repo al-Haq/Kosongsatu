@@ -12,6 +12,11 @@ import {
 } from "../server/domain.mjs";
 const fixture = () => {
   const store = openDatabase(":memory:");
+  store.saveSettings({
+    registration: "TEST-001",
+    address: "Test office",
+    email: "billing@example.com",
+  });
   const client = store.saveClient({
     name: "Test client",
     email: "billing@example.com",
@@ -251,6 +256,11 @@ test("SQLite records survive closing and reopening the application store", async
   let store;
   try {
     store = openDatabase(join(dir, "test.sqlite"));
+    store.saveSettings({
+      registration: "TEST-001",
+      address: "Test office",
+      email: "billing@example.com",
+    });
     const c = store.saveClient({ name: "Persistent client" });
     const d = store.saveDocument({
       kind: "invoice",
@@ -262,6 +272,11 @@ test("SQLite records survive closing and reopening the application store", async
     store.issue(d.id);
     store.db.close();
     store = openDatabase(join(dir, "test.sqlite"));
+    store.saveSettings({
+      registration: "TEST-001",
+      address: "Test office",
+      email: "billing@example.com",
+    });
     assert.equal(store.document(d.id).client.name, "Persistent client");
     assert.equal(store.document(d.id).total, 10000);
     assert.equal(store.document(d.id).state, "issued");

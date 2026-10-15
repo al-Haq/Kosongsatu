@@ -1,3 +1,8 @@
+import { migrate } from "./migrations.mjs";
+import { requestContext } from "./context.mjs";
+import { attachFinance } from "./finance.mjs";
+import { attachBanking } from "./banking.mjs";
+import { loadMfaKey } from "./mfa.mjs";
 import { DatabaseSync } from "node:sqlite";
 import { readFileSync, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
@@ -41,14 +46,30 @@ export function openDatabase(path) {
   db.prepare("INSERT OR IGNORE INTO settings(id,data) VALUES(1,?)").run(
     JSON.stringify(defaults),
   );
-  return new Store(db);
+  migrate(db, path);
+  const store = new Store(db);
+  store.path = path;
+  try {
+    store.mfaKey = loadMfaKey(
+      path,
+      !!db
+        .prepare("SELECT id FROM owners WHERE mfa_secret IS NOT NULL LIMIT 1")
+        .get(),
+    );
+    return store;
+  } catch (e) {
+    db.close();
+    throw e;
+  }
 }
 export class Store {
   constructor(db) {
     this.db = db;
   }
   tx(fn) {
+    if (this._transaction) return fn();
     this.db.exec("BEGIN IMMEDIATE");
+    this._transaction = true;
     try {
       const r = fn();
       this.db.exec("COMMIT");
@@ -56,14 +77,24 @@ export class Store {
     } catch (e) {
       this.db.exec("ROLLBACK");
       throw e;
+    } finally {
+      this._transaction = false;
     }
   }
-  audit(action, entity, detail = "") {
+  audit(action, entity, detail = "", before = null, after = null) {
     this.db
       .prepare(
-        "INSERT INTO audit(action,entity_id,detail,created) VALUES(?,?,?,?)",
+        "INSERT INTO audit(action,entity_id,detail,created,actor,before_data,after_data) VALUES(?,?,?,?,?,?,?)",
       )
-      .run(action, entity, detail, now());
+      .run(
+        action,
+        entity,
+        detail,
+        now(),
+        requestContext.getStore()?.actor || "system",
+        before === null ? null : JSON.stringify(before),
+        after === null ? null : JSON.stringify(after),
+      );
   }
   settings() {
     return JSON.parse(
@@ -483,11 +514,13 @@ export class Store {
       service_id: b.service_id,
       next_date: date(b.next_date),
       terms: integer(b.terms ?? 14, 0, 365),
+      anchor_day: Number(b.next_date.slice(-2)),
+      month_end: b.month_end === true ? 1 : 0,
       created: now(),
     };
     this.db
       .prepare(
-        "INSERT INTO schedules(id,client_id,service_id,next_date,terms,created) VALUES(:id,:client_id,:service_id,:next_date,:terms,:created)",
+        "INSERT INTO schedules(id,client_id,service_id,next_date,terms,anchor_day,month_end,created) VALUES(:id,:client_id,:service_id,:next_date,:terms,:anchor_day,:month_end,:created)",
       )
       .run(s);
     this.audit("schedule.created", s.id);
@@ -528,7 +561,7 @@ export class Store {
         .run(sid, s.next_date, d.id);
       this.db
         .prepare("UPDATE schedules SET next_date=? WHERE id=?")
-        .run(nextMonth(s.next_date), sid);
+        .run(nextMonth(s.next_date, s.anchor_day, s.month_end), sid);
       this.audit("schedule.draft.created", sid, d.id);
       return d;
     });
@@ -549,3 +582,6 @@ export class Store {
     };
   }
 }
+
+attachFinance(Store);
+attachBanking(Store);

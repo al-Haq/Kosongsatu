@@ -1,6 +1,6 @@
 {
   "name": "nawlogic-invoice",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "description": "Nawlogic invoicing workspace - owner billing and secure client documents",
@@ -13,7 +13,10 @@
     "setup": "node --env-file-if-exists=.env server/cli.mjs setup",
     "demo": "node server/cli.mjs demo",
     "test": "node --test test/*.test.mjs",
-    "check": "node scripts/check.mjs"
+    "check": "node scripts/check.mjs",
+    "backup": "node --env-file-if-exists=.env server/cli.mjs backup",
+    "restore": "node --env-file-if-exists=.env server/cli.mjs restore",
+    "recover": "node --env-file-if-exists=.env server/cli.mjs recover"
   },
   "dependencies": {
     "pdfkit": "0.20.2"

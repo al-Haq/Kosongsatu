@@ -57,3 +57,19 @@ test("long invoice paginates without one extra page per footer", async () => {
   assert.ok(pageCount(pdf) >= 3);
   assert.ok(pageCount(pdf) <= 8);
 });
+
+test("multiple long adjustment reasons paginate within the content margin", async () => {
+  const d = fixture();
+  d.credit = 1000;
+  d.debit = 500;
+  d.adjusted_total = d.total - 500;
+  d.adjustments = Array.from({ length: 12 }, (_, i) => ({
+    number: "CN-2026-" + String(i + 1).padStart(5, "0"),
+    kind: "credit",
+    amount: 100,
+    reason: "Reduced scope and agreed handover. ".repeat(25),
+  }));
+  const pdf = await renderPdf(d);
+  assert.ok(pageCount(pdf) >= 4);
+  assert.ok(pageCount(pdf) <= 12);
+});

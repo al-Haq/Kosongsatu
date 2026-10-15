@@ -101,7 +101,7 @@ export function addDays(value, n) {
   return d.toISOString().slice(0, 10);
 }
 // Clamp month-end (31 Jan -> 28/29 Feb), instead of skipping February.
-export function nextMonth(value) {
+export function nextMonth(value, anchorDay = null, monthEnd = false) {
   const d = new Date(value + "T00:00:00Z");
   const day = d.getUTCDate();
   d.setUTCDate(1);
@@ -109,7 +109,7 @@ export function nextMonth(value) {
   const end = new Date(
     Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0),
   ).getUTCDate();
-  d.setUTCDate(Math.min(day, end));
+  d.setUTCDate(monthEnd ? end : Math.min(anchorDay ?? day, end));
   return d.toISOString().slice(0, 10);
 }
 export function status(doc, paid = 0, asOf = today()) {

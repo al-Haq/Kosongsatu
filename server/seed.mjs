@@ -40,13 +40,11 @@ export function seedDemo(store) {
     });
   const d = draft(
     a,
-    services
-      .slice(0, 3)
-      .map((s) => ({
-        description: s.name,
-        quantity: 1,
-        rate: (s.rate / 100).toFixed(2),
-      })),
+    services.slice(0, 3).map((s) => ({
+      description: s.name,
+      quantity: 1,
+      rate: (s.rate / 100).toFixed(2),
+    })),
   );
   store.issue(d.id);
   store.recordPayment(d.id, {

@@ -1,7 +1,10 @@
+import { financeUI } from "./finance.mjs";
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
 const app = $("#app"),
   modal = $("#modal");
+let advanced;
+const requestKeys = new Map();
 let S = null,
   session = null,
   filter = "All",
@@ -83,14 +86,22 @@ function toast(message, error = false) {
   toastTimer = setTimeout(() => (t.className = ""), 5500);
 }
 async function api(path, method = "GET", body) {
+  const retryable =
+    method === "POST" &&
+    /^\/(documents|receipts|bank|clients|services|schedules)/.test(path);
+  const requestId = method + ":" + path + ":" + JSON.stringify(body);
+  if (retryable && !requestKeys.has(requestId))
+    requestKeys.set(requestId, crypto.randomUUID());
   const response = await fetch("/api" + path, {
     method,
     headers: {
+      ...(retryable ? { "Idempotency-Key": requestKeys.get(requestId) } : {}),
       ...(body ? { "Content-Type": "application/json" } : {}),
       ...(method !== "GET" && session ? { "X-CSRF-Token": session.csrf } : {}),
     },
     ...(body ? { body: JSON.stringify(body) } : {}),
   });
+  if (response.ok || response.status < 500) requestKeys.delete(requestId);
   let data;
   try {
     data = await response.json();
@@ -141,7 +152,7 @@ const clientOptions = () => [
   ...S.clients.map((c) => [c.id, c.name]),
 ];
 function renderLogin() {
-  app.innerHTML = `<div class="login-screen"><section class="login-brand"><span class="eyebrow">NAWLOGIC / BILLING WORKSPACE</span><h1>Good work deserves<br><span class="accent">a clear invoice.</span></h1><p>From the first quotation to the final receipt. A quieter way to keep your business moving.</p><div class="login-points"><span>${icon("doc")}Create with confidence</span><span>${icon("wallet")}Track every payment</span><span>${icon("shield")}Your private workspace</span></div></section><section class="login-form"><div class="login-inner">${logo()}<h2>Welcome back.</h2><p>Sign in to your Nawlogic workspace.</p><form data-form="login">${input("Email address", "email", "", "email", true, 'autocomplete="username" maxlength="160"')}${input("Password", "password", "", "password", true, 'autocomplete="current-password" maxlength="256"')}${errorBlock()}<button class="btn primary" type="submit">Sign in ${icon("arrow")}</button></form><div class="login-footer">${icon("shield")} Owner access only. Customer invoices use a separate private link.</div></div></section></div>`;
+  app.innerHTML = `<div class="login-screen"><section class="login-brand"><span class="eyebrow">NAWLOGIC / BILLING WORKSPACE</span><h1>Good work deserves<br><span class="accent">a clear invoice.</span></h1><p>From the first quotation to the final receipt. A quieter way to keep your business moving.</p><div class="login-points"><span>${icon("doc")}Create with confidence</span><span>${icon("wallet")}Track every payment</span><span>${icon("shield")}Your private workspace</span></div></section><section class="login-form"><div class="login-inner">${logo()}<h2>Welcome back.</h2><p>Sign in to your Nawlogic workspace.</p><form data-form="login">${input("Email address", "email", "", "email", true, 'autocomplete="username" maxlength="160"')}${input("Password", "password", "", "password", true, 'autocomplete="current-password" maxlength="256"')}${input("Authenticator or recovery code (if enabled)", "code", "", "text", false, 'autocomplete="one-time-code" maxlength="40"')}${errorBlock()}<button class="btn primary" type="submit">Sign in ${icon("arrow")}</button></form><div class="login-footer">${icon("shield")} Owner access only. Customer invoices use a separate private link.</div></div></section></div>`;
 }
 const navItems = [
   ["overview", "Overview", "grid"],
@@ -151,6 +162,8 @@ const navItems = [
   ["services", "Services", "box"],
   ["recurring", "Recurring", "clock"],
   ["payments", "Payments", "wallet"],
+  ["ledger", "Cash & credits", "wallet"],
+  ["bank", "Bank matching", "trend"],
   ["settings", "Settings", "settings"],
 ];
 function renderShell(html, active) {
@@ -164,7 +177,7 @@ function invoiceTable(docs) {
       "No matching documents",
       "Create your first invoice or change the filters.",
     );
-  return `<div class="table-wrap"><table><caption class="sr-only">Billing documents</caption><thead><tr><th>Document</th><th>Client</th><th>Due / valid until</th><th class="num">Total</th><th class="num">Balance</th><th>Status</th><th><span class="sr-only">Action</span></th></tr></thead><tbody>${docs.map((d) => `<tr><td><button class="link-button" data-action="open-document" data-id="${d.id}">${E(d.number || "Draft")} ${!d.number ? "<small>" + d.id.slice(0, 8) + "</small>" : ""}</button></td><td>${E(d.client.name)}</td><td>${dateLabel(d.due_date)}</td><td class="num">${money(d.total)}</td><td class="num">${d.kind === "quote" || d.state === "void" ? "—" : money(d.balance)}</td><td>${badge(d.status)}</td><td><button class="btn ghost small" data-action="open-document" data-id="${d.id}" aria-label="Open ${E(d.number || "draft")}">${icon("arrow")}</button></td></tr>`).join("")}</tbody></table></div>`;
+  return `<div class="table-wrap"><table><caption class="sr-only">Billing documents</caption><thead><tr><th>Document</th><th>Client</th><th>Due / valid until</th><th class="num">Total</th><th class="num">Balance</th><th>Status</th><th><span class="sr-only">Action</span></th></tr></thead><tbody>${docs.map((d) => `<tr><td><button class="link-button" data-action="open-document" data-id="${d.id}">${E(d.number || "Draft")} ${!d.number ? "<small>" + d.id.slice(0, 8) + "</small>" : ""}</button></td><td>${E(d.client.name)}</td><td>${dateLabel(d.due_date)}</td><td class="num">${money(d.adjusted_total ?? d.total)}</td><td class="num">${d.kind === "quote" || d.state === "void" ? "—" : money(d.balance)}</td><td>${badge(d.status)}</td><td><button class="btn ghost small" data-action="open-document" data-id="${d.id}" aria-label="Open ${E(d.number || "draft")}">${icon("arrow")}</button></td></tr>`).join("")}</tbody></table></div>`;
 }
 function overview() {
   const invoices = S.documents.filter(
@@ -173,11 +186,27 @@ function overview() {
     month = S.today.slice(0, 7),
     outstanding = invoices.filter((d) => d.balance > 0),
     overdue = invoices.filter((d) => d.status === "Overdue"),
-    payments = invoices.flatMap((d) => d.payments.filter((p) => !p.reversed));
+    payments = S.finance.receipts.flatMap((r) =>
+      r.voided
+        ? []
+        : [
+            { paid_date: r.paid_date, amount: r.amount },
+            ...r.refunds.map((f) => ({
+              paid_date: f.paid_date,
+              amount: -f.amount,
+            })),
+          ],
+    );
   const sums = [
     invoices
       .filter((d) => d.issue_date.startsWith(month))
-      .reduce((s, d) => s + d.total, 0),
+      .reduce((s, d) => s + d.total, 0) +
+      S.finance.adjustments
+        .filter((a) => a.issue_date.startsWith(month))
+        .reduce(
+          (sum, a) => sum + (a.kind === "credit" ? -a.amount : a.amount),
+          0,
+        ),
     payments
       .filter((p) => p.paid_date.startsWith(month))
       .reduce((s, p) => s + p.amount, 0),
@@ -194,7 +223,7 @@ function overview() {
         .reduce((s, p) => s + p.amount, 0),
     };
   });
-  const max = Math.max(1, ...weeks.map((w) => w.value));
+  const max = Math.max(1, ...weeks.map((w) => Math.abs(w.value)));
   return (
     heading(
       "Your billing, at a glance.",
@@ -204,7 +233,7 @@ function overview() {
     (!S.settings.bankAccount
       ? `<div class="notice info">${icon("settings")}<p>Add your company details and payment instructions before sharing a real invoice.</p><a href="#/settings">Open settings →</a></div>`
       : "") +
-    `<div class="metrics">${["Invoiced this month", "Collected this month", "Outstanding", "Overdue"].map((label, i) => `<div class="metric"><span class="metric-icon">${icon(["doc", "wallet", "clock", "trend"][i])}</span><div class="label">${label}</div><div class="value ${i === 1 ? "teal" : i === 3 ? "red-text" : ""}">${money(sums[i])}</div><div class="hint">${["Issued invoice value", "Confirmed payments only", `${outstanding.length} unpaid invoices / all dates`, `${overdue.length} invoices need attention`][i]}</div></div>`).join("")}</div><div class="grid-2"><section class="panel"><div class="panel-head"><div><h2>Payment collection</h2><p>Confirmed receipts over the last four weeks</p></div>${badge("MYR")}</div><div class="chart">${weeks.map((w) => `<div class="bar-col"><strong>${money(w.value)}</strong><div class="bar" data-height="${Math.round((w.value / max) * 150) + 3}"></div><span>${w.label}</span></div>`).join("")}</div></section><section class="panel"><div class="panel-head"><div><h2>Needs your attention</h2><p>Outstanding invoices, oldest due first</p></div><a href="#/invoices">View all →</a></div>${
+    `<div class="metrics">${["Net invoiced this month", "Net customer cash", "Outstanding", "Overdue"].map((label, i) => `<div class="metric"><span class="metric-icon">${icon(["doc", "wallet", "clock", "trend"][i])}</span><div class="label">${label}</div><div class="value ${i === 1 ? "teal" : i === 3 ? "red-text" : ""}">${money(sums[i])}</div><div class="hint">${["Invoices + debit notes - credit notes", "Receipts less refunds / this month", `${outstanding.length} unpaid invoices / all dates`, `${overdue.length} invoices need attention`][i]}</div></div>`).join("")}</div><div class="grid-2"><section class="panel"><div class="panel-head"><div><h2>Payment collection</h2><p>Net customer cash over the last four weeks</p></div>${badge("MYR")}</div><div class="chart">${weeks.map((w) => `<div class="bar-col"><strong>${money(w.value)}</strong><div class="bar ${w.value < 0 ? "outflow" : ""}" data-height="${Math.round((Math.abs(w.value) / max) * 150) + 3}"></div><span>${w.label}</span></div>`).join("")}</div></section><section class="panel"><div class="panel-head"><div><h2>Needs your attention</h2><p>Outstanding invoices, oldest due first</p></div><a href="#/invoices">View all →</a></div>${
       [...outstanding]
         .sort((a, b) => a.due_date.localeCompare(b.due_date))
         .slice(0, 4)
@@ -342,13 +371,13 @@ function payments() {
   return (
     heading(
       "Payments",
-      "Confirmed receipts and client references awaiting your review.",
+      "Amounts applied to invoices. Cash & credits shows money received once.",
       button("Record payment", "choose-payment", "", true, "plus"),
     ) +
     (proofs.length
       ? `<section class="panel mb22"><div class="panel-head"><h2>Awaiting review</h2>${badge("Pending review")}</div>${proofs.map((p) => `<div class="attention"><div><strong>${E(p.document.number)} / ${E(p.document.client.name)}</strong><small>Reference: ${E(p.reference)}${p.note ? " / " + E(p.note) : ""}</small></div>${button("Review invoice", "open-document", p.document.id)}</div>`).join("")}</section>`
       : "") +
-    `<section class="panel">${all.length ? `<div class="table-wrap"><table><thead><tr><th>Payment / invoice</th><th>Received</th><th>Method</th><th>Reference</th><th class="num">Amount</th><th>Status</th><th>Receipt</th></tr></thead><tbody>${all.map((p) => `<tr><td><button class="link-button" data-action="open-document" data-id="${p.document.id}">${E(p.document.number)}</button><small>${E(p.document.client.name)}</small></td><td>${dateLabel(p.paid_date)}</td><td>${E(p.method)}</td><td>${E(p.reference)}</td><td class="num">${money(p.amount)}</td><td>${badge(p.reversed ? "Reversed" : "Confirmed")}</td><td>${p.reversed ? "—" : `<a class="btn small" href="/api/payments/${p.id}/receipt">${icon("download")} PDF</a>`}</td></tr>`).join("")}</tbody></table></div>` : empty("No payments recorded", "Record a payment only after checking it was received.")}</section>`
+    `<section class="panel">${all.length ? `<div class="table-wrap"><table><thead><tr><th>Payment / invoice</th><th>Received</th><th>Method</th><th>Reference</th><th class="num">Amount</th><th>Status</th><th>Receipt</th></tr></thead><tbody>${all.map((p) => `<tr><td><button class="link-button" data-action="open-document" data-id="${p.document.id}">${E(p.document.number)}</button><small>${E(p.document.client.name)}</small></td><td>${dateLabel(p.paid_date)}</td><td>${E(p.method)}</td><td>${E(p.reference)}</td><td class="num">${money(p.applied ?? p.amount)}${p.released ? `<small>Released ${money(p.released)}</small>` : ""}</td><td>${badge(p.reversed ? "Reversed" : "Confirmed")}</td><td>${p.reversed ? "—" : `<a class="btn small" href="/api/payments/${p.id}/receipt">${icon("download")} PDF</a>`}</td></tr>`).join("")}</tbody></table></div>` : empty("No payments recorded", "Record a payment only after checking it was received.")}</section>`
   );
 }
 function settings() {
@@ -358,13 +387,13 @@ function settings() {
       "Workspace settings",
       "Your company identity, document defaults and payment instructions.",
     ) +
-    `<div class="grid-equal"><section class="panel"><div class="panel-head"><h2>Brand & company</h2></div>${logo()}<div class="palette"><div class="swatch teal-bg"><span></span>Teal<br>#0EA5A4</div><div class="swatch orange-bg"><span></span>Orange<br>#F97316</div><div class="swatch ink-bg"><span></span>Ink<br>#0F172A</div></div><form data-form="settings"><div class="form-grid">${input("Registered business name", "company", b.company, "text", true, 'maxlength="180"')}${input("Registration number", "registration", b.registration, "text", false, 'maxlength="80"')}${input("Billing email", "email", b.email, "email", false, 'maxlength="160"')}${input("Phone", "phone", b.phone, "text", false, 'maxlength="60"')}<div class="span-2">${area("Business address", "address", b.address, 600)}</div>${input("Invoice prefix", "invoicePrefix", b.invoicePrefix, "text", true, 'pattern="[A-Z][A-Z0-9-]{0,11}" maxlength="12"')}${input("Quotation prefix", "quotePrefix", b.quotePrefix, "text", true, 'pattern="[A-Z][A-Z0-9-]{0,11}" maxlength="12"')}<div class="span-2">${area("Default terms", "paymentTerms", b.paymentTerms)}</div>${input("Bank name", "bankName", b.bankName, "text", false, 'maxlength="100"')}${input("Account number", "bankAccount", b.bankAccount, "text", false, 'maxlength="60"')}<div class="span-2">${input("Account holder", "bankHolder", b.bankHolder, "text", false, 'maxlength="180"')}</div></div>${errorBlock()}<p class="field-hint">Issued documents keep a snapshot of the company and client details. Tax calculation is not configured.</p><div class="form-actions"><button class="btn primary" type="submit">Save settings</button></div></form></section><div class="stack"><section class="panel"><div class="panel-head"><h2>Access & integrations</h2></div><div class="setting-line"><div><h3>Owner access</h3><p>${E(session.email)}</p></div>${badge("Password protected")}</div><div class="setting-line"><div><h3>Client invoice links</h3><p>Document only / 30-day expiry / revocable</p></div>${icon("shield")}</div><div class="setting-line"><div><h3>MyInvois / payment gateway</h3><p>Requires separate integration and validation</p></div>${badge("Not connected")}</div><div class="setting-line"><div><h3>Email & scheduled reminders</h3><p>Manual sharing in this release</p></div>${badge("Not connected")}</div></section><section class="panel"><div class="panel-head"><h2>Account password</h2></div><form data-form="password">${input("Current password", "current", "", "password", true, 'autocomplete="current-password"')}${input("New password (at least 12 characters)", "password", "", "password", true, 'minlength="12" maxlength="256" autocomplete="new-password"')}${errorBlock()}<button type="submit" class="btn">Change password & sign out</button></form></section><section class="panel"><div class="panel-head"><h2>Your business data</h2></div><p>Download a business data export, including documents, payments and audit history. Store it privately.</p><div class="actions mt22"><a class="btn" href="/api/backup">${icon("download")} Export JSON</a><a class="btn" href="/api/invoices.csv">Export CSV</a></div><p class="field-hint">For full disaster recovery, use the SQLite backup procedure in the deployment guide.</p></section></div></div>`
+    `<div class="grid-equal"><section class="panel"><div class="panel-head"><h2>Brand & company</h2></div>${logo()}<div class="palette"><div class="swatch teal-bg"><span></span>Teal<br>#0EA5A4</div><div class="swatch orange-bg"><span></span>Orange<br>#F97316</div><div class="swatch ink-bg"><span></span>Ink<br>#0F172A</div></div><form data-form="settings"><div class="form-grid">${input("Registered business name", "company", b.company, "text", true, 'maxlength="180"')}${input("Registration number", "registration", b.registration, "text", false, 'maxlength="80"')}${input("Billing email", "email", b.email, "email", false, 'maxlength="160"')}${input("Phone", "phone", b.phone, "text", false, 'maxlength="60"')}<div class="span-2">${area("Business address", "address", b.address, 600)}</div>${input("Invoice prefix", "invoicePrefix", b.invoicePrefix, "text", true, 'pattern="[A-Z][A-Z0-9-]{0,11}" maxlength="12"')}${input("Quotation prefix", "quotePrefix", b.quotePrefix, "text", true, 'pattern="[A-Z][A-Z0-9-]{0,11}" maxlength="12"')}<div class="span-2">${area("Default terms", "paymentTerms", b.paymentTerms)}</div>${input("Bank name", "bankName", b.bankName, "text", false, 'maxlength="100"')}${input("Account number", "bankAccount", b.bankAccount, "text", false, 'maxlength="60"')}<div class="span-2">${input("Account holder", "bankHolder", b.bankHolder, "text", false, 'maxlength="180"')}</div></div>${errorBlock()}<p class="field-hint">Issued documents keep a snapshot of the company and client details. Tax calculation is not configured.</p><div class="form-actions"><button class="btn primary" type="submit">Save settings</button></div></form></section><div class="stack"><section class="panel"><div class="panel-head"><h2>Access & integrations</h2></div><div class="setting-line"><div><h3>Owner access</h3><p>${E(session.email)}</p></div>${badge("Password protected")}</div><div class="setting-line"><div><h3>Client invoice links</h3><p>Document only / 1–90 days / revocable</p></div>${icon("shield")}</div><div class="setting-line"><div><h3>MyInvois / payment gateway</h3><p>Requires separate integration and validation</p></div>${badge("Not connected")}</div><div class="setting-line"><div><h3>Email & scheduled reminders</h3><p>Manual sharing in this release</p></div>${badge("Not connected")}</div></section><section class="panel"><div class="panel-head"><h2>Account password</h2></div><form data-form="password">${input("Current password", "current", "", "password", true, 'autocomplete="current-password"')}${input("New password (at least 12 characters)", "password", "", "password", true, 'minlength="12" maxlength="256" autocomplete="new-password"')}${S.security.enabled ? input("Authenticator or recovery code", "code", "", "text", true, 'autocomplete="one-time-code"') : ""}${errorBlock()}<button type="submit" class="btn">Change password & sign out</button></form></section><section class="panel"><div class="panel-head"><h2>Your business data</h2></div><p>Download a business data export, including documents, payments and audit history. Store it privately.</p><div class="actions mt22"><a class="btn" href="/api/backup">${icon("download")} Export JSON</a><a class="btn" href="/api/invoices.csv">Export CSV</a></div><p class="field-hint">For full disaster recovery, use the encrypted backup and restore procedure in the deployment guide.</p></section></div></div>`
   );
 }
 function paper(d, publicView = false) {
   const b = d.business,
     c = d.client;
-  return `<section class="panel invoice-paper"><div class="paper-head"><div>${logo()}<div class="paper-company"><strong>${E(b.company)}</strong><p>${E([b.registration ? `Reg: ${b.registration}` : "", b.address, b.email, b.phone].filter(Boolean).join("\n"))}</p></div></div><div><h2>${d.kind === "quote" ? "QUOTATION" : "INVOICE"}</h2><p>${E(d.number || "Draft — not issued")}</p></div></div>${b.demo ? '<div class="notice">Demo document. No real transaction.</div>' : ""}<div class="billing-grid"><div><div class="eyebrow">Bill to</div><strong>${E(c.name)}</strong><p>${E([c.contact, c.address].filter(Boolean).join("\n"))}</p></div><div><div class="eyebrow">Document details</div><p>Issue date: ${dateLabel(d.issue_date)}<br>${d.kind === "quote" ? "Valid until" : "Due date"}: ${dateLabel(d.due_date)}<br>Currency: MYR</p></div></div><div class="table-wrap"><table><thead><tr><th>Description</th><th class="num line-qty">Qty</th><th class="num line-rate">Rate</th><th class="num">Amount</th></tr></thead><tbody>${d.items.map((i) => `<tr><td class="quote-scope">${E(i.description)}<small class="mobile-line-meta">${i.quantity} × ${money(i.rate)}</small></td><td class="num line-qty">${i.quantity}</td><td class="num line-rate">${money(i.rate)}</td><td class="num">${money(i.amount)}</td></tr>`).join("")}</tbody></table></div><div class="totals"><div class="total-row"><span>Subtotal</span><strong>${money(d.subtotal)}</strong></div>${d.discount ? `<div class="total-row"><span>Discount</span><strong>−${money(d.discount)}</strong></div>` : ""}<div class="total-row emphasis"><span>Total</span><span>${money(d.total)}</span></div>${d.kind === "invoice" ? `<div class="total-row"><span>Paid</span><strong>${money(d.paid)}</strong></div><div class="total-row emphasis"><span>Balance due</span><span>${money(d.balance)}</span></div>` : ""}</div>${d.kind === "invoice" && d.state !== "void" ? `<div class="paper-notes"><h3>Payment information</h3>${b.bankAccount ? `<p>${E([b.bankName, b.bankHolder, b.bankAccount].filter(Boolean).join("\n"))}</p><p>Reference: ${E(d.number || "Not yet issued")}</p>` : "<p>Bank details are not configured. Contact Nawlogic before paying.</p>"}</div>` : ""}${d.terms ? `<div class="paper-notes"><h3>Terms</h3><p>${E(d.terms)}</p></div>` : ""}${d.notes ? `<div class="paper-notes"><h3>Notes</h3><p>${E(d.notes)}</p></div>` : ""}${publicView ? '<p class="field-hint">Business document. Not a validated MyInvois e-Invoice.</p>' : ""}</section>`;
+  return `<section class="panel invoice-paper"><div class="paper-head"><div>${logo()}<div class="paper-company"><strong>${E(b.company)}</strong><p>${E([b.registration ? `Reg: ${b.registration}` : "", b.address, b.email, b.phone].filter(Boolean).join("\n"))}</p></div></div><div><h2>${d.kind === "quote" ? "QUOTATION" : "INVOICE"}</h2><p>${E(d.number || "Draft — not issued")}</p></div></div>${b.demo ? '<div class="notice">Demo document. No real transaction.</div>' : ""}<div class="billing-grid"><div><div class="eyebrow">Bill to</div><strong>${E(c.name)}</strong><p>${E([c.contact, c.address].filter(Boolean).join("\n"))}</p></div><div><div class="eyebrow">Document details</div><p>Issue date: ${dateLabel(d.issue_date)}<br>${d.kind === "quote" ? "Valid until" : "Due date"}: ${dateLabel(d.due_date)}<br>Currency: MYR</p></div></div><div class="table-wrap"><table><thead><tr><th>Description</th><th class="num line-qty">Qty</th><th class="num line-rate">Rate</th><th class="num">Amount</th></tr></thead><tbody>${d.items.map((i) => `<tr><td class="quote-scope">${E(i.description)}<small class="mobile-line-meta">${i.quantity} × ${money(i.rate)}</small></td><td class="num line-qty">${i.quantity}</td><td class="num line-rate">${money(i.rate)}</td><td class="num">${money(i.amount)}</td></tr>`).join("")}</tbody></table></div><div class="totals"><div class="total-row"><span>Subtotal</span><strong>${money(d.subtotal)}</strong></div>${d.discount ? `<div class="total-row"><span>Discount</span><strong>−${money(d.discount)}</strong></div>` : ""}<div class="total-row emphasis"><span>Original total</span><span>${money(d.total)}</span></div>${d.credit ? `<div class="total-row"><span>Credit notes</span><strong>−${money(d.credit)}</strong></div>` : ""}${d.debit ? `<div class="total-row"><span>Debit notes</span><strong>+${money(d.debit)}</strong></div>` : ""}${d.credit || d.debit ? `<div class="total-row emphasis"><span>Adjusted total</span><span>${money(d.adjusted_total)}</span></div>` : ""}${d.kind === "invoice" ? `<div class="total-row"><span>Paid</span><strong>${money(d.paid)}</strong></div><div class="total-row emphasis"><span>Balance due</span><span>${money(d.balance)}</span></div>` : ""}</div>${d.kind === "invoice" && d.state !== "void" ? `<div class="paper-notes"><h3>Payment information</h3>${b.bankAccount ? `<p>${E([b.bankName, b.bankHolder, b.bankAccount].filter(Boolean).join("\n"))}</p><p>Reference: ${E(d.number || "Not yet issued")}</p>` : "<p>Bank details are not configured. Contact Nawlogic before paying.</p>"}</div>` : ""}${d.terms ? `<div class="paper-notes"><h3>Terms</h3><p>${E(d.terms)}</p></div>` : ""}${d.notes ? `<div class="paper-notes"><h3>Notes</h3><p>${E(d.notes)}</p></div>` : ""}${publicView ? '<p class="field-hint">Business document. Not a validated MyInvois e-Invoice.</p>' : ""}</section>`;
 }
 function documentView(id) {
   const d = S.documents.find((d) => d.id === id);
@@ -384,17 +413,17 @@ function documentView(id) {
       d.client.name,
       actions,
     ) +
-    `<div class="doc-grid">${paper(d)}<div class="stack"><section class="panel"><div class="panel-head"><h2>Document status</h2>${badge(d.status)}</div><div class="total-row"><span>Document total</span><strong>${money(d.total)}</strong></div>${d.kind === "invoice" ? `<div class="total-row"><span>Confirmed payments</span><strong>${money(d.paid)}</strong></div><div class="total-row emphasis"><span>Balance</span><span>${money(d.balance)}</span></div>` : ""}${d.state === "draft" ? '<p class="field-hint">Review the client, dates, amounts and terms before issuing. Issuing locks the document.</p>' : ""}${d.kind === "invoice" && d.state === "issued" && d.balance > 0 ? `<div class="actions mt22">${button("Record payment", "record-payment", id, true, "plus")}</div>` : ""}${d.kind === "quote" && d.state === "accepted" ? `<p class="field-hint">Accepted by ${E(d.accepted_name)}</p><div class="mt22">${button("Create / open invoice", "convert-quote", id, true)}</div>` : ""}${d.token_hash ? `<div class="mt22">${button("Revoke client link", "revoke-link", id)}</div>` : ""}${d.state !== "void" ? `<div class="mt22">${button("Void document", "void-document", id)}</div>` : ""}</section>${
+    `<div class="doc-grid">${paper(d)}<div class="stack">${advanced.documentExtras(d)}<section class="panel"><div class="panel-head"><h2>Document status</h2>${badge(d.status)}</div><div class="total-row"><span>Document total</span><strong>${money(d.total)}</strong></div>${d.kind === "invoice" ? `<div class="total-row"><span>Confirmed payments</span><strong>${money(d.paid)}</strong></div><div class="total-row emphasis"><span>Balance</span><span>${money(d.balance)}</span></div>` : ""}${d.state === "draft" ? '<p class="field-hint">Review the client, dates, amounts and terms before issuing. Issuing locks the document.</p>' : ""}${d.kind === "invoice" && d.state === "issued" && d.balance > 0 ? `<div class="actions mt22">${button("Record payment", "record-payment", id, true, "plus")}</div>` : ""}${d.kind === "quote" && d.state === "accepted" ? `<p class="field-hint">Accepted by ${E(d.accepted_name)}</p><div class="mt22">${button("Create / open invoice", "convert-quote", id, true)}</div>` : ""}${d.token_hash ? `<div class="mt22">${button("Revoke client link", "revoke-link", id)}</div>` : ""}${d.state !== "void" ? `<div class="mt22">${button("Void document", "void-document", id)}</div>` : ""}</section>${
       d.proofs.filter((p) => p.status === "pending").length
         ? `<section class="panel"><div class="panel-head"><h2>Awaiting review</h2>${badge("Pending review")}</div>${d.proofs
             .filter((p) => p.status === "pending")
             .map(
               (p) =>
-                `<div class="payment"><strong>${E(p.reference)}</strong><p>${E(p.note || "Client submitted a transaction reference.")}<br>${timeLabel(p.created)}</p><p>Check your bank account before recording a payment.</p></div>`,
+                `<div class="payment"><strong>${E(p.reference)}</strong><p>${E(p.note || "Client submitted a transaction reference.")}<br>${timeLabel(p.created)}</p><p>Check your bank account before recording a payment.</p>${button("Reject reference", "reject-proof", p.id)}</div>`,
             )
             .join("")}</section>`
         : ""
-    }${d.kind === "invoice" ? `<section class="panel"><div class="panel-head"><h2>Payment history</h2></div>${d.payments.map((p) => `<div class="payment"><div class="payment-top"><strong>${money(p.amount)}</strong>${badge(p.reversed ? "Reversed" : "Confirmed")}</div><p>${dateLabel(p.paid_date)} / ${E(p.method)}<br>Reference: ${E(p.reference)}</p>${p.reversed ? `<p>Reversal: ${E(p.reversal_reason)}</p>` : `<div class="payment-actions"><a href="/api/payments/${p.id}/receipt">Receipt PDF</a><button class="link-button red-text" data-action="reverse-payment" data-id="${p.id}">Reverse</button></div>`}</div>`).join("") || "<p>No payments recorded yet.</p>"}</section>` : ""}<section class="panel"><div class="panel-head"><h2>Activity</h2></div><div class="timeline">${events.map((e) => `<div class="timeline-item"><strong>${E(e.action.replaceAll(".", " "))}</strong><small>${timeLabel(e.created)}</small>${e.detail ? `<p>${E(e.detail)}</p>` : ""}</div>`).join("") || "<p>No activity yet.</p>"}</div></section></div></div>`
+    }${d.kind === "invoice" ? `<section class="panel"><div class="panel-head"><h2>Payment history</h2></div>${d.payments.map((p) => `<div class="payment"><div class="payment-top"><strong>${money(p.amount)}</strong>${badge(p.reversed ? "Reversed" : "Confirmed")}</div><p>${dateLabel(p.paid_date)} / ${E(p.method)}<br>Reference: ${E(p.reference)}</p>${p.reversed ? `<p>Reversal: ${E(p.reversal_reason)}</p>` : `<div class="payment-actions"><a href="/api/payments/${p.id}/receipt">Receipt PDF</a><button class="link-button red-text" data-action="reverse-payment" data-id="${p.id}">Reverse</button></div>`}</div>`).join("") || "<p>No payments recorded yet.</p>"}</section>` : ""}<section class="panel"><div class="panel-head"><h2>Activity</h2></div><div class="timeline">${events.map((e) => `<div class="timeline-item"><strong>${E(e.action.replaceAll(".", " "))}</strong><small>${timeLabel(e.created)} / ${E(e.actor || "system")}</small>${e.detail ? `<p>${E(e.detail)}</p>` : ""}</div>`).join("") || "<p>No activity yet.</p>"}</div></section></div></div>`
   );
 }
 function renderRoute() {
@@ -426,11 +455,17 @@ function renderRoute() {
     case "recurring":
       html = recurring();
       break;
+    case "ledger":
+      html = advanced.ledger();
+      break;
+    case "bank":
+      html = advanced.bank();
+      break;
     case "payments":
       html = payments();
       break;
     case "settings":
-      html = settings();
+      html = settings() + advanced.security();
       break;
     case "document":
       html = documentView(id);
@@ -570,7 +605,7 @@ function scheduleForm() {
   }
   showModal(
     "New monthly schedule",
-    `<form data-form="schedule">${select("Client", "client_id", clientOptions())}${select("Monthly service", "service_id", [["", "Select a service"], ...S.services.filter((s) => s.active).map((s) => [s.id, `${s.name} / ${money(s.rate)}`])])}<div class="form-grid">${input("First run date", "next_date", S.today, "date", true)}${input("Payment terms (days)", "terms", 14, "number", true, 'min="0" max="365" step="1"')}</div><div class="notice info"><p>Monthly / draft-first. Generating a draft does not send an invoice or charge the client.</p></div>${formEnd("Save schedule")}</form>`,
+    `<form data-form="schedule">${select("Client", "client_id", clientOptions())}${select("Monthly service", "service_id", [["", "Select a service"], ...S.services.filter((s) => s.active).map((s) => [s.id, `${s.name} / ${money(s.rate)}`])])}<div class="form-grid">${input("First run date", "next_date", S.today, "date", true)}${input("Payment terms (days)", "terms", 14, "number", true, 'min="0" max="365" step="1"')}</div><label class="check-row"><input type="checkbox" name="month_end">Bill on the last day of each month.</label><div class="notice info"><p>Monthly / draft-first. Generating a draft does not send an invoice or charge the client.</p></div>${formEnd("Save schedule")}</form>`,
   );
 }
 function reasonForm(title, type, id) {
@@ -584,10 +619,11 @@ function shareModal(id) {
   const d = S.documents.find((d) => d.id === id);
   showModal(
     "Client document link",
-    `<p>Anyone with this private link can view this document and download its PDF. The link expires in 30 days.</p>${d.token_hash ? '<div class="notice mt22"><p>Replacing the link will immediately disable the previous link. Keep using your existing link unless a replacement is needed.</p></div>' : ""}<div class="actions mt22">${button(d.token_hash ? "Replace existing link" : "Generate private link", "generate-link", id, true)}${d.token_hash ? button("Revoke existing link", "revoke-link", id) : ""}</div>`,
+    `<p>Anyone with this private link can view this document and download its PDF.</p>${input("Link validity (days)", "linkdays", 30, "number", true, 'min="1" max="90" step="1"')}${d.token_hash ? '<div class="notice mt22"><p>Replacing the link will immediately disable the previous link. Keep using your existing link unless a replacement is needed.</p></div>' : ""}<div class="actions mt22">${button(d.token_hash ? "Replace existing link" : "Generate private link", "generate-link", id, true)}${d.token_hash ? button("Revoke existing link", "revoke-link", id) : ""}</div>`,
   );
 }
 async function runAction(action, id, el) {
+  if (await advanced.action(action, id)) return;
   switch (action) {
     case "close-modal":
       modal.close();
@@ -664,7 +700,9 @@ async function runAction(action, id, el) {
       shareModal(id);
       break;
     case "generate-link": {
-      const r = await api(`/documents/${id}/share`, "POST", {});
+      const r = await api(`/documents/${id}/share`, "POST", {
+        days: Number(modal.querySelector("[name=linkdays]")?.value || 30),
+      });
       generatedLink = r.url;
       modal.close();
       await refresh();
@@ -777,7 +815,7 @@ async function renderPublic() {
   try {
     const d = await api(`/public/${token}`);
     document.title = `${d.number} | Nawlogic`;
-    app.innerHTML = `<main class="public-wrap"><header class="public-header">${logo()}<span class="badge">Private client document</span></header><div class="public-top"><div><h1>${d.kind === "quote" ? "Quotation" : "Invoice"} ${E(d.number)}</h1><p>${E(d.client.name)} / ${badge(d.status)}</p></div><div class="actions"><a class="btn" href="/api/public/${token}/pdf">${icon("download")} Download PDF</a></div></div><div class="doc-grid">${paper(d, true)}<aside class="stack"><section class="balance-card"><p>${d.kind === "quote" ? "Quotation total" : "Balance due"}</p><div class="value">${money(d.kind === "quote" ? d.total : d.balance)}</div><p>${d.kind === "quote" ? "Valid until" : "Due"} ${dateLabel(d.due_date)}</p><p>Total ${money(d.total)}${d.kind === "invoice" ? " / Paid " + money(d.paid) : ""}</p></section><section class="panel"><h2>${d.kind === "quote" ? "Your quotation" : "Payment information"}</h2>${d.kind === "quote" ? (d.state === "accepted" ? `<div class="notice info mt22"><p>Accepted by ${E(d.accepted_name)}. Nawlogic will follow up with the next step.</p></div>` : d.status === "Expired" ? '<p class="mt22">This quotation has expired. Contact Nawlogic for an updated quotation.</p>' : `<p class="mt22">Review the scope and terms. Accept when you are ready to proceed.</p><button class="btn primary full" data-action="public-accept">Accept quotation</button>`) : d.balance <= 0 ? '<div class="notice info mt22"><p>Thank you. This invoice is paid in full.</p></div>' : `<p class="mt22">${d.business.bankAccount ? E(d.business.bankName) + "<br>" + E(d.business.bankHolder) + "<br><strong>" + E(d.business.bankAccount) + "</strong>" : "Bank details are not configured. Contact Nawlogic before paying."}</p><p class="field-hint">Use ${E(d.number)} as the bank transfer reference.</p><button class="btn primary full" data-action="public-reference">Submit payment reference</button>`}${d.proofs.length ? `<div class="mt22">${d.proofs.map((p) => `<div class="payment"><strong>${E(p.reference)}</strong><p>${badge(p.status === "pending" ? "Pending review" : p.status === "confirmed" ? "Confirmed" : "Rejected")}</p></div>`).join("")}</div>` : ""}</section></aside></div><footer class="public-footer">Powered by Nawlogic · Keep your document link private.<br>Questions? Contact Nawlogic using the contact details on your document.</footer></main>`;
+    app.innerHTML = `<main class="public-wrap"><header class="public-header">${logo()}<span class="badge">Private client document</span></header><div class="public-top"><div><h1>${d.kind === "quote" ? "Quotation" : "Invoice"} ${E(d.number)}</h1><p>${E(d.client.name)} / ${badge(d.status)}</p></div><div class="actions"><a class="btn" href="/api/public/${token}/pdf">${icon("download")} Download PDF</a></div></div><div class="doc-grid">${paper(d, true)}<aside class="stack"><section class="balance-card"><p>${d.kind === "quote" ? "Quotation total" : "Balance due"}</p><div class="value">${money(d.kind === "quote" ? d.total : d.balance)}</div><p>${d.kind === "quote" ? "Valid until" : "Due"} ${dateLabel(d.due_date)}</p><p>Total ${money(d.adjusted_total ?? d.total)}${d.kind === "invoice" ? " / Paid " + money(d.paid) : ""}</p></section><section class="panel"><h2>${d.kind === "quote" ? "Your quotation" : "Payment information"}</h2>${d.kind === "quote" ? (d.state === "accepted" ? `<div class="notice info mt22"><p>Accepted by ${E(d.accepted_name)}. Nawlogic will follow up with the next step.</p></div>` : d.status === "Expired" ? '<p class="mt22">This quotation has expired. Contact Nawlogic for an updated quotation.</p>' : `<p class="mt22">Review the scope and terms. Accept when you are ready to proceed.</p><button class="btn primary full" data-action="public-accept">Accept quotation</button>`) : d.balance <= 0 ? `<div class="notice info mt22"><p>${d.status === "Credited" ? "This invoice is fully credited. No payment is due." : "Thank you. No further payment is due."}</p></div>` : `<p class="mt22">${d.business.bankAccount ? E(d.business.bankName) + "<br>" + E(d.business.bankHolder) + "<br><strong>" + E(d.business.bankAccount) + "</strong>" : "Bank details are not configured. Contact Nawlogic before paying."}</p><p class="field-hint">Use ${E(d.number)} as the bank transfer reference.</p><button class="btn primary full" data-action="public-reference">Submit payment reference</button>`}${d.proofs.length ? `<div class="mt22">${d.proofs.map((p) => `<div class="payment"><strong>${E(p.reference)}</strong><p>${badge(p.status === "pending" ? "Pending review" : p.status === "confirmed" ? "Confirmed" : "Rejected")}</p></div>`).join("")}</div>` : ""}</section></aside></div><footer class="public-footer">Powered by Nawlogic · Keep your document link private.<br>Questions? Contact Nawlogic using the contact details on your document.</footer></main>`;
   } catch (e) {
     app.innerHTML = `<main class="error-page">${logo()}<h1>This document link is unavailable.</h1><p>${E(e.message)} Contact Nawlogic for a new link.</p></main>`;
   }
@@ -786,6 +824,7 @@ async function submitForm(form) {
   const type = form.dataset.form,
     b = Object.fromEntries(new FormData(form)),
     id = form.dataset.id;
+  if (await advanced.submit(form, b)) return;
   if (type === "login") {
     session = await api("/login", "POST", b);
     await refresh();
@@ -868,7 +907,7 @@ async function submitForm(form) {
     return;
   }
   if (type === "schedule") {
-    await api("/schedules", "POST", b);
+    await api("/schedules", "POST", { ...b, month_end: b.month_end === "on" });
     modal.close();
     await refresh();
     renderRoute();
@@ -987,5 +1026,29 @@ async function boot() {
 }
 document.addEventListener("click", (event) => {
   if (event.target.closest('[data-action="reload"]')) location.reload();
+});
+advanced = financeUI({
+  get: () => S,
+  api,
+  refresh,
+  renderRoute,
+  navigate,
+  showModal,
+  modal,
+  toast,
+  E,
+  money,
+  dec,
+  dateLabel,
+  timeLabel,
+  button,
+  badge,
+  input,
+  area,
+  select,
+  formEnd,
+  heading,
+  empty,
+  icon,
 });
 boot();

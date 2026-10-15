@@ -11,7 +11,16 @@ import {
   cookie,
   passwordHash,
 } from "./auth.mjs";
-import { renderPdf } from "./pdf.mjs";
+import { renderPdf, renderReceiptPdf, renderAdjustmentPdf } from "./pdf.mjs";
+import { requestContext } from "./context.mjs";
+import { BackupManager } from "./recovery.mjs";
+import {
+  mfaStatus,
+  beginMfa,
+  enableMfa,
+  disableMfa,
+  verifySecondFactor,
+} from "./mfa.mjs";
 const publicDir = fileURLToPath(new URL("../public/", import.meta.url));
 const mime = {
   ".html": "text/html; charset=utf-8",
@@ -34,6 +43,11 @@ function safeDoc(d) {
     subtotal: d.subtotal,
     discount: d.discount,
     total: d.total,
+    adjusted_total: d.adjusted_total,
+    credit: d.credit,
+    debit: d.debit,
+    adjustments: d.adjustments,
+    collection_status: d.collection_status,
     paid: d.paid,
     balance: d.balance,
     notes: d.notes,
@@ -61,10 +75,15 @@ export function createApp({
   store,
   appUrl = "http://localhost:3000",
   secure = false,
+  backupConfig = {
+    directory: process.env.BACKUP_DIRECTORY,
+    key: process.env.BACKUP_KEY,
+  },
 } = {}) {
   check(store, "Store required.");
   const allowedOrigin = new URL(appUrl).origin;
   const limits = new Map();
+  const backups = new BackupManager(store, backupConfig);
   const allow = (key, max, ms) => {
     const t = Date.now();
     if (limits.size > 5000) {
@@ -78,347 +97,556 @@ export function createApp({
     limits.set(key, e);
     check(e.count <= max, "Too many attempts. Try again later.", 429);
   };
-  const server = http.createServer(async (req, res) => {
-    const headers = {
-      "X-Content-Type-Options": "nosniff",
-      "X-Frame-Options": "DENY",
-      "Referrer-Policy": "no-referrer",
-      "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
-      "Content-Security-Policy":
-        "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'; object-src 'none'",
-      "Cache-Control": "no-store",
-    };
-    if (secure) headers["Strict-Transport-Security"] = "max-age=31536000";
-    res.setTimeout(20000);
-    const send = (status, data, extra = {}) => {
-      res.writeHead(status, {
-        ...headers,
-        "Content-Type": "application/json; charset=utf-8",
-        ...extra,
-      });
-      res.end(
-        Buffer.isBuffer(data) || typeof data === "string"
-          ? data
-          : JSON.stringify(data),
-      );
-    };
-    try {
-      check(
-        ["GET", "POST", "PUT", "PATCH"].includes(req.method),
-        "Method not allowed.",
-        405,
-      );
-      const url = new URL(req.url, "http://localhost");
-      const path = url.pathname;
-      const method = req.method;
-      if (method !== "GET")
-        check(
-          req.headers.origin === allowedOrigin,
-          "Request origin is not allowed.",
-          403,
-        );
-      const body = async () => {
-        check(
-          (req.headers["content-type"] || "").startsWith("application/json"),
-          "JSON request required.",
-          415,
-        );
-        let data = "";
-        for await (const chunk of req) {
-          data += chunk.toString();
-          check(Buffer.byteLength(data) <= 128000, "Request too large.", 413);
-        }
-        try {
-          const value = JSON.parse(data);
-          check(
-            value && typeof value === "object" && !Array.isArray(value),
-            "JSON object required.",
-          );
-          return value;
-        } catch (e) {
-          if (e instanceof AppError) throw e;
-          throw new AppError("Invalid JSON body.");
-        }
+  const server = http.createServer((req, res) =>
+    requestContext.run({ actor: "anonymous" }, async () => {
+      const headers = {
+        "X-Content-Type-Options": "nosniff",
+        "X-Frame-Options": "DENY",
+        "Referrer-Policy": "no-referrer",
+        "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
+        "Content-Security-Policy":
+          "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'; object-src 'none'",
+        "Cache-Control": "no-store",
       };
-      if (path === "/api/health" && method === "GET")
-        return send(200, { ok: true });
-      if (path === "/api/login" && method === "POST") {
-        allow("login:" + req.socket.remoteAddress, 10, 15 * 60000);
-        const b = await body();
-        const email = text(b.email || "", 160).toLowerCase();
-        const owner = store.db
-          .prepare("SELECT * FROM owners WHERE email=?")
-          .get(email);
-        // Perform a real KDF even for unknown users to avoid a cheap account timing oracle.
-        const fallback = "00000000000000000000000000000000:" + "0".repeat(128);
-        const valid = await verifyPassword(
-          b.password,
-          owner?.password || fallback,
+      if (secure) headers["Strict-Transport-Security"] = "max-age=31536000";
+      res.setTimeout(20000);
+      const send = (status, data, extra = {}) => {
+        res.writeHead(status, {
+          ...headers,
+          "Content-Type": "application/json; charset=utf-8",
+          ...extra,
+        });
+        res.end(
+          Buffer.isBuffer(data) || typeof data === "string"
+            ? data
+            : JSON.stringify(data),
         );
-        check(owner && valid, "Email or password is incorrect.", 401);
-        const s = createSession(store, owner.id);
-        return send(
-          200,
-          { email: owner.email, csrf: s.csrf },
-          { "Set-Cookie": cookie(s.token, secure) },
+      };
+      try {
+        check(
+          ["GET", "POST", "PUT", "PATCH"].includes(req.method),
+          "Method not allowed.",
+          405,
         );
-      }
-      if (path.startsWith("/api/public/")) {
-        const match = path.match(
-          /^\/api\/public\/([\w-]+)(?:\/(pdf|accept|payment-reference))?$/,
-        );
-        check(match, "Not found.", 404);
-        const [, token, action] = match;
-        allow("public:" + req.socket.remoteAddress, 120, 60000);
-        if (method === "GET" && !action)
-          return send(200, safeDoc(store.publicDocument(token, true)));
-        if (method === "GET" && action === "pdf") {
-          const d = store.publicDocument(token);
-          return send(200, await renderPdf(d), {
-            "Content-Type": "application/pdf",
-            "Content-Disposition": `attachment; filename="${d.number}.pdf"`,
-          });
-        }
-        if (method === "POST" && action === "accept") {
-          allow("submit:" + req.socket.remoteAddress, 12, 60000);
-          const b = await body();
-          return send(200, safeDoc(store.accept(token, b.name)));
-        }
-        if (method === "POST" && action === "payment-reference") {
-          allow("submit:" + req.socket.remoteAddress, 12, 60000);
-          return send(201, store.proof(token, await body()));
-        }
-        throw new AppError("Not found.", 404);
-      }
-      if (path.startsWith("/api/")) {
-        const session = sessionFrom(req, store);
-        check(session, "Please sign in.", 401);
+        const url = new URL(req.url, "http://localhost");
+        const path = url.pathname;
+        const method = req.method;
         if (method !== "GET")
           check(
-            req.headers["x-csrf-token"] === session.csrf,
-            "Session verification failed. Refresh and try again.",
+            req.headers.origin === allowedOrigin,
+            "Request origin is not allowed.",
             403,
           );
-        if (path === "/api/session" && method === "GET")
-          return send(200, { email: session.email, csrf: session.csrf });
-        if (path === "/api/logout" && method === "POST") {
-          store.db
-            .prepare("DELETE FROM sessions WHERE hash=?")
-            .run(session.hash);
-          return send(
-            200,
-            { ok: true },
-            { "Set-Cookie": cookie("", secure, true) },
-          );
-        }
-        if (path === "/api/password" && method === "POST") {
-          const b = await body();
-          const owner = store.db
-            .prepare("SELECT * FROM owners WHERE id=?")
-            .get(session.owner_id);
+        const body = async () => {
           check(
-            await verifyPassword(b.current, owner.password),
-            "Current password is incorrect.",
-            403,
+            (req.headers["content-type"] || "").startsWith("application/json"),
+            "JSON request required.",
+            415,
           );
-          const password = await passwordHash(b.password);
-          store.tx(() => {
-            store.db
-              .prepare("UPDATE owners SET password=? WHERE id=?")
-              .run(password, owner.id);
-            store.db
-              .prepare("DELETE FROM sessions WHERE owner_id=?")
-              .run(owner.id);
-            store.audit("password.changed", null);
-          });
-          return send(
-            200,
-            { ok: true },
-            { "Set-Cookie": cookie("", secure, true) },
-          );
-        }
-        if (path === "/api/workspace" && method === "GET")
-          return send(200, store.workspace());
-        if (path === "/api/settings" && method === "PUT")
-          return send(200, store.saveSettings(await body()));
-        if (path === "/api/backup" && method === "GET")
-          return send(
-            200,
-            {
-              schemaVersion: 1,
-              exported: new Date().toISOString(),
-              ...store.workspace(),
-            },
-            {
-              "Content-Disposition":
-                'attachment; filename="nawlogic-business-export.json"',
-            },
-          );
-        if (path === "/api/invoices.csv" && method === "GET") {
-          const lines = [
-            [
-              "Number",
-              "Client",
-              "Issue date",
-              "Due date",
-              "Total MYR",
-              "Paid MYR",
-              "Balance MYR",
-              "Status",
-            ],
-            ...store
-              .documents()
-              .filter((d) => d.kind === "invoice")
-              .map((d) => [
-                d.number || "DRAFT",
-                d.client.name,
-                d.issue_date,
-                d.due_date,
-                (d.total / 100).toFixed(2),
-                (d.paid / 100).toFixed(2),
-                (d.balance / 100).toFixed(2),
-                d.status,
-              ]),
-          ];
-          return send(
-            200,
-            "\uFEFF" + lines.map((r) => r.map(csvCell).join(",")).join("\r\n"),
-            {
-              "Content-Type": "text/csv; charset=utf-8",
-              "Content-Disposition":
-                'attachment; filename="nawlogic-invoices.csv"',
-            },
-          );
-        }
-        const simple = path.match(/^\/api\/(clients|services)(?:\/([\w-]+))?$/);
-        if (simple && ["POST", "PUT"].includes(method)) {
-          const [, kind, idv] = simple;
-          if (idv)
+          const chunks = [];
+          let size = 0;
+          for await (const chunk of req) {
+            size += chunk.length;
+            check(size <= 128000, "Request too large.", 413);
+            chunks.push(chunk);
+          }
+          const data = Buffer.concat(chunks).toString("utf8");
+          try {
+            const value = JSON.parse(data);
             check(
-              store.db.prepare(`SELECT id FROM ${kind} WHERE id=?`).get(idv),
-              "Record not found.",
-              404,
+              value && typeof value === "object" && !Array.isArray(value),
+              "JSON object required.",
             );
+            return value;
+          } catch (e) {
+            if (e instanceof AppError) throw e;
+            throw new AppError("Invalid JSON body.");
+          }
+        };
+        if (path === "/api/health" && method === "GET")
+          return send(200, { ok: true });
+        if (path === "/api/login" && method === "POST") {
+          allow("login:" + req.socket.remoteAddress, 10, 15 * 60000);
           const b = await body();
+          const email = text(b.email || "", 160).toLowerCase();
+          const owner = store.db
+            .prepare("SELECT * FROM owners WHERE email=?")
+            .get(email);
+          // Perform a real KDF even for unknown users to avoid a cheap account timing oracle.
+          const fallback =
+            "00000000000000000000000000000000:" + "0".repeat(128);
+          const valid = await verifyPassword(
+            b.password,
+            owner?.password || fallback,
+          );
+          check(owner && valid, "Email or password is incorrect.", 401);
+          check(
+            verifySecondFactor(store, owner.id, b.code),
+            "Authenticator or recovery code is required/invalid.",
+            401,
+          );
+          requestContext.getStore().actor = "owner:" + owner.email;
+          store.audit("owner.signed_in", String(owner.id));
+          const s = createSession(store, owner.id);
           return send(
-            idv ? 200 : 201,
-            kind === "clients"
-              ? store.saveClient(b, idv)
-              : store.saveService(b, idv),
+            200,
+            { email: owner.email, csrf: s.csrf },
+            { "Set-Cookie": cookie(s.token, secure) },
           );
         }
-        if (path === "/api/documents" && method === "POST")
-          return send(201, store.saveDocument(await body()));
-        const doc = path.match(
-          /^\/api\/documents\/([\w-]+)(?:\/(issue|share|revoke|void|convert|payments|pdf))?$/,
-        );
-        if (doc) {
-          const [, idv, action] = doc;
+        if (path.startsWith("/api/public/")) {
+          const match = path.match(
+            /^\/api\/public\/([\w-]+)(?:\/(pdf|accept|payment-reference))?$/,
+          );
+          check(match, "Not found.", 404);
+          const [, token, action] = match;
+          requestContext.getStore().actor = "client-link";
+          allow("public:" + req.socket.remoteAddress, 120, 60000);
           if (method === "GET" && !action)
-            return send(200, store.document(idv));
-          if (method === "PUT" && !action)
-            return send(200, store.saveDocument(await body(), idv));
+            return send(200, safeDoc(store.publicDocument(token, true)));
           if (method === "GET" && action === "pdf") {
-            const d = store.document(idv);
+            const d = store.publicDocument(token);
             return send(200, await renderPdf(d), {
               "Content-Type": "application/pdf",
-              "Content-Disposition": `attachment; filename="${d.number || "DRAFT"}.pdf"`,
+              "Content-Disposition": `attachment; filename="${d.number}.pdf"`,
             });
           }
-          if (method === "POST" && action === "issue")
-            return send(200, store.issue(idv));
-          if (method === "POST" && action === "share") {
-            const result = store.share(idv);
+          if (method === "POST" && action === "accept") {
+            allow("submit:" + req.socket.remoteAddress, 12, 60000);
+            const b = await body();
+            return send(200, safeDoc(store.accept(token, b.name)));
+          }
+          if (method === "POST" && action === "payment-reference") {
+            allow("submit:" + req.socket.remoteAddress, 12, 60000);
+            return send(201, store.proof(token, await body()));
+          }
+          throw new AppError("Not found.", 404);
+        }
+        if (path.startsWith("/api/")) {
+          const session = sessionFrom(req, store);
+          check(session, "Please sign in.", 401);
+          requestContext.getStore().actor = "owner:" + session.email;
+          const write = (scope, payload, fn) =>
+            store.idempotent(
+              scope,
+              req.headers["idempotency-key"],
+              payload,
+              fn,
+            );
+          if (method !== "GET")
+            check(
+              req.headers["x-csrf-token"] === session.csrf,
+              "Session verification failed. Refresh and try again.",
+              403,
+            );
+          if (path === "/api/session" && method === "GET")
+            return send(200, { email: session.email, csrf: session.csrf });
+          if (path === "/api/logout" && method === "POST") {
+            store.db
+              .prepare("DELETE FROM sessions WHERE hash=?")
+              .run(session.hash);
+            return send(
+              200,
+              { ok: true },
+              { "Set-Cookie": cookie("", secure, true) },
+            );
+          }
+          if (path === "/api/password" && method === "POST") {
+            const b = await body();
+            const owner = store.db
+              .prepare("SELECT * FROM owners WHERE id=?")
+              .get(session.owner_id);
+            check(
+              await verifyPassword(b.current, owner.password),
+              "Current password is incorrect.",
+              403,
+            );
+            check(
+              verifySecondFactor(store, session.owner_id, b.code),
+              "Authenticator or recovery code is required/invalid.",
+              403,
+            );
+            const password = await passwordHash(b.password);
+            store.tx(() => {
+              store.db
+                .prepare("UPDATE owners SET password=? WHERE id=?")
+                .run(password, owner.id);
+              store.db
+                .prepare("DELETE FROM sessions WHERE owner_id=?")
+                .run(owner.id);
+              store.audit("password.changed", null);
+            });
+            return send(
+              200,
+              { ok: true },
+              { "Set-Cookie": cookie("", secure, true) },
+            );
+          }
+          if (path === "/api/workspace" && method === "GET")
             return send(200, {
-              url: `${allowedOrigin}/client/${result.token}`,
-              expires: result.expires,
+              ...store.workspace(),
+              finance: store.finance(),
+              security: mfaStatus(store, session.owner_id),
+              backupStatus: backups.status(),
             });
+          if (path === "/api/settings" && method === "PUT")
+            return send(200, store.saveSettings(await body()));
+          if (path === "/api/backup" && method === "GET")
+            return send(
+              200,
+              {
+                schemaVersion: 2,
+                exported: new Date().toISOString(),
+                ...store.workspace(),
+                finance: store.finance(),
+                audit: store.db
+                  .prepare("SELECT * FROM audit ORDER BY id")
+                  .all(),
+              },
+              {
+                "Content-Disposition":
+                  'attachment; filename="nawlogic-business-export.json"',
+              },
+            );
+          if (path === "/api/invoices.csv" && method === "GET") {
+            const lines = [
+              [
+                "Number",
+                "Client",
+                "Issue date",
+                "Due date",
+                "Total MYR",
+                "Paid MYR",
+                "Balance MYR",
+                "Status",
+              ],
+              ...store
+                .documents()
+                .filter((d) => d.kind === "invoice")
+                .map((d) => [
+                  d.number || "DRAFT",
+                  d.client.name,
+                  d.issue_date,
+                  d.due_date,
+                  ((d.adjusted_total ?? d.total) / 100).toFixed(2),
+                  (d.paid / 100).toFixed(2),
+                  (d.balance / 100).toFixed(2),
+                  d.status,
+                ]),
+            ];
+            return send(
+              200,
+              "\uFEFF" +
+                lines.map((r) => r.map(csvCell).join(",")).join("\r\n"),
+              {
+                "Content-Type": "text/csv; charset=utf-8",
+                "Content-Disposition":
+                  'attachment; filename="nawlogic-invoices.csv"',
+              },
+            );
           }
-          if (method === "POST" && action === "revoke") {
-            store.revoke(idv);
-            return send(200, { ok: true });
+          if (path === "/api/recovery/status" && method === "GET")
+            return send(200, backups.status());
+          if (path === "/api/recovery/backup" && method === "POST")
+            return send(201, await backups.run());
+          const mfa = path.match(/^\/api\/mfa\/(status|begin|enable|disable)$/);
+          if (mfa) {
+            const action = mfa[1];
+            if (action === "status" && method === "GET")
+              return send(200, mfaStatus(store, session.owner_id));
+            if (method === "POST") {
+              allow("mfa:" + session.owner_id, 8, 5 * 60000);
+              const b = await body();
+              const owner = store.db
+                .prepare("SELECT * FROM owners WHERE id=?")
+                .get(session.owner_id);
+              check(
+                await verifyPassword(b.password, owner.password),
+                "Current password is incorrect.",
+                403,
+              );
+              if (action === "begin")
+                return send(200, beginMfa(store, owner.id));
+              if (action === "enable")
+                return send(
+                  200,
+                  enableMfa(store, owner.id, b.code, session.hash),
+                );
+              if (action === "disable") {
+                check(
+                  verifySecondFactor(store, owner.id, b.code),
+                  "Authenticator or recovery code is invalid.",
+                  403,
+                );
+                disableMfa(store, owner.id, session.hash);
+                return send(200, { ok: true });
+              }
+            }
           }
-          if (method === "POST" && action === "void")
-            return send(200, store.void(idv, (await body()).reason));
-          if (method === "POST" && action === "convert")
-            return send(200, store.convert(idv));
-          if (method === "POST" && action === "payments")
-            return send(201, store.recordPayment(idv, await body()));
-        }
-        const payment = path.match(
-          /^\/api\/payments\/([\w-]+)\/(reverse|receipt)$/,
-        );
-        if (payment) {
-          const [, pid, action] = payment;
-          if (action === "reverse" && method === "POST") {
-            store.reverse(pid, (await body()).reason);
-            return send(200, { ok: true });
+          if (path === "/api/receipts" && method === "POST") {
+            const b = await body();
+            return send(
+              201,
+              write("receipt.create", b, () => store.receive(b)),
+            );
           }
-          if (action === "receipt" && method === "GET") {
-            const p = store.db
-              .prepare("SELECT * FROM payments WHERE id=? AND reversed=0")
-              .get(pid);
-            check(p, "Active payment not found.", 404);
-            const d = store.document(p.invoice_id);
-            return send(200, await renderPdf(d, p), {
-              "Content-Type": "application/pdf",
-              "Content-Disposition": `attachment; filename="receipt-${p.id.slice(0, 8)}.pdf"`,
-            });
-          }
-        }
-        if (path === "/api/schedules" && method === "POST")
-          return send(201, store.saveSchedule(await body()));
-        const sch = path.match(
-          /^\/api\/schedules\/([\w-]+)\/(run|pause|resume)$/,
-        );
-        if (sch && method === "POST") {
-          const [, sid, action] = sch;
-          if (action === "run") return send(201, store.runSchedule(sid));
-          check(
-            store.db.prepare("SELECT id FROM schedules WHERE id=?").get(sid),
-            "Schedule not found.",
-            404,
+          const receipt = path.match(
+            /^\/api\/receipts\/([\w-]+)\/(allocate|refund|void|review|pdf)$/,
           );
-          store.db
-            .prepare("UPDATE schedules SET active=? WHERE id=?")
-            .run(action === "resume" ? 1 : 0, sid);
-          store.audit("schedule." + action, sid);
-          return send(200, { ok: true });
+          if (receipt) {
+            const [, rid, action] = receipt;
+            if (method === "GET" && action === "pdf") {
+              const r = store.receipt(rid);
+              check(!r.voided, "Receipt was voided.", 409);
+              return send(200, await renderReceiptPdf(r), {
+                "Content-Type": "application/pdf",
+                "Content-Disposition": `attachment; filename="${r.number}.pdf"`,
+              });
+            }
+            if (method === "POST") {
+              const b = await body();
+              if (action === "allocate")
+                return send(
+                  201,
+                  write("allocate:" + rid, b, () => store.allocate(rid, b)),
+                );
+              if (action === "refund")
+                return send(
+                  201,
+                  write("refund:" + rid, b, () => store.refund(rid, b)),
+                );
+              if (action === "void") {
+                store.voidReceipt(rid, b.reason);
+                return send(200, { ok: true });
+              }
+              if (action === "review")
+                return send(200, store.resolveLegacy(rid, b.reason));
+            }
+          }
+          const note = path.match(
+            /^\/api\/(adjustments|refunds)\/([\w-]+)\/pdf$/,
+          );
+          if (note && method === "GET") {
+            const row = store.db
+              .prepare(`SELECT * FROM ${note[1]} WHERE id=?`)
+              .get(note[2]);
+            check(row, "Note not found.", 404);
+            let d;
+            if (note[1] === "adjustments") d = store.document(row.invoice_id);
+            else {
+              const r = store.receipt(row.receipt_id);
+              d = { number: r.number, business: r.business, client: r.client };
+              row.kind = "refund";
+            }
+            return send(200, await renderAdjustmentPdf(d, row), {
+              "Content-Type": "application/pdf",
+              "Content-Disposition": `attachment; filename="${row.number}.pdf"`,
+            });
+          }
+          if (path === "/api/bank/preview" && method === "POST")
+            return send(200, store.previewBank(await body()));
+          if (path === "/api/bank/import" && method === "POST") {
+            const b = await body();
+            return send(
+              201,
+              write("bank.import", b, () => store.importBank(b)),
+            );
+          }
+          const bank = path.match(
+            /^\/api\/bank\/([\w-]+)\/(match|unmatch|exclude|receive)$/,
+          );
+          if (bank && method === "POST") {
+            const b = await body();
+            if (bank[2] === "receive")
+              return send(
+                201,
+                write("bank.receive:" + bank[1], b, () =>
+                  store.recordBankReceipt(bank[1], b),
+                ),
+              );
+            if (bank[2] === "match")
+              return send(200, store.matchBank(bank[1], b));
+            if (bank[2] === "unmatch") store.resetBank(bank[1], b.reason);
+            else store.ignoreBank(bank[1], b.reason);
+            return send(200, { ok: true });
+          }
+          const proof = path.match(/^\/api\/proofs\/([\w-]+)\/reject$/);
+          if (proof && method === "POST") {
+            store.reviewProof(proof[1], (await body()).reason);
+            return send(200, { ok: true });
+          }
+          const simple = path.match(
+            /^\/api\/(clients|services)(?:\/([\w-]+))?$/,
+          );
+          if (simple && ["POST", "PUT"].includes(method)) {
+            const [, kind, idv] = simple;
+            if (idv)
+              check(
+                store.db.prepare(`SELECT id FROM ${kind} WHERE id=?`).get(idv),
+                "Record not found.",
+                404,
+              );
+            const b = await body();
+            return send(
+              idv ? 200 : 201,
+              write(`${kind}:${idv || "create"}`, b, () =>
+                kind === "clients"
+                  ? store.saveClient(b, idv)
+                  : store.saveService(b, idv),
+              ),
+            );
+          }
+          if (path === "/api/documents" && method === "POST") {
+            const b = await body();
+            return send(
+              201,
+              write("document.create", b, () => store.saveDocument(b)),
+            );
+          }
+          const doc = path.match(
+            /^\/api\/documents\/([\w-]+)(?:\/(issue|share|revoke|void|convert|payments|adjustments|pdf))?$/,
+          );
+          if (doc) {
+            const [, idv, action] = doc;
+            if (method === "GET" && !action)
+              return send(200, store.document(idv));
+            if (method === "PUT" && !action)
+              return send(200, store.saveDocument(await body(), idv));
+            if (method === "GET" && action === "pdf") {
+              const d = store.document(idv);
+              return send(200, await renderPdf(d), {
+                "Content-Type": "application/pdf",
+                "Content-Disposition": `attachment; filename="${d.number || "DRAFT"}.pdf"`,
+              });
+            }
+            if (method === "POST" && action === "issue")
+              return send(
+                200,
+                write("issue:" + idv, {}, () => store.issue(idv)),
+              );
+            if (method === "POST" && action === "share") {
+              const b = await body();
+              const result = store.share(idv, b.days ?? 30);
+              return send(200, {
+                url: `${allowedOrigin}/client/${result.token}`,
+                expires: result.expires,
+              });
+            }
+            if (method === "POST" && action === "revoke") {
+              store.revoke(idv);
+              return send(200, { ok: true });
+            }
+            if (method === "POST" && action === "void")
+              return send(200, store.void(idv, (await body()).reason));
+            if (method === "POST" && action === "convert")
+              return send(200, store.convert(idv));
+            if (method === "POST" && action === "payments") {
+              const b = await body();
+              return send(
+                201,
+                write("payment:" + idv, b, () => store.recordPayment(idv, b)),
+              );
+            }
+            if (method === "POST" && action === "adjustments") {
+              const b = await body();
+              return send(
+                201,
+                write("adjustment:" + idv, b, () => store.adjustment(idv, b)),
+              );
+            }
+          }
+          const payment = path.match(
+            /^\/api\/payments\/([\w-]+)\/(reverse|receipt)$/,
+          );
+          if (payment) {
+            const [, pid, action] = payment;
+            if (action === "reverse" && method === "POST") {
+              store.reverse(pid, (await body()).reason);
+              return send(200, { ok: true });
+            }
+            if (action === "receipt" && method === "GET") {
+              const p = store.db
+                .prepare("SELECT * FROM payments WHERE id=? AND reversed=0")
+                .get(pid);
+              check(p, "Active payment not found.", 404);
+              const d = store.document(p.invoice_id);
+              return send(
+                200,
+                await renderReceiptPdf(store.receipt(p.receipt_id)),
+                {
+                  "Content-Type": "application/pdf",
+                  "Content-Disposition": `attachment; filename="receipt-${p.id.slice(0, 8)}.pdf"`,
+                },
+              );
+            }
+          }
+          if (path === "/api/schedules" && method === "POST") {
+            const b = await body();
+            return send(
+              201,
+              write("schedule.create", b, () => store.saveSchedule(b)),
+            );
+          }
+          const sch = path.match(
+            /^\/api\/schedules\/([\w-]+)\/(run|pause|resume)$/,
+          );
+          if (sch && method === "POST") {
+            const [, sid, action] = sch;
+            if (action === "run")
+              return send(
+                201,
+                write("schedule.run:" + sid, {}, () => store.runSchedule(sid)),
+              );
+            check(
+              store.db.prepare("SELECT id FROM schedules WHERE id=?").get(sid),
+              "Schedule not found.",
+              404,
+            );
+            store.db
+              .prepare("UPDATE schedules SET active=? WHERE id=?")
+              .run(action === "resume" ? 1 : 0, sid);
+            store.audit("schedule." + action, sid);
+            return send(200, { ok: true });
+          }
+          throw new AppError("Not found.", 404);
         }
-        throw new AppError("Not found.", 404);
+        check(method === "GET", "Not found.", 404);
+        const staticPath =
+          path === "/" || /^\/client\/[\w-]+$/.test(path)
+            ? "/index.html"
+            : path;
+        const file = resolve(publicDir, "." + decodeURIComponent(staticPath));
+        check(
+          file.startsWith(publicDir + sep) ||
+            (file.startsWith(publicDir) && publicDir.endsWith(sep)),
+          "Not found.",
+          404,
+        );
+        const contentType = mime[extname(file)];
+        check(contentType, "Not found.", 404);
+        let bytes;
+        try {
+          bytes = await readFile(file);
+        } catch {
+          throw new AppError("Not found.", 404);
+        }
+        return send(200, bytes, { "Content-Type": contentType });
+      } catch (e) {
+        const status = e instanceof AppError ? e.status : 500;
+        if (status === 500) console.error("Request failed:", e.message);
+        if (!res.headersSent)
+          send(status, {
+            error:
+              status === 500
+                ? "Unexpected server error. Please try again."
+                : e.message,
+          });
+        else res.end();
       }
-      check(method === "GET", "Not found.", 404);
-      const staticPath =
-        path === "/" || /^\/client\/[\w-]+$/.test(path) ? "/index.html" : path;
-      const file = resolve(publicDir, "." + decodeURIComponent(staticPath));
-      check(
-        file.startsWith(publicDir + sep) ||
-          (file.startsWith(publicDir) && publicDir.endsWith(sep)),
-        "Not found.",
-        404,
-      );
-      const contentType = mime[extname(file)];
-      check(contentType, "Not found.", 404);
-      let bytes;
-      try {
-        bytes = await readFile(file);
-      } catch {
-        throw new AppError("Not found.", 404);
-      }
-      return send(200, bytes, { "Content-Type": contentType });
-    } catch (e) {
-      const status = e instanceof AppError ? e.status : 500;
-      if (status === 500) console.error("Request failed:", e.message);
-      if (!res.headersSent)
-        send(status, {
-          error:
-            status === 500
-              ? "Unexpected server error. Please try again."
-              : e.message,
-        });
-      else res.end();
-    }
-  });
+    }),
+  );
+  server.backups = backups;
+  server.on("close", () => backups.stop());
   server.requestTimeout = 20000;
   server.headersTimeout = 15000;
   server.maxHeadersCount = 60;
@@ -440,7 +668,10 @@ if (
   if (!store.db.prepare("SELECT id FROM owners LIMIT 1").get())
     throw new Error("No owner configured. Run npm run setup first.");
   const server = createApp({ store, appUrl, secure: production });
-  server.listen(port, host, () => console.log(`Nawlogic Invoice: ${appUrl}`));
+  server.listen(port, host, () => {
+    console.log(`Nawlogic Invoice: ${appUrl}`);
+    server.backups.start();
+  });
   for (const signal of ["SIGINT", "SIGTERM"])
     process.on(signal, () =>
       server.close(() => {

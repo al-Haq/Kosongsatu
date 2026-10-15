@@ -7,6 +7,11 @@ import { today, addDays } from "../server/domain.mjs";
 const password = "Test-only-password-28";
 async function fixture() {
   const store = openDatabase(":memory:");
+  store.saveSettings({
+    registration: "TEST-001",
+    address: "Test office",
+    email: "billing@example.com",
+  });
   await createOwner(store, "owner@example.com", password);
   const server = createApp({ store, appUrl: "http://localhost" });
   await new Promise((r) => server.listen(0, "127.0.0.1", r));
@@ -200,6 +205,133 @@ test("password change revokes sessions and old password", async () => {
       body: JSON.stringify({ email: "owner@example.com", password }),
     });
     assert.equal(r.status, 401);
+  } finally {
+    await f.close();
+  }
+});
+
+test("financial HTTP retries return the same receipt, reject conflicts and expose owner-only notes", async () => {
+  const f = await fixture();
+  try {
+    const c = f.store.saveClient({ name: "HTTP customer" });
+    const d = f.store.saveDocument({
+      kind: "invoice",
+      client_id: c.id,
+      issue_date: today(),
+      due_date: today(),
+      items: [{ description: "Support", quantity: 1, rate: 100 }],
+    });
+    f.store.issue(d.id);
+    const send = (payload) =>
+      f.request("/api/receipts", {
+        method: "POST",
+        headers: {
+          Cookie: f.cookie,
+          "X-CSRF-Token": f.session.csrf,
+          "Content-Type": "application/json",
+          "Idempotency-Key": "http-receipt-test-000001",
+        },
+        body: JSON.stringify(payload),
+      });
+    const payload = {
+      client_id: c.id,
+      amount: 100,
+      paid_date: today(),
+      method: "Bank transfer",
+      reference: "HTTP-1",
+    };
+    const first = await send(payload);
+    assert.equal(first.status, 201);
+    const r = await first.json();
+    assert.equal((await (await send(payload)).json()).id, r.id);
+    assert.equal((await send({ ...payload, amount: 90 })).status, 409);
+    assert.equal(f.store.receipts().length, 1);
+    await f.auth(`/api/receipts/${r.id}/allocate`, "POST", {
+      invoice_id: d.id,
+      amount: 100,
+    });
+    const note = await (
+      await f.auth(`/api/documents/${d.id}/adjustments`, "POST", {
+        kind: "credit",
+        amount: 20,
+        reason: "Reduced scope",
+      })
+    ).json();
+    assert.equal(
+      (await f.auth(`/api/adjustments/${note.id}/pdf`)).headers.get(
+        "content-type",
+      ),
+      "application/pdf",
+    );
+    assert.equal(
+      (await f.request(`/api/adjustments/${note.id}/pdf`)).status,
+      401,
+    );
+    assert.equal(f.store.receipt(r.id).available, 2000);
+    const link = f.store.share(d.id, 1);
+    const pub = await (await f.request("/api/public/" + link.token)).json();
+    assert.equal(pub.adjusted_total, 8000);
+    assert.equal(pub.balance, 0);
+    assert.equal(pub.adjustments.length, 1);
+    assert.equal(pub.finance, undefined);
+    assert.equal(pub.payments, undefined);
+    const exported = await (await f.auth("/api/backup")).json();
+    assert.equal(exported.schemaVersion, 2);
+    assert.equal(exported.security, undefined);
+    assert.equal(exported.finance.receipts.length, 1);
+    assert.ok(!JSON.stringify(exported).includes("mfa_secret"));
+  } finally {
+    await f.close();
+  }
+});
+test("HTTP MFA requires password and a second factor; recovery codes are one-use and password changes respect MFA", async () => {
+  const { totp } = await import("../server/mfa.mjs");
+  const f = await fixture();
+  try {
+    assert.equal(
+      (await f.auth("/api/mfa/begin", "POST", { password: "incorrect" }))
+        .status,
+      403,
+    );
+    const setup = await (
+      await f.auth("/api/mfa/begin", "POST", { password })
+    ).json();
+    const response = await f.auth("/api/mfa/enable", "POST", {
+      password,
+      code: totp(setup.secret),
+    });
+    assert.equal(response.status, 200);
+    const { codes } = await response.json();
+    assert.equal((await f.auth("/api/mfa/status")).status, 200);
+    const login = (code) =>
+      f.request("/api/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: "owner@example.com", password, code }),
+      });
+    assert.equal((await login()).status, 401);
+    assert.equal((await login(codes[0])).status, 200);
+    assert.equal((await login(codes[0])).status, 401);
+    assert.equal(
+      (
+        await f.auth("/api/password", "POST", {
+          current: password,
+          password: "Updated-test-password-123",
+        })
+      ).status,
+      403,
+    );
+    assert.equal(
+      (await f.auth("/api/mfa/disable", "POST", { password, code: "wrong" }))
+        .status,
+      403,
+    );
+    assert.equal(
+      (await f.auth("/api/mfa/disable", "POST", { password, code: codes[1] }))
+        .status,
+      200,
+    );
+    assert.equal((await login()).status, 200);
   } finally {
     await f.close();
   }

@@ -1,3 +1,8 @@
+import { DatabaseSync } from "node:sqlite";
+import { passwordHash } from "./auth.mjs";
+import { BackupManager, restoreBackup } from "./recovery.mjs";
+import { requestContext } from "./context.mjs";
+import { now } from "./domain.mjs";
 import { openDatabase } from "./db.mjs";
 import { createOwner } from "./auth.mjs";
 import { seedDemo } from "./seed.mjs";
@@ -36,6 +41,66 @@ if (mode === "setup") {
   } finally {
     store.db.close();
   }
+} else if (mode === "backup") {
+  const store = openDatabase(
+    process.env.DATABASE_PATH || "./data/nawlogic.sqlite",
+  );
+  try {
+    console.log(
+      await new BackupManager(store, {
+        directory: process.env.BACKUP_DIRECTORY,
+        key: process.env.BACKUP_KEY,
+      }).run(),
+    );
+  } finally {
+    store.db.close();
+  }
+} else if (mode === "restore") {
+  const input = process.argv[3],
+    output = process.argv[4];
+  if (!input || !output)
+    throw new Error(
+      "Usage: npm run restore -- backup.nwlbackup NEW-database.sqlite",
+    );
+  console.log(await restoreBackup(input, output, process.env.BACKUP_KEY));
+} else if (mode === "recover") {
+  const path = process.env.DATABASE_PATH || "./data/nawlogic.sqlite";
+  const db = new DatabaseSync(path);
+  const rl = createInterface({ input: stdin, output: stdout });
+  try {
+    const owner = db.prepare("SELECT * FROM owners LIMIT 1").get();
+    if (!owner) throw new Error("Owner not found.");
+    const answer = await rl.question(
+      "Console recovery resets owner password, disables MFA and revokes sessions. Type the owner email to confirm: ",
+    );
+    if (answer.trim().toLowerCase() !== owner.email)
+      throw new Error("Owner email did not match. No changes made.");
+    const password = randomBytes(18).toString("base64url");
+    const hashed = await passwordHash(password);
+    db.exec("PRAGMA foreign_keys=ON;BEGIN IMMEDIATE");
+    try {
+      db.prepare(
+        "UPDATE owners SET password=?,mfa_secret=NULL,mfa_pending=NULL,mfa_pending_expires=NULL,mfa_step=-1 WHERE id=?",
+      ).run(hashed, owner.id);
+      db.prepare("DELETE FROM sessions WHERE owner_id=?").run(owner.id);
+      db.prepare("DELETE FROM recovery_codes WHERE owner_id=?").run(owner.id);
+      db.prepare(
+        "INSERT INTO audit(action,entity_id,detail,created,actor) VALUES('owner.console_recovery',?,'Password reset; MFA disabled; sessions revoked',?,'local-console')",
+      ).run(String(owner.id), now());
+      db.exec("COMMIT");
+    } catch (e) {
+      db.exec("ROLLBACK");
+      throw e;
+    }
+    console.log(
+      "New one-time generated password (save privately):\n" +
+        password +
+        "\nSign in, change it, then re-enrol MFA.",
+    );
+  } finally {
+    rl.close();
+    db.close();
+  }
 } else if (mode === "demo") {
   if (process.env.NODE_ENV === "production")
     throw new Error("Demo must not run in production.");
@@ -44,6 +109,7 @@ if (mode === "setup") {
   const password = randomBytes(18).toString("base64url");
   // Each demo run rotates the disposable demo owner password and invalidates sessions.
   store.db.prepare("DELETE FROM sessions").run();
+  store.db.prepare("DELETE FROM recovery_codes").run();
   store.db.prepare("DELETE FROM owners").run();
   await createOwner(store, email, password);
   seedDemo(store);
