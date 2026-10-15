@@ -1,0 +1,16 @@
+PRAGMA foreign_keys = ON;
+CREATE TABLE IF NOT EXISTS settings (id INTEGER PRIMARY KEY CHECK(id=1), data TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS owners (id INTEGER PRIMARY KEY, email TEXT NOT NULL UNIQUE, password TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS sessions (hash TEXT PRIMARY KEY, owner_id INTEGER NOT NULL REFERENCES owners(id), csrf TEXT NOT NULL, expires INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS clients (id TEXT PRIMARY KEY, name TEXT NOT NULL, email TEXT NOT NULL, phone TEXT NOT NULL DEFAULT '', address TEXT NOT NULL DEFAULT '', contact TEXT NOT NULL DEFAULT '', terms INTEGER NOT NULL DEFAULT 14, created TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS services (id TEXT PRIMARY KEY, name TEXT NOT NULL, description TEXT NOT NULL DEFAULT '', unit TEXT NOT NULL DEFAULT 'Project', rate INTEGER NOT NULL CHECK(rate>=0), active INTEGER NOT NULL DEFAULT 1);
+CREATE TABLE IF NOT EXISTS documents (id TEXT PRIMARY KEY, kind TEXT NOT NULL CHECK(kind IN ('invoice','quote')), number TEXT UNIQUE, client_id TEXT NOT NULL REFERENCES clients(id), client_snapshot TEXT, business_snapshot TEXT, state TEXT NOT NULL DEFAULT 'draft' CHECK(state IN ('draft','issued','accepted','declined','void')), issue_date TEXT NOT NULL, due_date TEXT NOT NULL, items TEXT NOT NULL, subtotal INTEGER NOT NULL, discount INTEGER NOT NULL DEFAULT 0, total INTEGER NOT NULL CHECK(total>=0), notes TEXT NOT NULL DEFAULT '', terms TEXT NOT NULL DEFAULT '', source_quote TEXT UNIQUE REFERENCES documents(id), token_hash TEXT UNIQUE, token_expires INTEGER, viewed_at TEXT, accepted_name TEXT, created TEXT NOT NULL, updated TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS counters (key TEXT PRIMARY KEY, value INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS payments (id TEXT PRIMARY KEY, invoice_id TEXT NOT NULL REFERENCES documents(id), amount INTEGER NOT NULL CHECK(amount>0), paid_date TEXT NOT NULL, method TEXT NOT NULL, reference TEXT NOT NULL, note TEXT NOT NULL DEFAULT '', reversed INTEGER NOT NULL DEFAULT 0, reversal_reason TEXT, created TEXT NOT NULL, UNIQUE(invoice_id,reference));
+CREATE TABLE IF NOT EXISTS proofs (id TEXT PRIMARY KEY, invoice_id TEXT NOT NULL REFERENCES documents(id), reference TEXT NOT NULL, note TEXT NOT NULL DEFAULT '', status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','confirmed','rejected')), created TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS schedules (id TEXT PRIMARY KEY, client_id TEXT NOT NULL REFERENCES clients(id), service_id TEXT NOT NULL REFERENCES services(id), next_date TEXT NOT NULL, terms INTEGER NOT NULL DEFAULT 14, active INTEGER NOT NULL DEFAULT 1, created TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS schedule_runs (schedule_id TEXT NOT NULL REFERENCES schedules(id), period TEXT NOT NULL, invoice_id TEXT NOT NULL UNIQUE REFERENCES documents(id), PRIMARY KEY(schedule_id,period));
+CREATE TABLE IF NOT EXISTS audit (id INTEGER PRIMARY KEY AUTOINCREMENT, action TEXT NOT NULL, entity_id TEXT, detail TEXT NOT NULL, created TEXT NOT NULL);
+CREATE INDEX IF NOT EXISTS payment_invoice_idx ON payments(invoice_id);
+CREATE INDEX IF NOT EXISTS document_client_idx ON documents(client_id);
+CREATE INDEX IF NOT EXISTS proof_invoice_idx ON proofs(invoice_id);
