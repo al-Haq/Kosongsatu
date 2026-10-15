@@ -72,7 +72,7 @@ Restore **to a NEW filename**, while the app is stopped:
 npm run restore -- /private/backups/nawlogic-example.nwlbackup ./data/restored.sqlite
 ```
 
-The command requires the original `BACKUP_KEY`, rejects tampering/wrong keys, checks SQLite integrity/foreign keys, and never overwrites an existing target. It revokes restored sessions and all client links. Preserve the old database and sidecars as a rollback set; point `DATABASE_PATH` to the newly restored file. Do not mix old WAL/SHM files with the new database.
+The command requires the original `BACKUP_KEY`, rejects tampering/wrong keys, checks SQLite integrity/foreign keys, and never overwrites an existing target. It revokes restored sessions, all client links and connector tokens, disables workflow rules and marks interrupted AI runs failed. Preserve the old database and sidecars as a rollback set; point `DATABASE_PATH` to the newly restored file. Do not mix old WAL/SHM files with the new database.
 
 Restore the original `MFA_ENCRYPTION_KEY`, or copy the original MFA key to `./data/restored.sqlite.mfa-key` with owner-only permissions. A database containing active MFA fails startup if the file key is missing. Verify clients, invoice/receipt balances, note PDFs, bank matches and audit before restarting public access. Generate new customer links as needed.
 
@@ -86,7 +86,7 @@ When password/authenticator/recovery codes or the MFA key are irretrievably lost
 npm run recover
 ```
 
-Type the exact owner email when prompted. Recovery generates a new password, disables MFA, deletes recovery codes, revokes sessions and records `local-console` in the audit. It is unavailable through HTTP. Sign in privately, change the generated password and re-enrol MFA. Console/volume access is a privileged capability; restrict it accordingly. If an obsolete MFA key file is invalid, preserve it for investigation, then install a valid new key after recovery before restarting.
+Type the exact owner email when prompted. Recovery generates a new password, disables MFA, deletes recovery codes, revokes sessions and connector tokens, disables rules and records `local-console` in the audit. It is unavailable through HTTP. Sign in privately, change the generated password and re-enrol MFA. Console/volume access is a privileged capability; restrict it accordingly. If an obsolete MFA key file is invalid, preserve it for investigation, then install a valid new key after recovery before restarting.
 
 ## Financial corrections and reconciliation
 
@@ -101,3 +101,9 @@ Type the exact owner email when prompted. Recovery generates a new password, dis
 See [migration and phase 1 behavior](RELEASE-0.2.md). Audit entries have update/delete guards but are not cryptographically tamper-evident against server administrators. Customer acceptance records an interaction, not independent signer verification. Bearer links should be revoked if leaked.
 
 Payment gateways, bank feeds, outgoing email, uploads, MyInvois and production hosting remain unconnected. Gateway callbacks will require signature verification and idempotency before any future balance changes.
+
+## Optional sales automation / AI
+
+See [AUTOMATION.md](AUTOMATION.md) for the v0.3 sales/PO model, scoped REST/MCP setup, optional AI provider environment, worker lifecycle and restore behavior. The MCP server is a stdio subprocess connecting to this app over authenticated REST, rather than another database writer. The normal app starts its deterministic event worker every 30 seconds; rules remain disabled until configured by the owner.
+
+The built-in assistant requires a selected tool-capable model and server-side provider configuration. Prompts and requested business records go to that provider only after the UI's explicit per-request consent. Test the actual model/provider before real customer use; automated provider tests use controlled test responses. No live model/provider billing or external automation is provisioned by this repository.

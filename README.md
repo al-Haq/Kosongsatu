@@ -2,7 +2,7 @@
 
 An owner-operated invoicing web app for **NAWLOGIC SYSTEMS SOLUTION**, using the supplied Nawlogic logo and teal / orange / ink brand palette.
 
-Release **0.2.0** is a working owner billing application: the browser talks to an authenticated Node.js API and a persistent SQLite database. It is not a localStorage-only mockup. No customer data, credentials, business registration attachments or payment account numbers are committed.
+Release **0.3.0** is a working owner billing application: the browser talks to an authenticated Node.js API and a persistent SQLite database. It is not a localStorage-only mockup. No customer data, credentials, business registration attachments or payment account numbers are committed.
 
 ## Run locally
 
@@ -25,6 +25,14 @@ npm run demo
 This starts on loopback only and prints a new temporary demo password. Demo records are stored in **data/demo.sqlite**, separately from the real workspace (**data/nawlogic.sqlite**). Each demo launch invalidates previous demo sessions. Do not use the demo workspace for real customer data.
 
 Optional runtime settings can be copied from `.env.example` to `.env`. Set `APP_URL` to the exact browser origin, including its port. In local development use `localhost`, not `127.0.0.1`, in your browser unless `APP_URL` is changed accordingly.
+
+## Sales and automation
+
+Open **Sales & POs** to manage opportunities, prepare quotation proposals, record verified customer acceptance and register customer purchase orders. **AI & automation** provides the review queue, opt-in rules, connector tokens and optional built-in AI chat.
+
+The MCP stdio server and scoped REST tools let your agents or n8n read permitted records and queue proposals. Owner approval is separate. An enabled deterministic PO rule can create an invoice draft automatically; it never issues, sends or charges. Configure your own tool-capable compatible model to use the natural-language assistant. No model or external account is connected by default.
+
+See [AI, MCP and sales setup](docs/AUTOMATION.md) for configuration, tool scopes, n8n examples, data handling and exact limitations.
 
 ## Included
 

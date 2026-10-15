@@ -1536,3 +1536,81 @@ dialog.wide {
 select:disabled {
   background: var(--bg);
 }
+
+.sales-stages {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 16px;
+}
+.sales-stages .label {
+  text-transform: capitalize;
+}
+.automation-banner {
+  display: grid;
+  grid-template-columns: 1.5fr 1fr;
+  gap: 32px;
+  background: var(--ink, #0f172a);
+  color: white;
+  border-radius: 14px;
+  padding: 32px;
+}
+.automation-banner h2 {
+  font-size: 30px;
+  line-height: 1.2;
+  margin: 12px 0;
+}
+.automation-banner p {
+  color: #cbd5e1;
+  margin: 12px 0;
+  line-height: 1.6;
+}
+.automation-banner .eyebrow {
+  color: #5eead4;
+}
+.proposal-card,
+.assistant-message {
+  padding: 18px 0;
+  border-bottom: 1px solid #e2e8f0;
+}
+.proposal-card p {
+  font-size: 12px;
+  overflow-wrap: anywhere;
+  margin: 10px 0;
+}
+.assistant-message h3 {
+  margin: 12px 0;
+  font-size: 14px;
+}
+.assistant-message p,
+.proposal-preview p {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: 1.65;
+  margin: 12px 0;
+}
+.assistant-message small {
+  color: #64748b;
+}
+.assistant-history {
+  margin-top: 20px;
+}
+@media (max-width: 900px) {
+  .sales-stages {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .automation-banner {
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
+}
+@media (max-width: 560px) {
+  .sales-stages {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .automation-banner {
+    padding: 22px;
+  }
+  .automation-banner h2 {
+    font-size: 26px;
+  }
+}

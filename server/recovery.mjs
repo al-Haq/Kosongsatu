@@ -108,11 +108,24 @@ export async function restoreBackup(input, output, key) {
     db.exec(
       "BEGIN IMMEDIATE;DELETE FROM sessions;UPDATE documents SET token_hash=NULL,token_expires=NULL;COMMIT",
     );
+    if (
+      db
+        .prepare(
+          "SELECT name FROM sqlite_master WHERE name='integration_tokens'",
+        )
+        .get()
+    ) {
+      db.exec(
+        "UPDATE integration_tokens SET revoked=1;UPDATE automation_rules SET enabled=0;UPDATE assistant_runs SET state='failed',response='Interrupted by restore' WHERE state='running'",
+      );
+    }
     db.close();
     return {
       path: resolve(output),
       sessionsRevoked: true,
       clientLinksRevoked: true,
+      connectorTokensRevoked: true,
+      automationRulesDisabled: true,
     };
   } catch (e) {
     db?.close();

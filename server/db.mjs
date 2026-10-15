@@ -1,3 +1,6 @@
+import { migrateAutomation } from "./automation-migration.mjs";
+import { attachSales } from "./sales.mjs";
+import { attachAutomation } from "./automation.mjs";
 import { migrate } from "./migrations.mjs";
 import { requestContext } from "./context.mjs";
 import { attachFinance } from "./finance.mjs";
@@ -47,6 +50,7 @@ export function openDatabase(path) {
     JSON.stringify(defaults),
   );
   migrate(db, path);
+  migrateAutomation(db, path);
   const store = new Store(db);
   store.path = path;
   try {
@@ -585,3 +589,6 @@ export class Store {
 
 attachFinance(Store);
 attachBanking(Store);
+
+attachSales(Store);
+attachAutomation(Store);

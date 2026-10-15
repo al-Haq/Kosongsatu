@@ -84,6 +84,16 @@ if (mode === "setup") {
       ).run(hashed, owner.id);
       db.prepare("DELETE FROM sessions WHERE owner_id=?").run(owner.id);
       db.prepare("DELETE FROM recovery_codes WHERE owner_id=?").run(owner.id);
+      if (
+        db
+          .prepare(
+            "SELECT name FROM sqlite_master WHERE name='integration_tokens'",
+          )
+          .get()
+      )
+        db.exec(
+          "UPDATE integration_tokens SET revoked=1;UPDATE automation_rules SET enabled=0",
+        );
       db.prepare(
         "INSERT INTO audit(action,entity_id,detail,created,actor) VALUES('owner.console_recovery',?,'Password reset; MFA disabled; sessions revoked',?,'local-console')",
       ).run(String(owner.id), now());
@@ -110,6 +120,8 @@ if (mode === "setup") {
   // Each demo run rotates the disposable demo owner password and invalidates sessions.
   store.db.prepare("DELETE FROM sessions").run();
   store.db.prepare("DELETE FROM recovery_codes").run();
+  store.db.prepare("DELETE FROM assistant_runs").run();
+  store.db.prepare("UPDATE integration_tokens SET revoked=1").run();
   store.db.prepare("DELETE FROM owners").run();
   await createOwner(store, email, password);
   seedDemo(store);

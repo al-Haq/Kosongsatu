@@ -46,7 +46,7 @@ test("v1 migration preserves duplicate receipts, old reversals, anchor and rollb
     db.close();
     db = null;
     s = openDatabase(path);
-    assert.equal(s.db.prepare("PRAGMA user_version").get().user_version, 2);
+    assert.equal(s.db.prepare("PRAGMA user_version").get().user_version, 3);
     assert.equal(s.receipts().length, 3);
     assert.equal(s.receipts().filter((r) => r.legacy_review).length, 2);
     assert.equal(s.document("d1").paid, 5000);
@@ -64,6 +64,12 @@ test("v1 migration preserves duplicate receipts, old reversals, anchor and rollb
     assert.equal(old.prepare("PRAGMA user_version").get().user_version, 0);
     assert.equal(old.prepare("SELECT count(*) n FROM payments").get().n, 3);
     old.close();
+    const v3snapshot = (await readdir(dir)).find((f) => f.includes(".pre-v3-"));
+    assert.ok(v3snapshot);
+    const v2 = new DatabaseSync(join(dir, v3snapshot), { readOnly: true });
+    assert.equal(v2.prepare("PRAGMA user_version").get().user_version, 2);
+    assert.equal(v2.prepare("SELECT count(*) n FROM cash_receipts").get().n, 3);
+    v2.close();
     assert.throws(
       () => s.allocate("legacy-p1", { invoice_id: "d1", amount: 1 }),
       /Review/,

@@ -1,9 +1,10 @@
+import { automationUI } from "./automation.mjs";
 import { financeUI } from "./finance.mjs";
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
 const app = $("#app"),
   modal = $("#modal");
-let advanced;
+let advanced, workflow;
 const requestKeys = new Map();
 let S = null,
   session = null,
@@ -88,7 +89,7 @@ function toast(message, error = false) {
 async function api(path, method = "GET", body) {
   const retryable =
     method === "POST" &&
-    /^\/(documents|receipts|bank|clients|services|schedules)/.test(path);
+    /^\/(documents|receipts|bank|clients|services|schedules|sales)/.test(path);
   const requestId = method + ":" + path + ":" + JSON.stringify(body);
   if (retryable && !requestKeys.has(requestId))
     requestKeys.set(requestId, crypto.randomUUID());
@@ -126,10 +127,7 @@ function showModal(title, body, wide = false) {
   modal.className = wide ? "wide" : "";
   modal.innerHTML = `<div class="modal-head"><h2>${E(title)}</h2><button class="btn ghost" data-action="close-modal" aria-label="Close dialog">${icon("close")}</button></div><div class="modal-body">${body}</div>`;
   modal.showModal();
-  setTimeout(
-    () => modal.querySelector("input:not([readonly]),select,textarea")?.focus(),
-    10,
-  );
+  modal.querySelector("input:not([readonly]),select,textarea")?.focus();
 }
 const input = (
   label,
@@ -156,6 +154,8 @@ function renderLogin() {
 }
 const navItems = [
   ["overview", "Overview", "grid"],
+  ["sales", "Sales & POs", "trend"],
+  ["automation", "AI & automation", "shield"],
   ["invoices", "Invoices", "doc"],
   ["quotes", "Quotations", "doc"],
   ["clients", "Clients", "users"],
@@ -433,6 +433,12 @@ function renderRoute() {
   let html,
     active = page;
   switch (page) {
+    case "sales":
+      html = workflow.sales();
+      break;
+    case "automation":
+      html = workflow.automation();
+      break;
     case "overview":
       html = overview();
       break;
@@ -623,6 +629,7 @@ function shareModal(id) {
   );
 }
 async function runAction(action, id, el) {
+  if (await workflow.action(action, id)) return;
   if (await advanced.action(action, id)) return;
   switch (action) {
     case "close-modal":
@@ -824,6 +831,7 @@ async function submitForm(form) {
   const type = form.dataset.form,
     b = Object.fromEntries(new FormData(form)),
     id = form.dataset.id;
+  if (await workflow.submit(form, b)) return;
   if (await advanced.submit(form, b)) return;
   if (type === "login") {
     session = await api("/login", "POST", b);
@@ -1027,7 +1035,7 @@ async function boot() {
 document.addEventListener("click", (event) => {
   if (event.target.closest('[data-action="reload"]')) location.reload();
 });
-advanced = financeUI({
+const uiHelpers = {
   get: () => S,
   api,
   refresh,
@@ -1050,5 +1058,7 @@ advanced = financeUI({
   heading,
   empty,
   icon,
-});
+};
+advanced = financeUI(uiHelpers);
+workflow = automationUI(uiHelpers);
 boot();

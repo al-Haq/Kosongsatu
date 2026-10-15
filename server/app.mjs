@@ -1,3 +1,6 @@
+import { Assistant } from "./assistant.mjs";
+import { TOOL_DEFINITIONS } from "./automation.mjs";
+import { z } from "zod";
 import http from "node:http";
 import { readFile } from "node:fs/promises";
 import { resolve, extname, sep } from "node:path";
@@ -75,6 +78,8 @@ export function createApp({
   store,
   appUrl = "http://localhost:3000",
   secure = false,
+  assistantConfig,
+  aiFetch,
   backupConfig = {
     directory: process.env.BACKUP_DIRECTORY,
     key: process.env.BACKUP_KEY,
@@ -84,6 +89,10 @@ export function createApp({
   const allowedOrigin = new URL(appUrl).origin;
   const limits = new Map();
   const backups = new BackupManager(store, backupConfig);
+  const assistant = new Assistant(store, {
+    ...(assistantConfig !== undefined ? { config: assistantConfig } : {}),
+    ...(aiFetch ? { fetcher: aiFetch } : {}),
+  });
   const allow = (key, max, ms) => {
     const t = Date.now();
     if (limits.size > 5000) {
@@ -131,7 +140,7 @@ export function createApp({
         const url = new URL(req.url, "http://localhost");
         const path = url.pathname;
         const method = req.method;
-        if (method !== "GET")
+        if (method !== "GET" && !path.startsWith("/api/integrations/"))
           check(
             req.headers.origin === allowedOrigin,
             "Request origin is not allowed.",
@@ -163,6 +172,42 @@ export function createApp({
             throw new AppError("Invalid JSON body.");
           }
         };
+        if (path.startsWith("/api/integrations/")) {
+          allow("connector-ip:" + req.socket.remoteAddress, 120, 60000);
+          const raw = req.headers.authorization || "";
+          check(
+            raw.startsWith("Bearer "),
+            "Connector bearer token required.",
+            401,
+          );
+          const token = store.connector(raw.slice(7));
+          allow("connector:" + token.id, 60, 60000);
+          requestContext.getStore().actor =
+            "connector:" + token.label + ":" + token.id;
+          store.db
+            .prepare("UPDATE integration_tokens SET last_used=? WHERE id=?")
+            .run(new Date().toISOString(), token.id);
+          if (path === "/api/integrations/tools" && method === "GET")
+            return send(200, {
+              tools: TOOL_DEFINITIONS.filter((t) =>
+                token.scopes.includes(t.scope),
+              ).map((t) => ({
+                name: t.name,
+                description: t.description,
+                inputSchema: z.toJSONSchema(t.schema),
+              })),
+            });
+          const match = path.match(/^\/api\/integrations\/tools\/([a-z_]+)$/);
+          if (match && method === "POST")
+            return send(
+              200,
+              store.toolCall(match[1], await body(), {
+                scopes: token.scopes,
+                source: "connector:" + token.id,
+              }),
+            );
+          throw new AppError("Integration endpoint not found.", 404);
+        }
         if (path === "/api/health" && method === "GET")
           return send(200, { ok: true });
         if (path === "/api/login" && method === "POST") {
@@ -274,6 +319,7 @@ export function createApp({
               store.db
                 .prepare("DELETE FROM sessions WHERE owner_id=?")
                 .run(owner.id);
+              store.db.prepare("UPDATE integration_tokens SET revoked=1").run();
               store.audit("password.changed", null);
             });
             return send(
@@ -282,12 +328,129 @@ export function createApp({
               { "Set-Cookie": cookie("", secure, true) },
             );
           }
+          if (path === "/api/sales/opportunities" && method === "POST") {
+            const b = await body();
+            return send(
+              201,
+              write("sales.create", b, () => store.saveOpportunity(b)),
+            );
+          }
+          const sale = path.match(/^\/api\/sales\/opportunities\/([\w-]+)$/);
+          if (sale && method === "PUT")
+            return send(200, store.saveOpportunity(await body(), sale[1]));
+          const acceptance = path.match(
+            /^\/api\/sales\/quotes\/([\w-]+)\/accept$/,
+          );
+          if (acceptance && method === "POST")
+            return send(200, store.acceptOffline(acceptance[1], await body()));
+          if (path === "/api/sales/customer-pos" && method === "POST") {
+            const b = await body();
+            return send(
+              201,
+              write("po.create", b, () => store.registerPO(b)),
+            );
+          }
+          const poInvoice = path.match(
+            /^\/api\/sales\/customer-pos\/([\w-]+)\/invoice$/,
+          );
+          if (poInvoice && method === "POST") {
+            const po = store.db
+              .prepare("SELECT * FROM customer_pos WHERE id=?")
+              .get(poInvoice[1]);
+            check(po, "Customer PO not found.", 404);
+            return send(200, store.invoiceFromQuote(po.quote_id, po.id));
+          }
+          if (path === "/api/automation/proposals" && method === "POST") {
+            const b = await body();
+            return send(
+              201,
+              store.propose(
+                b.kind,
+                b.data,
+                "owner:" + session.email,
+                b.request_key,
+              ),
+            );
+          }
+          const review = path.match(
+            /^\/api\/automation\/proposals\/([\w-]+)\/(approve|reject)$/,
+          );
+          if (review && method === "POST") {
+            const b = await body();
+            return send(
+              200,
+              store.reviewProposal(
+                review[1],
+                review[2] === "approve",
+                b.reason,
+              ),
+            );
+          }
+          const rule = path.match(/^\/api\/automation\/rules\/([\w-]+)$/);
+          if (rule && method === "PUT") {
+            store.setRule(rule[1], (await body()).enabled);
+            return send(200, { ok: true });
+          }
+          if (path === "/api/automation/run" && method === "POST")
+            return send(
+              200,
+              requestContext.run({ actor: "automation:owner-triggered" }, () =>
+                store.runAutomations(),
+              ),
+            );
+          const retry = path.match(
+            /^\/api\/automation\/runs\/([\w-]+)\/retry$/,
+          );
+          if (retry && method === "POST")
+            return send(200, store.retryAutomation(retry[1]));
+          if (path === "/api/automation/connectors" && method === "POST") {
+            allow("connector-create:" + session.owner_id, 8, 300000);
+            const b = await body();
+            const owner = store.db
+              .prepare("SELECT password FROM owners WHERE id=?")
+              .get(session.owner_id);
+            check(
+              await verifyPassword(b.password, owner.password),
+              "Current password is incorrect.",
+              403,
+            );
+            check(
+              verifySecondFactor(store, session.owner_id, b.code),
+              "Authenticator or recovery code required/invalid.",
+              403,
+            );
+            return send(201, store.createConnector(b));
+          }
+          const connector = path.match(
+            /^\/api\/automation\/connectors\/([\w-]+)\/revoke$/,
+          );
+          if (connector && method === "POST") {
+            store.revokeConnector(connector[1]);
+            return send(200, { ok: true });
+          }
+          if (path === "/api/assistant/chat" && method === "POST") {
+            allow("assistant:" + session.owner_id, 10, 600000);
+            res.setTimeout(120000);
+            return send(
+              200,
+              await assistant.run(session.owner_id, await body()),
+            );
+          }
           if (path === "/api/workspace" && method === "GET")
             return send(200, {
               ...store.workspace(),
               finance: store.finance(),
               security: mfaStatus(store, session.owner_id),
               backupStatus: backups.status(),
+              sales: store.sales(),
+              automation: store.automationState(),
+              connectors: store.connectorTokens(),
+              assistant: assistant.status(),
+              assistantRuns: store.db
+                .prepare(
+                  "SELECT id,prompt,response,state,tool_log,created FROM assistant_runs WHERE owner_id=? ORDER BY created DESC LIMIT 20",
+                )
+                .all(session.owner_id),
             });
           if (path === "/api/settings" && method === "PUT")
             return send(200, store.saveSettings(await body()));
@@ -295,10 +458,12 @@ export function createApp({
             return send(
               200,
               {
-                schemaVersion: 2,
+                schemaVersion: 3,
                 exported: new Date().toISOString(),
                 ...store.workspace(),
                 finance: store.finance(),
+                sales: store.sales(),
+                automation: store.automationState(),
                 audit: store.db
                   .prepare("SELECT * FROM audit ORDER BY id")
                   .all(),
@@ -646,7 +811,27 @@ export function createApp({
     }),
   );
   server.backups = backups;
-  server.on("close", () => backups.stop());
+  let automationTimer;
+  server.startAutomations = () => {
+    if (automationTimer) return;
+    const run = () =>
+      requestContext.run({ actor: "automation:worker" }, () => {
+        try {
+          store.runAutomations();
+        } catch {
+          console.error(
+            "Automation worker failed; inspect database/server status.",
+          );
+        }
+      });
+    run();
+    automationTimer = setInterval(run, 30000);
+    automationTimer.unref();
+  };
+  server.on("close", () => {
+    backups.stop();
+    if (automationTimer) clearInterval(automationTimer);
+  });
   server.requestTimeout = 20000;
   server.headersTimeout = 15000;
   server.maxHeadersCount = 60;
@@ -671,6 +856,7 @@ if (
   server.listen(port, host, () => {
     console.log(`Nawlogic Invoice: ${appUrl}`);
     server.backups.start();
+    server.startAutomations();
   });
   for (const signal of ["SIGINT", "SIGTERM"])
     process.on(signal, () =>

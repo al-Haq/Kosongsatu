@@ -137,6 +137,16 @@ test("encrypted backup restores a consistent new database and revokes sessions a
       method: "Bank transfer",
       reference: "Backup-receipt",
     });
+    const connector = s.createConnector({
+      label: "Restore test",
+      scopes: ["business:read"],
+    });
+    s.setRule("customer_po_invoice", true);
+    const opportunity = s.saveOpportunity({
+      client_id: c.id,
+      title: "Preserved sales",
+      expected_amount: 100,
+    });
     const key = randomBytes(32).toString("base64"),
       directory = join(dir, "backups");
     const manager = new BackupManager(s, { directory, key, keep: 2 });
@@ -156,6 +166,9 @@ test("encrypted backup restores a consistent new database and revokes sessions a
     restored = openDatabase(output);
     assert.equal(restored.document(d.id).balance, 6000);
     assert.equal(restored.receipts().length, 1);
+    assert.throws(() => restored.connector(connector.token), /revoked/);
+    assert.ok(restored.automationState().rules.every((r) => !r.enabled));
+    assert.equal(restored.sales().opportunities[0].id, opportunity.id);
     assert.equal(
       restored.db.prepare("SELECT count(*) n FROM sessions").get().n,
       0,
