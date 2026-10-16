@@ -239,7 +239,9 @@ export function attachAutomation(Store) {
           .get(source, request_key);
         if (existing) {
           check(
-            existing.fingerprint === fingerprint,
+            existing.fingerprint === fingerprint ||
+              // Proposals stored before v0.4 used key-order dependent fingerprints.
+              existing.fingerprint === hash(JSON.stringify({ kind, payload })),
             "Proposal key was reused with different data.",
             409,
           );

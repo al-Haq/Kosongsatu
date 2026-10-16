@@ -133,7 +133,7 @@ export function createApp({
       };
       try {
         check(
-          ["GET", "POST", "PUT", "PATCH"].includes(req.method),
+          ["GET", "POST", "PUT", "PATCH", "DELETE"].includes(req.method),
           "Method not allowed.",
           405,
         );
@@ -458,7 +458,7 @@ export function createApp({
             return send(
               200,
               {
-                schemaVersion: 3,
+                schemaVersion: 4,
                 exported: new Date().toISOString(),
                 ...store.workspace(),
                 finance: store.finance(),
@@ -640,6 +640,34 @@ export function createApp({
             store.reviewProof(proof[1], (await body()).reason);
             return send(200, { ok: true });
           }
+          const archive = path.match(
+            /^\/api\/clients\/([\w-]+)\/(archive|restore)$/,
+          );
+          if (archive && method === "POST")
+            return send(
+              200,
+              store.archiveClient(archive[1], archive[2] === "archive"),
+            );
+          const removable = path.match(
+            /^\/api\/(clients|services|documents|schedules|sales\/opportunities)\/([\w-]+)$/,
+          );
+          if (removable && method === "DELETE") {
+            const [, kind, rid] = removable;
+            ({
+              clients: () => store.deleteClient(rid),
+              services: () => store.deleteService(rid),
+              documents: () => store.deleteDraft(rid),
+              schedules: () => store.deleteSchedule(rid),
+              "sales/opportunities": () => store.deleteOpportunity(rid),
+            })[kind]();
+            return send(200, { ok: true });
+          }
+          const scheduleEdit = path.match(/^\/api\/schedules\/([\w-]+)$/);
+          if (scheduleEdit && method === "PUT")
+            return send(
+              200,
+              store.updateSchedule(scheduleEdit[1], await body()),
+            );
           const simple = path.match(
             /^\/api\/(clients|services)(?:\/([\w-]+))?$/,
           );
@@ -669,7 +697,7 @@ export function createApp({
             );
           }
           const doc = path.match(
-            /^\/api\/documents\/([\w-]+)(?:\/(issue|share|revoke|void|convert|payments|adjustments|pdf))?$/,
+            /^\/api\/documents\/([\w-]+)(?:\/(issue|share|revoke|void|convert|payments|adjustments|pdf|duplicate))?$/,
           );
           if (doc) {
             const [, idv, action] = doc;
@@ -703,6 +731,13 @@ export function createApp({
             }
             if (method === "POST" && action === "void")
               return send(200, store.void(idv, (await body()).reason));
+            if (method === "POST" && action === "duplicate")
+              return send(
+                201,
+                write("duplicate:" + idv, {}, () =>
+                  store.duplicateDocument(idv),
+                ),
+              );
             if (method === "POST" && action === "convert")
               return send(200, store.convert(idv));
             if (method === "POST" && action === "payments") {

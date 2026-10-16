@@ -376,3 +376,20 @@ test("proposal fingerprints ignore key order and prototype names are not proposa
     s.db.close();
   }
 });
+test("identical retries still match proposals stored with the pre-v0.4 fingerprint", async () => {
+  const { s, c } = fixture();
+  const { hash } = await import("../server/domain.mjs");
+  try {
+    const payload = { title: "Legacy", client_id: c.id };
+    const p = s.propose("sales", payload, "test", "proposal-legacy-00001");
+    s.db
+      .prepare("UPDATE automation_proposals SET fingerprint=? WHERE id=?")
+      .run(hash(JSON.stringify({ kind: "sales", payload })), p.id);
+    assert.equal(
+      s.propose("sales", payload, "test", "proposal-legacy-00001").id,
+      p.id,
+    );
+  } finally {
+    s.db.close();
+  }
+});

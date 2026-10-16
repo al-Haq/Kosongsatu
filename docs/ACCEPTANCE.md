@@ -38,3 +38,10 @@ No live bank payment, email delivery, MyInvois submission, production TLS deploy
 - Create a scoped connector with current password/MFA. Store its token once, confirm read/proposal restrictions and revoke it. Check a real MCP handshake and tool call.
 - With an explicit test model/provider, run a chat tool loop that queues a proposal. Verify no record changes before owner approval and inspect phone layouts. Never present deterministic fake-provider tests as live-model verification.
 - Restore a disposable backup and confirm connector revocation, rules disabled, preserved sales/PO records and unchanged invoice balances.
+
+## v0.4 record maintenance
+
+- Duplicate an issued invoice; confirm a new draft with the same lines and today's date. Delete that draft and confirm the audit lists `draft.deleted`.
+- Try to delete a client with documents; confirm the error asks you to archive. Archive the client; confirm it disappears from new invoice/schedule/opportunity choices but its documents remain. Restore it.
+- Delete an unused service. Try to delete one used by a schedule; confirm it is refused.
+- Edit a schedule's next run date and terms. Confirm a used schedule cannot be deleted or moved back over a billed period.
