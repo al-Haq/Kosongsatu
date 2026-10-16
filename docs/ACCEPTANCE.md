@@ -66,3 +66,9 @@ No live bank payment, email delivery, MyInvois submission, production TLS deploy
 - Click "Pay online" twice before paying; confirm the same Billplz bill is reused.
 - Send a callback with a wrong signature; confirm it is refused and nothing changes.
 - In Settings > Online payments, use "Check status" on a pending bill; confirm it stays pending until paid.
+
+## v0.8 pagination and reverse proxy
+
+- With more than 50 invoices or clients, confirm the list shows 50 rows with Previous/Next, and search and filters still find older records.
+- `GET /api/documents?q=&kind=&state=&limit=&offset=` returns `total` and one page of results.
+- Behind the proxy with `TRUST_PROXY=1`, fail sign-in 10 times from one network; confirm that network is limited while another can still sign in.

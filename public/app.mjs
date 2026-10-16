@@ -10,6 +10,7 @@ let S = null,
   session = null,
   filter = "All",
   search = "",
+  page = 0,
   toastTimer,
   generatedLink = "";
 const E = (value) =>
@@ -179,6 +180,22 @@ function renderShell(html, active) {
 }
 const heading = (title, sub, actions = "") =>
   `<div class="heading"><div><h1>${E(title)}</h1><p>${E(sub)}</p></div><div class="actions">${actions}</div></div>`;
+const PAGE_SIZE = 50;
+// Long lists show 50 rows at a time; search and filters still cover every record.
+function paged(list) {
+  const pages = Math.max(1, Math.ceil(list.length / PAGE_SIZE));
+  page = Math.min(page, pages - 1);
+  const rows = list.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+  const nav =
+    pages > 1
+      ? `<nav class="pager" aria-label="Pages"><button class="btn" type="button" data-action="page" data-id="${page - 1}" ${page ? "" : "disabled"}>Previous</button><span>${page * PAGE_SIZE + 1}–${page * PAGE_SIZE + rows.length} of ${list.length}</span><button class="btn" type="button" data-action="page" data-id="${page + 1}" ${page < pages - 1 ? "" : "disabled"}>Next</button></nav>`
+      : "";
+  return { rows, nav };
+}
+function documentTable(docs) {
+  const { rows, nav } = paged(docs);
+  return invoiceTable(rows) + nav;
+}
 function invoiceTable(docs) {
   if (!docs.length)
     return empty(
@@ -270,7 +287,7 @@ function documentList(kind) {
         "plus",
       ),
     ) +
-    `<div class="tabs" role="group" aria-label="Filter by status">${(quotes ? ["All", "Draft", "Issued", "Accepted", "Expired"] : ["All", "Unpaid", "Overdue", "Paid", "Draft"]).map((t) => `<button class="tab ${t === filter ? "active" : ""}" data-action="filter" data-id="${t}">${t} <span>${t === "All" ? data.length : data.filter((d) => matches(d, t)).length}</span></button>`).join("")}</div><section class="panel"><div class="toolbar"><label class="search"><span class="sr-only">Search documents</span>${icon("search")}<input id="document-search" placeholder="Search invoice number or client" value="${E(search)}"></label>${!quotes ? '<a class="btn" href="/api/invoices.csv">' + icon("download") + " Export CSV</a>" : ""}</div><div id="document-table">${invoiceTable(filteredDocs(kind))}</div><div class="table-foot"><span>${data.length} ${quotes ? "quotations" : "invoices"} in workspace</span><span>All dates / MYR</span></div></section>`
+    `<div class="tabs" role="group" aria-label="Filter by status">${(quotes ? ["All", "Draft", "Issued", "Accepted", "Expired"] : ["All", "Unpaid", "Overdue", "Paid", "Draft"]).map((t) => `<button class="tab ${t === filter ? "active" : ""}" data-action="filter" data-id="${t}">${t} <span>${t === "All" ? data.length : data.filter((d) => matches(d, t)).length}</span></button>`).join("")}</div><section class="panel"><div class="toolbar"><label class="search"><span class="sr-only">Search documents</span>${icon("search")}<input id="document-search" placeholder="Search invoice number or client" value="${E(search)}"></label>${!quotes ? '<a class="btn" href="/api/invoices.csv">' + icon("download") + " Export CSV</a>" : ""}</div><div id="document-table">${documentTable(filteredDocs(kind))}</div><div class="table-foot"><span>${data.length} ${quotes ? "quotations" : "invoices"} in workspace</span><span>All dates / MYR</span></div></section>`
   );
 }
 function matches(d, f) {
@@ -288,7 +305,7 @@ function filteredDocs(kind) {
     (d) =>
       d.kind === kind &&
       matches(d, filter) &&
-      ((d.number || "draft") + " " + d.client.name)
+      ((d.number || "draft") + " " + d.client.name + " " + (d.client.email || ""))
         .toLowerCase()
         .includes(search.toLowerCase()),
   );
@@ -300,7 +317,7 @@ function clients() {
       "One place for every contact, quotation and billing history.",
       button("Add client", "new-client", "", true, "plus"),
     ) +
-    `<section class="panel">${S.clients.length ? `<div class="table-wrap"><table><thead><tr><th>Client</th><th>Contact</th><th>Payment terms</th><th class="num">Outstanding</th><th>Action</th></tr></thead><tbody>${S.clients.map((c) => `<tr><td><button class="link-button" data-action="open-client" data-id="${c.id}">${E(c.name)}</button><small>${E(c.email)}</small></td><td>${E(c.contact || "—")}</td><td>${c.terms} days${c.archived ? " " + badge("Archived") : ""}</td><td class="num">${money(S.documents.filter((d) => d.client_id === c.id && d.kind === "invoice" && d.state === "issued").reduce((s, d) => s + d.balance, 0))}</td><td>${button("Edit", "edit-client", c.id)}</td></tr>`).join("")}</tbody></table></div>` : empty("Your first client starts here", "Add their billing name and contact details.", button("Add client", "new-client", "", true))}</section>`
+    `<section class="panel">${S.clients.length ? `<div class="table-wrap"><table><thead><tr><th>Client</th><th>Contact</th><th>Payment terms</th><th class="num">Outstanding</th><th>Action</th></tr></thead><tbody>${paged(S.clients).rows.map((c) => `<tr><td><button class="link-button" data-action="open-client" data-id="${c.id}">${E(c.name)}</button><small>${E(c.email)}</small></td><td>${E(c.contact || "—")}</td><td>${c.terms} days${c.archived ? " " + badge("Archived") : ""}</td><td class="num">${money(S.documents.filter((d) => d.client_id === c.id && d.kind === "invoice" && d.state === "issued").reduce((s, d) => s + d.balance, 0))}</td><td>${button("Edit", "edit-client", c.id)}</td></tr>`).join("")}</tbody></table></div>${paged(S.clients).nav}` : empty("Your first client starts here", "Add their billing name and contact details.", button("Add client", "new-client", "", true))}</section>`
   );
 }
 function clientProfile(id) {
@@ -801,7 +818,13 @@ async function runAction(action, id, el) {
       break;
     case "filter":
       filter = id;
+      page = 0;
       renderRoute();
+      break;
+    case "page":
+      page = Math.max(0, Number(id) || 0);
+      renderRoute();
+      window.scrollTo(0, 0);
       break;
     case "add-line":
       $("#line-items").insertAdjacentHTML("beforeend", lineMarkup());
@@ -1263,7 +1286,8 @@ document.addEventListener("submit", async (event) => {
 document.addEventListener("input", (event) => {
   if (event.target.id === "document-search") {
     search = event.target.value;
-    $("#document-table").innerHTML = invoiceTable(
+    page = 0;
+    $("#document-table").innerHTML = documentTable(
       filteredDocs(location.hash.includes("quotes") ? "quote" : "invoice"),
     );
   } else if (event.target.closest('form[data-form="editor"]')) updatePreview();
@@ -1309,6 +1333,7 @@ document.addEventListener("change", (event) => {
 window.addEventListener("hashchange", () => {
   filter = "All";
   search = "";
+  page = 0;
   renderRoute();
   window.scrollTo(0, 0);
 });

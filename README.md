@@ -59,6 +59,7 @@ See [AI, MCP and sales setup](docs/AUTOMATION.md) for configuration, tool scopes
 - CSV export with formula-cell neutralization, business JSON export and actor/before-after audit history.
 - Optional authenticator MFA, one-use recovery codes and local operator recovery.
 - AES-256-GCM online backups, daily scheduling when configured and integrity-checked restore to a new database.
+- Lists page 50 rows at a time with search across all records; `GET /api/documents` offers paged, searchable results for integrations. Set `TRUST_PROXY` behind a reverse proxy so rate limits see real client addresses.
 - Responsive desktop/mobile layout and semantic forms, keyboard-focus styling, explicit labels and native dialogs.
 
 **Issued** means published/locked inside this app, not emailed. Sharing opens a link or WhatsApp composer; the app does not send a message itself. A viewed status means the link was opened and is not proof of delivery or identity.
