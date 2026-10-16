@@ -45,3 +45,10 @@ No live bank payment, email delivery, MyInvois submission, production TLS deploy
 - Try to delete a client with documents; confirm the error asks you to archive. Archive the client; confirm it disappears from new invoice/schedule/opportunity choices but its documents remain. Restore it.
 - Delete an unused service. Try to delete one used by a schedule; confirm it is refused.
 - Edit a schedule's next run date and terms. Confirm a used schedule cannot be deleted or moved back over a billed period.
+
+## v0.5 email, reminders and statements
+
+- With SMTP configured, email an issued invoice with "Include a private online link"; confirm the PDF attachment, the link opens, the old link stops working and the Emails panel shows "Sent".
+- With a wrong SMTP password, confirm the app shows a send failure and the log shows "Failed".
+- Enable reminders in Settings with an invoice due in 3 days and one overdue by 1 day. Run "Send due reminders now"; confirm one email each, then run again and confirm nothing is resent.
+- Download a client statement for the last 90 days; check opening balance, movements, closing balance and aging against the invoices and payments.

@@ -74,7 +74,7 @@ const icon = (n) =>
 const logo = () =>
   '<img class="logo" src="/assets/nawlogic-logo.png" alt="Nawlogic">';
 const badge = (s) =>
-  `<span class="badge ${{ Paid: "green", Accepted: "green", Active: "green", "Part-paid": "orange", "Pending review": "orange", Overdue: "red", Void: "red", Declined: "red", Viewed: "blue", Issued: "blue", Expired: "orange", Archived: "orange" }[s] || ""}"><span class="dot"></span>${E(s)}</span>`;
+  `<span class="badge ${{ Paid: "green", Accepted: "green", Active: "green", "Part-paid": "orange", "Pending review": "orange", Overdue: "red", Void: "red", Declined: "red", Viewed: "blue", Issued: "blue", Expired: "orange", Archived: "orange", Sent: "green", Failed: "red", Sending: "blue", Connected: "green" }[s] || ""}"><span class="dot"></span>${E(s)}</span>`;
 const button = (label, action, id = "", primary = false, iconName = "") =>
   `<button type="button" class="btn ${primary ? "primary" : ""}" data-action="${action}" data-id="${E(id)}">${iconName ? icon(iconName) : ""}${E(label)}</button>`;
 const empty = (title, body = "", cta = "") =>
@@ -315,6 +315,7 @@ function clientProfile(id) {
           ? button("Restore client", "restore-client", c.id)
           : button("Archive client", "archive-client", c.id)) +
         button("Delete client", "delete-client", c.id) +
+        button("Statement", "client-statement", c.id) +
         (c.archived
           ? ""
           : button("New invoice", "client-invoice", c.id, true, "plus")),
@@ -413,6 +414,38 @@ function paper(d, publicView = false) {
     c = d.client;
   return `<section class="panel invoice-paper"><div class="paper-head"><div>${logo()}<div class="paper-company"><strong>${E(b.company)}</strong><p>${E([b.registration ? `Reg: ${b.registration}` : "", b.address, b.email, b.phone].filter(Boolean).join("\n"))}</p></div></div><div><h2>${d.kind === "quote" ? "QUOTATION" : "INVOICE"}</h2><p>${E(d.number || "Draft — not issued")}</p></div></div>${b.demo ? '<div class="notice">Demo document. No real transaction.</div>' : ""}<div class="billing-grid"><div><div class="eyebrow">Bill to</div><strong>${E(c.name)}</strong><p>${E([c.contact, c.address].filter(Boolean).join("\n"))}</p></div><div><div class="eyebrow">Document details</div><p>Issue date: ${dateLabel(d.issue_date)}<br>${d.kind === "quote" ? "Valid until" : "Due date"}: ${dateLabel(d.due_date)}<br>Currency: MYR</p></div></div><div class="table-wrap"><table><thead><tr><th>Description</th><th class="num line-qty">Qty</th><th class="num line-rate">Rate</th><th class="num">Amount</th></tr></thead><tbody>${d.items.map((i) => `<tr><td class="quote-scope">${E(i.description)}<small class="mobile-line-meta">${i.quantity} × ${money(i.rate)}</small></td><td class="num line-qty">${i.quantity}</td><td class="num line-rate">${money(i.rate)}</td><td class="num">${money(i.amount)}</td></tr>`).join("")}</tbody></table></div><div class="totals"><div class="total-row"><span>Subtotal</span><strong>${money(d.subtotal)}</strong></div>${d.discount ? `<div class="total-row"><span>Discount</span><strong>−${money(d.discount)}</strong></div>` : ""}<div class="total-row emphasis"><span>Original total</span><span>${money(d.total)}</span></div>${d.credit ? `<div class="total-row"><span>Credit notes</span><strong>−${money(d.credit)}</strong></div>` : ""}${d.debit ? `<div class="total-row"><span>Debit notes</span><strong>+${money(d.debit)}</strong></div>` : ""}${d.credit || d.debit ? `<div class="total-row emphasis"><span>Adjusted total</span><span>${money(d.adjusted_total)}</span></div>` : ""}${d.kind === "invoice" ? `<div class="total-row"><span>Paid</span><strong>${money(d.paid)}</strong></div><div class="total-row emphasis"><span>Balance due</span><span>${money(d.balance)}</span></div>` : ""}</div>${d.kind === "invoice" && d.state !== "void" ? `<div class="paper-notes"><h3>Payment information</h3>${b.bankAccount ? `<p>${E([b.bankName, b.bankHolder, b.bankAccount].filter(Boolean).join("\n"))}</p><p>Reference: ${E(d.number || "Not yet issued")}</p>` : "<p>Bank details are not configured. Contact Nawlogic before paying.</p>"}</div>` : ""}${d.terms ? `<div class="paper-notes"><h3>Terms</h3><p>${E(d.terms)}</p></div>` : ""}${d.notes ? `<div class="paper-notes"><h3>Notes</h3><p>${E(d.notes)}</p></div>` : ""}${publicView ? '<p class="field-hint">Business document. Not a validated MyInvois e-Invoice.</p>' : ""}</section>`;
 }
+function emailHistory(list) {
+  if (!list.length) return "";
+  return `<section class="panel"><div class="panel-head"><h2>Emails</h2></div>${list
+    .slice(0, 8)
+    .map(
+      (m) =>
+        `<div class="payment"><div class="payment-top"><strong>${E(m.subject)}</strong>${badge(m.status === "sent" ? "Sent" : m.status === "failed" ? "Failed" : "Sending")}</div><p>${E(m.recipients)}<br>${timeLabel(m.created)}${m.kind === "reminder" ? " / automatic reminder" : ""}</p>${m.error ? `<p>${E(m.error)}</p>` : ""}</div>`,
+    )
+    .join("")}</section>`;
+}
+function remindersPanel() {
+  const b = S.settings;
+  return `<section class="panel mt22"><div class="panel-head"><div><h2>Email & payment reminders</h2><p>${S.mail.configured ? "Sending from " + E(S.mail.from) : "Email is not configured. Set SMTP_HOST, SMTP_USER, SMTP_PASS and MAIL_FROM on the server."}</p></div>${badge(S.mail.configured ? "Connected" : "Not connected")}</div><form data-form="reminders"><label class="check-row"><input type="checkbox" name="remindersEnabled" ${b.remindersEnabled ? "checked" : ""} ${S.mail.configured ? "" : "disabled"}> Send automatic reminders for unpaid invoices to the client's email.</label><div class="form-grid">${input("Days before due date (0 = none)", "reminderBeforeDays", b.reminderBeforeDays ?? 3, "number", true, 'min="0" max="30" step="1"')}${input("Days after due date (comma separated)", "reminderAfterDays", b.reminderAfterDays ?? "1,7,14", "text", true, 'pattern="\\s*\\d{1,3}(\\s*,\\s*\\d{1,3}){0,4}\\s*" maxlength="40"')}</div><p class="field-hint">Each invoice gets each reminder once. A missed reminder is skipped after 2 days instead of being sent late. Reminders attach the invoice PDF and your bank details.</p>${errorBlock()}<div class="form-actions">${S.mail.configured ? button("Send due reminders now", "run-reminders") : ""}<button class="btn primary" type="submit">Save reminders</button></div></form>${emailHistory(S.emailLog.filter((m) => m.kind === "reminder")).replace("<h2>Emails</h2>", "<h2>Recent reminders</h2>")}</section>`;
+}
+function emailForm(id) {
+  const d = S.documents.find((d) => d.id === id);
+  if (!S.mail.configured) {
+    toast("Email is not configured on the server. Use the client link instead.", true);
+    return;
+  }
+  showModal(
+    "Email " + (d.kind === "quote" ? "quotation" : "invoice"),
+    `<form data-form="email-document" data-id="${E(id)}">${input("To", "to", d.client.email || "", "text", true, 'maxlength="600" placeholder="client@example.com"')}${input("Cc (optional)", "cc", "", "text", false, 'maxlength="600"')}${input("Subject", "subject", `${d.kind === "quote" ? "Quotation" : "Invoice"} ${d.number} from ${d.business.company}`, "text", true, 'maxlength="200"')}${area("Message (optional)", "message", "", 4000)}<label class="check-row"><input type="checkbox" name="include_link"> Include a private online link. This replaces any existing link for this document.</label>${input("Link validity (days)", "link_days", 30, "number", true, 'min="1" max="90" step="1"')}<p class="field-hint">The PDF is attached. Separate addresses with commas.</p>${formEnd("Send email")}</form>`,
+  );
+}
+function statementForm(id) {
+  const c = S.clients.find((c) => c.id === id);
+  showModal(
+    "Statement of account",
+    `<form data-form="statement" data-id="${E(id)}"><div class="form-grid">${input("From", "from_date", addDays(S.today, -90), "date", true)}${input("To", "to_date", S.today, "date", true, `max="${S.today}"`)}</div><div class="actions mt22">${button("Download PDF", "statement-pdf", id)}</div>${S.mail.configured ? `${input("Email to", "to", c.email || "", "text", true, 'maxlength="600"')}${area("Message (optional)", "message", "", 4000)}${formEnd("Email statement")}` : `<p class="field-hint">Email is not configured; download the PDF to send it yourself.</p>${errorBlock()}`}</form>`,
+  );
+}
 function documentView(id) {
   const d = S.documents.find((d) => d.id === id);
   if (!d) return empty("Document not found");
@@ -423,7 +456,8 @@ function documentView(id) {
         button("Issue document", "issue-document", id, true)
       : d.state === "void"
         ? ""
-        : button("Client link", "share-document", id, true, "copy")) +
+        : button("Client link", "share-document", id, true, "copy") +
+          button("Email", "email-document", id)) +
     button("Duplicate", "duplicate-document", id) +
     `<a class="btn" href="/api/documents/${id}/pdf">${icon("download")} PDF</a>`;
   const events = S.audit.filter((a) => a.entity_id === id).slice(0, 8);
@@ -443,7 +477,7 @@ function documentView(id) {
             )
             .join("")}</section>`
         : ""
-    }${d.kind === "invoice" ? `<section class="panel"><div class="panel-head"><h2>Payment history</h2></div>${d.payments.map((p) => `<div class="payment"><div class="payment-top"><strong>${money(p.amount)}</strong>${badge(p.reversed ? "Reversed" : "Confirmed")}</div><p>${dateLabel(p.paid_date)} / ${E(p.method)}<br>Reference: ${E(p.reference)}</p>${p.reversed ? `<p>Reversal: ${E(p.reversal_reason)}</p>` : `<div class="payment-actions"><a href="/api/payments/${p.id}/receipt">Receipt PDF</a><button class="link-button red-text" data-action="reverse-payment" data-id="${p.id}">Reverse</button></div>`}</div>`).join("") || "<p>No payments recorded yet.</p>"}</section>` : ""}<section class="panel"><div class="panel-head"><h2>Activity</h2></div><div class="timeline">${events.map((e) => `<div class="timeline-item"><strong>${E(e.action.replaceAll(".", " "))}</strong><small>${timeLabel(e.created)} / ${E(e.actor || "system")}</small>${e.detail ? `<p>${E(e.detail)}</p>` : ""}</div>`).join("") || "<p>No activity yet.</p>"}</div></section></div></div>`
+    }${d.kind === "invoice" ? `<section class="panel"><div class="panel-head"><h2>Payment history</h2></div>${d.payments.map((p) => `<div class="payment"><div class="payment-top"><strong>${money(p.amount)}</strong>${badge(p.reversed ? "Reversed" : "Confirmed")}</div><p>${dateLabel(p.paid_date)} / ${E(p.method)}<br>Reference: ${E(p.reference)}</p>${p.reversed ? `<p>Reversal: ${E(p.reversal_reason)}</p>` : `<div class="payment-actions"><a href="/api/payments/${p.id}/receipt">Receipt PDF</a><button class="link-button red-text" data-action="reverse-payment" data-id="${p.id}">Reverse</button></div>`}</div>`).join("") || "<p>No payments recorded yet.</p>"}</section>` : ""}${emailHistory(S.emailLog.filter((m) => m.document_id === id))}<section class="panel"><div class="panel-head"><h2>Activity</h2></div><div class="timeline">${events.map((e) => `<div class="timeline-item"><strong>${E(e.action.replaceAll(".", " "))}</strong><small>${timeLabel(e.created)} / ${E(e.actor || "system")}</small>${e.detail ? `<p>${E(e.detail)}</p>` : ""}</div>`).join("") || "<p>No activity yet.</p>"}</div></section></div></div>`
   );
 }
 function renderRoute() {
@@ -491,7 +525,7 @@ function renderRoute() {
       html = payments();
       break;
     case "settings":
-      html = settings() + advanced.security();
+      html = settings() + remindersPanel() + advanced.security();
       break;
     case "document":
       html = documentView(id);
@@ -882,6 +916,28 @@ async function runAction(action, id, el) {
       renderRoute();
       toast(action === "archive-client" ? "Client archived." : "Client restored.");
       break;
+    case "email-document":
+      emailForm(id);
+      break;
+    case "client-statement":
+      statementForm(id);
+      break;
+    case "statement-pdf": {
+      const f = modal.querySelector("form[data-form=statement]");
+      const q = new URLSearchParams({
+        from: f.from_date.value,
+        to: f.to_date.value,
+      });
+      location.href = `/api/clients/${id}/statement/pdf?${q}`;
+      break;
+    }
+    case "run-reminders": {
+      const r = await api("/reminders/run", "POST", {});
+      await refresh();
+      renderRoute();
+      toast(r.skipped ? "Reminders are turned off." : `${r.sent} reminder(s) sent.`);
+      break;
+    }
     case "duplicate-document": {
       const d = await api(`/documents/${id}/duplicate`, "POST", {});
       await refresh();
@@ -1019,6 +1075,36 @@ async function submitForm(form) {
     await refresh();
     renderRoute();
     toast("Payment reversed. Invoice balance updated.");
+    return;
+  }
+  if (type === "email-document") {
+    await api(`/documents/${id}/email`, "POST", {
+      ...b,
+      include_link: b.include_link === "on",
+      link_days: Number(b.link_days),
+    });
+    modal.close();
+    await refresh();
+    renderRoute();
+    toast("Email sent.");
+    return;
+  }
+  if (type === "statement") {
+    await api(`/clients/${id}/statement/email`, "POST", b);
+    modal.close();
+    await refresh();
+    toast("Statement emailed.");
+    return;
+  }
+  if (type === "reminders") {
+    await api("/settings", "PUT", {
+      remindersEnabled: b.remindersEnabled === "on",
+      reminderBeforeDays: Number(b.reminderBeforeDays),
+      reminderAfterDays: b.reminderAfterDays,
+    });
+    await refresh();
+    renderRoute();
+    toast("Reminder settings saved.");
     return;
   }
   if (type === "schedule") {

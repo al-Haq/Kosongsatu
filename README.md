@@ -40,6 +40,9 @@ See [AI, MCP and sales setup](docs/AUTOMATION.md) for configuration, tool scopes
 - Dashboard with issued invoice value, confirmed collections, outstanding balances and overdue invoices. Monthly and all-date metrics are explicitly distinguished.
 - Client and service catalogs, including editable payment terms and default rates. Clients with history can be archived and restored; unused clients, services, schedules, opportunities and drafts can be deleted, with the deletion kept in the audit history.
 - Duplicate any document into a new draft.
+- Email issued invoices and quotations with the PDF attached and an optional private link, through your own SMTP server. Every message is logged on the document.
+- Opt-in automatic payment reminders before and after the due date (default 3 days before; 1, 7 and 14 days after). Each invoice gets each reminder once, and a missed reminder is skipped instead of sent late.
+- Statement of account per client for any period, with opening/closing balance and aging (current, 1–30, 31–60, 61–90, 90+ days), as a PDF or by email.
 - Draft quotations and invoices with live preview, quantities to 2 decimals, line rounding in integer sen, discounts and MYR totals.
 - Issue-time numbering and immutable snapshots of client/business details. Issued documents cannot be silently rewritten.
 - Unicode-capable, branded downloadable PDF invoices, quotations and payment receipts. Long documents paginate.
@@ -61,7 +64,7 @@ See [AI, MCP and sales setup](docs/AUTOMATION.md) for configuration, tool scopes
 
 - LHDN MyInvois e-Invoice submission, validation, cancellation or validated tax notes.
 - SST registration, tax calculation or tax reporting. The app must not be represented as tax-compliant software without a separate review and integration.
-- Payment gateways, automatic bank feeds, direct debit, automatic reminders or email sending.
+- Payment gateways, automatic bank feeds or direct debit. Email needs your own SMTP account; none is connected by default.
 - Payment-slip file uploads (clients submit a transaction reference and message), multiple staff roles, multi-company tenancy or self-registration.
 - Fully automatic recurring scheduling. An owner deliberately generates due drafts; no job sends/charges automatically.
 - Business JSON import. Export is portable business data; use the encrypted database backup/restore procedure for recovery.

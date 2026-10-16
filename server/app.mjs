@@ -1,4 +1,6 @@
 import { Assistant } from "./assistant.mjs";
+import { Mailer } from "./mailer.mjs";
+import { renderStatementPdf } from "./statement.mjs";
 import { TOOL_DEFINITIONS } from "./automation.mjs";
 import { z } from "zod";
 import http from "node:http";
@@ -80,6 +82,8 @@ export function createApp({
   secure = false,
   assistantConfig,
   aiFetch,
+  mailConfig,
+  mailTransport,
   backupConfig = {
     directory: process.env.BACKUP_DIRECTORY,
     key: process.env.BACKUP_KEY,
@@ -89,6 +93,10 @@ export function createApp({
   const allowedOrigin = new URL(appUrl).origin;
   const limits = new Map();
   const backups = new BackupManager(store, backupConfig);
+  const mailer = new Mailer(store, {
+    ...(mailConfig !== undefined ? { config: mailConfig } : {}),
+    ...(mailTransport ? { transport: mailTransport } : {}),
+  });
   const assistant = new Assistant(store, {
     ...(assistantConfig !== undefined ? { config: assistantConfig } : {}),
     ...(aiFetch ? { fetcher: aiFetch } : {}),
@@ -446,6 +454,8 @@ export function createApp({
               automation: store.automationState(),
               connectors: store.connectorTokens(),
               assistant: assistant.status(),
+              mail: mailer.status(),
+              emailLog: store.emailLog(),
               assistantRuns: store.db
                 .prepare(
                   "SELECT id,prompt,response,state,tool_log,created FROM assistant_runs WHERE owner_id=? ORDER BY created DESC LIMIT 20",
@@ -458,7 +468,7 @@ export function createApp({
             return send(
               200,
               {
-                schemaVersion: 4,
+                schemaVersion: 5,
                 exported: new Date().toISOString(),
                 ...store.workspace(),
                 finance: store.finance(),
@@ -640,6 +650,36 @@ export function createApp({
             store.reviewProof(proof[1], (await body()).reason);
             return send(200, { ok: true });
           }
+          const statement = path.match(
+            /^\/api\/clients\/([\w-]+)\/statement(?:\/(pdf|email))?$/,
+          );
+          if (statement && statement[2] === "pdf" && method === "GET") {
+            const s = store.statement(statement[1], {
+              from_date: url.searchParams.get("from") || undefined,
+              to_date: url.searchParams.get("to") || undefined,
+            });
+            return send(200, await renderStatementPdf(s), {
+              "Content-Type": "application/pdf",
+              "Content-Disposition": `attachment; filename="statement-${s.to}.pdf"`,
+            });
+          }
+          if (statement && !statement[2] && method === "GET")
+            return send(
+              200,
+              store.statement(statement[1], {
+                from_date: url.searchParams.get("from") || undefined,
+                to_date: url.searchParams.get("to") || undefined,
+              }),
+            );
+          if (statement && statement[2] === "email" && method === "POST") {
+            allow("email:" + session.owner_id, 30, 600000);
+            return send(
+              201,
+              await mailer.sendStatement(statement[1], await body()),
+            );
+          }
+          if (path === "/api/reminders/run" && method === "POST")
+            return send(200, await mailer.runReminders());
           const archive = path.match(
             /^\/api\/clients\/([\w-]+)\/(archive|restore)$/,
           );
@@ -697,7 +737,7 @@ export function createApp({
             );
           }
           const doc = path.match(
-            /^\/api\/documents\/([\w-]+)(?:\/(issue|share|revoke|void|convert|payments|adjustments|pdf|duplicate))?$/,
+            /^\/api\/documents\/([\w-]+)(?:\/(issue|share|revoke|void|convert|payments|adjustments|pdf|duplicate|email))?$/,
           );
           if (doc) {
             const [, idv, action] = doc;
@@ -731,6 +771,17 @@ export function createApp({
             }
             if (method === "POST" && action === "void")
               return send(200, store.void(idv, (await body()).reason));
+            if (method === "POST" && action === "email") {
+              allow("email:" + session.owner_id, 30, 600000);
+              return send(
+                201,
+                await mailer.sendDocument(
+                  idv,
+                  await body(),
+                  (token) => `${allowedOrigin}/client/${token}`,
+                ),
+              );
+            }
             if (method === "POST" && action === "duplicate")
               return send(
                 201,
@@ -852,7 +903,7 @@ export function createApp({
     }),
   );
   server.backups = backups;
-  let automationTimer;
+  let automationTimer, reminderTimer;
   server.startAutomations = () => {
     if (automationTimer) return;
     const run = () =>
@@ -868,10 +919,19 @@ export function createApp({
     run();
     automationTimer = setInterval(run, 30000);
     automationTimer.unref();
+    // Reminders are opt-in in Settings; each invoice/stage is sent at most once.
+    const remind = () =>
+      mailer
+        .runReminders()
+        .catch(() => console.error("Reminder run failed; check mail settings."));
+    remind();
+    reminderTimer = setInterval(remind, 3600000);
+    reminderTimer.unref();
   };
   server.on("close", () => {
     backups.stop();
     if (automationTimer) clearInterval(automationTimer);
+    if (reminderTimer) clearInterval(reminderTimer);
   });
   server.requestTimeout = 20000;
   server.headersTimeout = 15000;
