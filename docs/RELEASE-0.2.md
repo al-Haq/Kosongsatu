@@ -21,6 +21,8 @@ Phase 1 implements priorities 1–16 from the feature review. The remaining prod
 | 15       | Idempotency keys for financial creation and other record creation                                                            | Finance and HTTP tests                           |
 | 16       | Document-scoped private links, configurable 1–90 day expiry, rotation/revocation                                             | Domain and browser tests                         |
 
+"Browser" checks in this table are the manual steps in [ACCEPTANCE.md](ACCEPTANCE.md); the repository has no automated browser suite.
+
 ## Accounting behavior
 
 Receipt RM200 → allocate RM100 each to two invoices = RM200 cash, not RM400. Credit RM20 against a paid invoice releases RM20 to the original receipt; it does not create new cash. Recording a RM20 bank refund consumes those available funds. A debit note raises the invoice balance but does not automatically reuse released funds.

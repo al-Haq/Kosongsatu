@@ -780,7 +780,13 @@ export function createApp({
           path === "/" || /^\/client\/[\w-]+$/.test(path)
             ? "/index.html"
             : path;
-        const file = resolve(publicDir, "." + decodeURIComponent(staticPath));
+        let decoded;
+        try {
+          decoded = decodeURIComponent(staticPath);
+        } catch {
+          throw new AppError("Not found.", 404);
+        }
+        const file = resolve(publicDir, "." + decoded);
         check(
           file.startsWith(publicDir + sep) ||
             (file.startsWith(publicDir) && publicDir.endsWith(sep)),
@@ -852,6 +858,12 @@ if (
     throw new Error("Production requires an explicit HTTPS APP_URL.");
   if (!store.db.prepare("SELECT id FROM owners LIMIT 1").get())
     throw new Error("No owner configured. Run npm run setup first.");
+  // A run left "running" by a previous process can never finish; mark it failed so it can be reviewed.
+  store.db
+    .prepare(
+      "UPDATE assistant_runs SET state='failed',response='Interrupted by server restart' WHERE state='running'",
+    )
+    .run();
   const server = createApp({ store, appUrl, secure: production });
   server.listen(port, host, () => {
     console.log(`Nawlogic Invoice: ${appUrl}`);

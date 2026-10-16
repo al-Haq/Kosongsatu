@@ -75,6 +75,6 @@ npm test
 npm audit --omit=dev
 ```
 
-Domain and HTTP integration tests cover exact amounts, immutable snapshots, financial allocations/notes/refunds, recurring anchors, idempotency, CSV reconciliation, migration, TOTP vectors and recovery codes, encrypted backup/restore, authorization and PDF pagination. Browser checks exercise both the original billing flow and the new finance/security screens on desktop/mobile.
+Domain and HTTP integration tests cover exact amounts, immutable snapshots, financial allocations/notes/refunds, recurring anchors, idempotency, CSV reconciliation, migration, TOTP vectors and recovery codes, encrypted backup/restore, authorization and PDF pagination. Browser flows (billing, finance/security, sales) are covered by the manual checklist in [ACCEPTANCE.md](docs/ACCEPTANCE.md); there is no automated browser test suite yet. GitHub Actions runs `check`, `test` and `audit` on every push and pull request.
 
 See the [phase 1 release matrix](docs/RELEASE-0.2.md), [deployment and backup](docs/DEPLOYMENT.md), [design decisions](docs/DESIGN.md) and [manual browser checks](docs/ACCEPTANCE.md). Production hosting is **not** configured by this repository commit.

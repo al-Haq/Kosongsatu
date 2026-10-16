@@ -157,8 +157,18 @@ const parsed = (schema, value) => {
   );
   return result.data;
 };
+// Key-order independent JSON, so an identical retry always has the same fingerprint.
+const canonical = (value) =>
+  JSON.stringify(value, (_, v) =>
+    v && typeof v === "object" && !Array.isArray(v)
+      ? Object.fromEntries(Object.keys(v).sort().map((k) => [k, v[k]]))
+      : v,
+  );
 function validate(store, kind, payload) {
-  check(schemas[kind], "Unknown proposal type.");
+  check(
+    typeof kind === "string" && Object.hasOwn(schemas, kind),
+    "Unknown proposal type.",
+  );
   const b = parsed(schemas[kind], payload);
   if (kind === "sales") {
     store.client(b.client_id);
@@ -221,7 +231,7 @@ export function attachAutomation(Store) {
       return this.tx(() => {
         parsed(key, request_key);
         source = text(source, 180, true);
-        const fingerprint = hash(JSON.stringify({ kind, payload }));
+        const fingerprint = hash(canonical({ kind, payload }));
         const existing = this.db
           .prepare(
             "SELECT * FROM automation_proposals WHERE source=? AND request_key=?",
@@ -408,9 +418,9 @@ export function attachAutomation(Store) {
           outstanding_sen: docs.reduce((n, d) => n + d.balance, 0),
           pending_proposals: this.db
             .prepare(
-              "SELECT count(*) n FROM automation_proposals WHERE state='pending'",
+              "SELECT count(*) n FROM automation_proposals WHERE state='pending' AND expires>?",
             )
-            .get().n,
+            .get(Date.now()).n,
         };
       }
       if (name === "get_document") {
