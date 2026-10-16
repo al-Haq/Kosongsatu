@@ -157,3 +157,23 @@ test("HTTP delete requires session, CSRF and origin", async () => {
     s.db.close();
   }
 });
+test("editing a clamped schedule without moving its date keeps the original anchor day", () => {
+  const { s, c } = fixture();
+  try {
+    const service = s.saveService({ name: "Care", rate: "50.00" });
+    const sch = s.saveSchedule({
+      client_id: c.id,
+      service_id: service.id,
+      next_date: "2025-01-30",
+    });
+    s.runSchedule(sch.id);
+    const feb = s.db.prepare("SELECT * FROM schedules WHERE id=?").get(sch.id);
+    assert.equal(feb.next_date, "2025-02-28");
+    const edited = s.updateSchedule(sch.id, { next_date: feb.next_date, terms: 30 });
+    assert.equal(edited.anchor_day, 30);
+    const moved = s.updateSchedule(sch.id, { next_date: "2025-03-15" });
+    assert.equal(moved.anchor_day, 15);
+  } finally {
+    s.db.close();
+  }
+});

@@ -24,10 +24,10 @@ export function automationUI(h) {
   } = h;
   const clientName = (id) => get().clients.find((c) => c.id === id)?.name || id;
   const quote = (id) => get().documents.find((d) => d.id === id);
-  const customerOpts = () => [
+  const customerOpts = (selected = "") => [
     ["", "Select a customer"],
     ...get()
-      .clients.filter((c) => !c.archived)
+      .clients.filter((c) => !c.archived || c.id === selected)
       .map((c) => [c.id, c.name]),
   ];
   let chatKey = crypto.randomUUID();
@@ -119,7 +119,7 @@ export function automationUI(h) {
     if (!S.clients.length) return toast("Add a customer in Clients first.");
     showModal(
       s ? "Edit opportunity" : "New sales opportunity",
-      `<form data-form="sales-save" data-id="${E(sid || "")}">${select("Customer", "client_id", customerOpts(), s?.client_id)}${input("Opportunity title", "title", s?.title || "", "text", true, 'maxlength="180"')}${area("Scope / sales notes", "description", s?.description || "", 1000)}<div class="form-grid">${select(
+      `<form data-form="sales-save" data-id="${E(sid || "")}">${select("Customer", "client_id", customerOpts(s?.client_id), s?.client_id)}${input("Opportunity title", "title", s?.title || "", "text", true, 'maxlength="180"')}${area("Scope / sales notes", "description", s?.description || "", 1000)}<div class="form-grid">${select(
         "Stage",
         "stage",
         ["new", "qualified", "quoted", "won", "lost"].map((v) => [v, v]),

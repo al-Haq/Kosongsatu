@@ -189,7 +189,9 @@ export function attachRecords(Store) {
           service_id: service.id,
           next_date,
           terms: integer(b.terms ?? s.terms, 0, 365),
-          anchor_day: Number(next_date.slice(-2)),
+          // Keep the original anchor (e.g. the 30th clamped to 28 Feb) unless the date was moved.
+          anchor_day:
+            next_date === s.next_date ? s.anchor_day : Number(next_date.slice(-2)),
           month_end:
             b.month_end === undefined ? s.month_end : b.month_end === true ? 1 : 0,
         };
