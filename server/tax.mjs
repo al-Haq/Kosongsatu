@@ -1,5 +1,5 @@
 import { chmodSync } from "node:fs";
-import { check, date, TAX_RATES, today, addDays } from "./domain.mjs";
+import { check, date, TAX_RATES, today, addDays, allocateDiscount } from "./domain.mjs";
 export function migrateTax(db, path) {
   const version = db.prepare("PRAGMA user_version").get().user_version;
   if (version >= 6) return;
@@ -26,8 +26,20 @@ export function migrateTax(db, path) {
   }
 }
 export function attachTax(Store) {
-  const originalService = Store.prototype.saveService;
+  const originalService = Store.prototype.saveService,
+    originalIssue = Store.prototype.issue;
   Object.assign(Store.prototype, {
+    // Settings can change after a draft is saved, so check again at issue time.
+    issue(idv) {
+      const d = this.document(idv);
+      if (d.state === "draft" && d.items.some((i) => i.tax > 0))
+        check(
+          this.settings().sstNumber,
+          "Add your SST registration number in Settings before issuing a document that charges SST.",
+          409,
+        );
+      return originalIssue.call(this, idv);
+    },
     saveService(b, idv) {
       check(
         TAX_RATES.includes(Number(b.tax_rate ?? 0)),
@@ -52,11 +64,16 @@ export function attachTax(Store) {
       const rows = [];
       for (const d of invoices) {
         const shares = new Map();
-        for (const i of d.items) {
+        // Documents created before SST support have no per-line taxable value,
+        // so their discount is spread over the lines the same way.
+        const legacy = allocateDiscount(
+          d.items.map((i) => i.amount),
+          d.discount,
+        );
+        for (const [n, i] of d.items.entries()) {
           const rate = i.tax_rate || 0;
           const r = shares.get(rate) || { taxable: 0, tax: 0 };
-          // Documents created before SST support have no per-line taxable value.
-          r.taxable += i.taxable ?? i.amount;
+          r.taxable += i.taxable ?? i.amount - legacy[n];
           r.tax += i.tax || 0;
           shares.set(rate, r);
         }

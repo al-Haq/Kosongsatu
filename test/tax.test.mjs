@@ -140,3 +140,52 @@ test("the SST report sums issued invoices by rate within the period", async () =
     s.db.close();
   }
 });
+test("a near-total discount never makes a line, its SST or the total negative", () => {
+  const items = Array.from({ length: 50 }, (_, n) => ({
+    description: "Line " + n,
+    quantity: "1",
+    rate: "1.00",
+    tax_rate: 10,
+  }));
+  const r = calculate(items, "49.99");
+  assert.ok(r.items.every((i) => i.taxable >= 0 && i.tax >= 0));
+  assert.equal(r.items.reduce((s, i) => s + i.taxable, 0), 1);
+  assert.ok(r.total > 0);
+});
+test("issuing a taxed draft needs the SST number at issue time", () => {
+  const { s, c } = fixture();
+  try {
+    const d = s.saveDocument({
+      kind: "invoice",
+      client_id: c.id,
+      issue_date: today(),
+      due_date: addDays(today(), 14),
+      items: lines,
+    });
+    s.saveSettings({ ...s.settings(), sstNumber: "" });
+    assert.throws(() => s.issue(d.id), /SST registration number/);
+  } finally {
+    s.db.close();
+  }
+});
+test("legacy invoices without per-line taxable values still net their discount in the report", () => {
+  const { s, c } = fixture();
+  try {
+    const d = s.issue(
+      s.saveDocument({
+        kind: "invoice",
+        client_id: c.id,
+        issue_date: today(),
+        due_date: addDays(today(), 14),
+        items: [{ description: "Old", quantity: "1", rate: "100.00" }],
+        discount: "10.00",
+      }).id,
+    );
+    const items = d.items.map(({ taxable, tax, tax_rate, ...rest }) => rest);
+    s.db.prepare("UPDATE documents SET items=? WHERE id=?").run(JSON.stringify(items), d.id);
+    const r = s.sstReport({});
+    assert.deepEqual(r.rates, [{ rate: 0, taxable: 9000, tax: 0 }]);
+  } finally {
+    s.db.close();
+  }
+});

@@ -656,21 +656,32 @@ function updatePreview() {
   const b = editorData(form);
   const items = b.items.map((i) => ({
     ...i,
-    amount: Math.round(
-      (Math.round(Number(i.rate || 0) * 100) *
-        Math.round(Number(i.quantity || 0) * 100)) /
-        100,
+    amount: Math.max(
+      0,
+      Math.round(
+        (Math.round(Number(i.rate || 0) * 100) *
+          Math.round(Number(i.quantity || 0) * 100)) /
+          100,
+      ) || 0,
     ),
   }));
   const subtotal = items.reduce((s, i) => s + i.amount, 0);
   const discount = Math.round(Number(b.discount || 0) * 100);
-  // Mirrors the server: discount shared by line amount, remainder to the largest line.
-  const shares = items.map((i) =>
-    subtotal ? Math.floor((discount * i.amount) / subtotal) : 0,
-  );
-  if (items.length) {
-    const largest = items.reduce((m, i, n) => (i.amount > items[m].amount ? n : m), 0);
-    shares[largest] += discount - shares.reduce((s, v) => s + v, 0);
+  // Mirrors the server's allocateDiscount: shares by line amount, remainders by largest fraction.
+  const off = Math.min(Math.max(discount, 0), subtotal);
+  const shares = items.map((i) => (subtotal ? Number((BigInt(off) * BigInt(i.amount)) / BigInt(subtotal)) : 0));
+  if (subtotal) {
+    let left = off - shares.reduce((s, v) => s + v, 0);
+    const order = items
+      .map((i, n) => [(BigInt(off) * BigInt(i.amount)) % BigInt(subtotal), i.amount, n])
+      .sort((x, y) => (x[0] === y[0] ? y[1] - x[1] : x[0] < y[0] ? 1 : -1));
+    for (const [, a, n] of order) {
+      if (!left) break;
+      if (shares[n] < a) {
+        shares[n]++;
+        left--;
+      }
+    }
   }
   const taxes = new Map();
   items.forEach((i, n) => {

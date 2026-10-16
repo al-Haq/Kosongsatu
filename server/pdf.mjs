@@ -217,9 +217,7 @@ export function renderPdf(invoice, payment = null) {
         y += height;
         rule(y - 6);
       }
-      room(215);
-      y += 10;
-      for (const [label, value] of [
+      const totals = [
         ["Subtotal", invoice.subtotal],
         ["Discount", invoice.discount],
         ...taxSummary(invoice.items).map((t) => [`SST ${t.rate}%`, t.tax]),
@@ -238,7 +236,11 @@ export function renderPdf(invoice, payment = null) {
               ["Balance due", invoice.balance],
             ]
           : []),
-      ]) {
+      ];
+      // Reserve the whole totals block (SST rows included) so it never splits across a page.
+      room(Math.max(215, totals.length * 24 + 23));
+      y += 10;
+      for (const [label, value] of totals) {
         const strong = label === "Total" || label === "Balance due";
         line(
           label,

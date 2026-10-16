@@ -67,6 +67,28 @@ export function integer(v, min, max) {
 }
 // Malaysian SST rates: sales tax 5%/10%, service tax 6%/8%.
 export const TAX_RATES = [0, 5, 6, 8, 10];
+// Splits a document discount across lines in proportion to their amounts
+// (largest remainder method), so no line's share ever exceeds its amount.
+export function allocateDiscount(amounts, off) {
+  const subtotal = amounts.reduce((s, a) => s + a, 0);
+  if (!off || !subtotal) return amounts.map(() => 0);
+  // BigInt keeps off * amount exact for amounts up to RM 99,999,999.99.
+  const total = BigInt(subtotal),
+    discount = BigInt(off);
+  const shares = amounts.map((a) => Number((discount * BigInt(a)) / total));
+  let left = off - shares.reduce((s, v) => s + v, 0);
+  const order = amounts
+    .map((a, n) => [(discount * BigInt(a)) % total, a, n])
+    .sort((x, y) => (x[0] === y[0] ? y[1] - x[1] : x[0] < y[0] ? 1 : -1));
+  for (const [, a, n] of order) {
+    if (!left) break;
+    if (shares[n] < a) {
+      shares[n]++;
+      left--;
+    }
+  }
+  return shares;
+}
 export function calculate(items, discount = "0") {
   check(
     Array.isArray(items) && items.length > 0 && items.length <= 50,
@@ -98,10 +120,7 @@ export function calculate(items, discount = "0") {
   );
   check(subtotal - off > 0, "Document total must be greater than zero.");
   // SST is charged on each line after its share of the document discount.
-  // Rounding leftovers of the discount go to the largest line.
-  const shares = clean.map((i) => Math.floor((off * i.amount) / subtotal));
-  const largest = clean.reduce((m, i, n) => (i.amount > clean[m].amount ? n : m), 0);
-  shares[largest] += off - shares.reduce((s, v) => s + v, 0);
+  const shares = allocateDiscount(clean.map((i) => i.amount), off);
   for (const [n, i] of clean.entries()) {
     i.taxable = i.amount - shares[n];
     i.tax = Math.round((i.taxable * i.tax_rate) / 100);
