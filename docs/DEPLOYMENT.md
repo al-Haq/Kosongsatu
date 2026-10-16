@@ -31,6 +31,10 @@ Use Node.js 24, one app instance and one writable persistent SQLite volume outsi
 | `SMTP_USER` / `SMTP_PASS` | unset                                     | SMTP credentials; use an app password, never commit it          |
 | `MAIL_FROM`          | unset                                          | Sender, e.g. `Nawlogic Billing <billing@your-domain>`           |
 | `MAIL_REPLY_TO`      | unset                                          | Optional reply-to address                                       |
+| `BILLPLZ_API_KEY`    | unset                                          | Billplz secret key; online payment stays off when unset         |
+| `BILLPLZ_COLLECTION_ID` | unset                                       | Billplz collection that new bills are created in                |
+| `BILLPLZ_X_SIGNATURE_KEY` | unset                                     | Verifies callbacks and redirects; X Signature must be enabled   |
+| `BILLPLZ_SANDBOX`    | unset                                          | `true` uses billplz-sandbox.com for testing                     |
 
 Generate each key independently:
 
@@ -105,7 +109,9 @@ Type the exact owner email when prompted. Recovery generates a new password, dis
 
 See [migration and phase 1 behavior](RELEASE-0.2.md). Audit entries have update/delete guards but are not cryptographically tamper-evident against server administrators. Customer acceptance records an interaction, not independent signer verification. Bearer links should be revoked if leaked.
 
-Payment gateways, bank feeds, uploads, MyInvois and production hosting remain unconnected. Outgoing email works only after you configure your own SMTP account; set up SPF/DKIM for the sending domain so invoices are not marked as spam. Gateway callbacks will require signature verification and idempotency before any future balance changes.
+Online payment works only after you configure your own Billplz account. Billplz must be able to reach `APP_URL/api/payments/billplz/callback` over HTTPS. Each callback and browser return is checked against the X Signature, and the bill is then read back from Billplz before a receipt is recorded, so a forged or replayed notification cannot mark an invoice paid. If an invoice was already settled another way, the online payment is kept as customer funds to allocate or refund. Test the full flow in sandbox mode first.
+
+Bank feeds, uploads, MyInvois and production hosting remain unconnected. Outgoing email works only after you configure your own SMTP account; set up SPF/DKIM for the sending domain so invoices are not marked as spam.
 
 ## Optional sales automation / AI
 

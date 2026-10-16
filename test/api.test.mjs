@@ -276,7 +276,7 @@ test("financial HTTP retries return the same receipt, reject conflicts and expos
     assert.equal(pub.finance, undefined);
     assert.equal(pub.payments, undefined);
     const exported = await (await f.auth("/api/backup")).json();
-    assert.equal(exported.schemaVersion, 6);
+    assert.equal(exported.schemaVersion, 7);
     assert.equal(exported.security, undefined);
     assert.equal(exported.finance.receipts.length, 1);
     assert.ok(!JSON.stringify(exported).includes("mfa_secret"));

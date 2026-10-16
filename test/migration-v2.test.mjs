@@ -46,7 +46,7 @@ test("v1 migration preserves duplicate receipts, old reversals, anchor and rollb
     db.close();
     db = null;
     s = openDatabase(path);
-    assert.equal(s.db.prepare("PRAGMA user_version").get().user_version, 6);
+    assert.equal(s.db.prepare("PRAGMA user_version").get().user_version, 7);
     assert.equal(s.receipts().length, 3);
     assert.equal(s.receipts().filter((r) => r.legacy_review).length, 2);
     assert.equal(s.document("d1").paid, 5000);
