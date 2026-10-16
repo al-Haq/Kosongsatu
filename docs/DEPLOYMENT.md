@@ -26,6 +26,11 @@ Use Node.js 24, one app instance and one writable persistent SQLite volume outsi
 | `MFA_ENCRYPTION_KEY` | Generated private `DATABASE_PATH.mfa-key` file | Independent 32-byte base64 server key for authenticator secrets |
 | `BACKUP_DIRECTORY`   | unset                                          | Private directory for encrypted backup files                    |
 | `BACKUP_KEY`         | unset                                          | Independent 32-byte base64 backup encryption key                |
+| `SMTP_HOST`          | unset                                          | Outgoing mail server; email features stay off when unset        |
+| `SMTP_PORT`          | `587`                                          | 587 with STARTTLS (required) or 465 with implicit TLS           |
+| `SMTP_USER` / `SMTP_PASS` | unset                                     | SMTP credentials; use an app password, never commit it          |
+| `MAIL_FROM`          | unset                                          | Sender, e.g. `Nawlogic Billing <billing@your-domain>`           |
+| `MAIL_REPLY_TO`      | unset                                          | Optional reply-to address                                       |
 
 Generate each key independently:
 
@@ -100,7 +105,7 @@ Type the exact owner email when prompted. Recovery generates a new password, dis
 
 See [migration and phase 1 behavior](RELEASE-0.2.md). Audit entries have update/delete guards but are not cryptographically tamper-evident against server administrators. Customer acceptance records an interaction, not independent signer verification. Bearer links should be revoked if leaked.
 
-Payment gateways, bank feeds, outgoing email, uploads, MyInvois and production hosting remain unconnected. Gateway callbacks will require signature verification and idempotency before any future balance changes.
+Payment gateways, bank feeds, uploads, MyInvois and production hosting remain unconnected. Outgoing email works only after you configure your own SMTP account; set up SPF/DKIM for the sending domain so invoices are not marked as spam. Gateway callbacks will require signature verification and idempotency before any future balance changes.
 
 ## Optional sales automation / AI
 
