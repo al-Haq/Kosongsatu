@@ -1,6 +1,6 @@
 import PDFDocument from "pdfkit";
 import { fileURLToPath } from "node:url";
-import { currency } from "./domain.mjs";
+import { currency, taxSummary } from "./domain.mjs";
 const regular = fileURLToPath(
   new URL("../public/assets/fonts/DejaVuSans.ttf", import.meta.url),
 );
@@ -101,6 +101,12 @@ export function renderPdf(invoice, payment = null) {
       invoice.business.registration
         ? `Registration: ${invoice.business.registration}`
         : "",
+      [
+        invoice.business.tin ? `TIN: ${invoice.business.tin}` : "",
+        invoice.business.sstNumber ? `SST No: ${invoice.business.sstNumber}` : "",
+      ]
+        .filter(Boolean)
+        .join("  |  "),
       invoice.business.address,
       invoice.business.email,
       invoice.business.phone,
@@ -130,6 +136,13 @@ export function renderPdf(invoice, payment = null) {
         invoice.client.contact,
         invoice.client.address,
         invoice.client.email,
+        [
+          invoice.client.brn ? `Reg/IC: ${invoice.client.brn}` : "",
+          invoice.client.tin ? `TIN: ${invoice.client.tin}` : "",
+          invoice.client.sst_number ? `SST: ${invoice.client.sst_number}` : "",
+        ]
+          .filter(Boolean)
+          .join("  |  "),
       ]
         .filter(Boolean)
         .join("\n"),
@@ -186,26 +199,28 @@ export function renderPdf(invoice, payment = null) {
       tableHead();
       for (const item of invoice.items) {
         pdf.font("Body").fontSize(10);
+        const description = item.tax_rate
+          ? `${item.description}\nSST ${item.tax_rate}%`
+          : item.description;
         const height = Math.max(
           30,
-          pdf.heightOfString(item.description, { width: 269 }) + 17,
+          pdf.heightOfString(description, { width: 269 }) + 17,
         );
         if (y + height > 735) {
           newPage();
           tableHead();
         }
-        line(item.description, 52, y, 10, "Body", ink, 269);
+        line(description, 52, y, 10, "Body", ink, 269);
         line(item.quantity, 333, y, 9, "Body", ink, 45);
         line((item.rate / 100).toFixed(2), 389, y, 9, "Body", ink, 78);
         line((item.amount / 100).toFixed(2), 477, y, 9, "Body", ink, 78);
         y += height;
         rule(y - 6);
       }
-      room(215);
-      y += 10;
-      for (const [label, value] of [
+      const totals = [
         ["Subtotal", invoice.subtotal],
         ["Discount", invoice.discount],
+        ...taxSummary(invoice.items).map((t) => [`SST ${t.rate}%`, t.tax]),
         [
           invoice.kind === "invoice" ? "Original total" : "Total",
           invoice.total,
@@ -221,7 +236,11 @@ export function renderPdf(invoice, payment = null) {
               ["Balance due", invoice.balance],
             ]
           : []),
-      ]) {
+      ];
+      // Reserve the whole totals block (SST rows included) so it never splits across a page.
+      room(Math.max(215, totals.length * 24 + 23));
+      y += 10;
+      for (const [label, value] of totals) {
         const strong = label === "Total" || label === "Balance due";
         line(
           label,

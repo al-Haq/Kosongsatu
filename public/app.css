@@ -689,6 +689,15 @@ dialog.wide {
   font-size: 11px;
   padding: 9px;
 }
+.with-tax .line-item,
+.with-tax .line-head {
+  grid-template-columns: 1fr 64px 96px 74px 30px;
+}
+.line-item select {
+  margin: 0;
+  font-size: 11px;
+  padding: 9px 4px;
+}
 .line-head {
   display: grid;
   grid-template-columns: 1fr 72px 108px 30px;
@@ -1323,6 +1332,10 @@ dialog.wide {
   .line-head {
     grid-template-columns: 1fr 54px 83px 25px;
     gap: 5px;
+  }
+  .with-tax .line-item,
+  .with-tax .line-head {
+    grid-template-columns: 1fr 44px 70px 58px 25px;
   }
   .line-item input,
   .line-item textarea {

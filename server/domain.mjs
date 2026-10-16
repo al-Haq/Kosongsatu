@@ -65,6 +65,30 @@ export function integer(v, min, max) {
   );
   return Number(v);
 }
+// Malaysian SST rates: sales tax 5%/10%, service tax 6%/8%.
+export const TAX_RATES = [0, 5, 6, 8, 10];
+// Splits a document discount across lines in proportion to their amounts
+// (largest remainder method), so no line's share ever exceeds its amount.
+export function allocateDiscount(amounts, off) {
+  const subtotal = amounts.reduce((s, a) => s + a, 0);
+  if (!off || !subtotal) return amounts.map(() => 0);
+  // BigInt keeps off * amount exact for amounts up to RM 99,999,999.99.
+  const total = BigInt(subtotal),
+    discount = BigInt(off);
+  const shares = amounts.map((a) => Number((discount * BigInt(a)) / total));
+  let left = off - shares.reduce((s, v) => s + v, 0);
+  const order = amounts
+    .map((a, n) => [(discount * BigInt(a)) % total, a, n])
+    .sort((x, y) => (x[0] === y[0] ? y[1] - x[1] : x[0] < y[0] ? 1 : -1));
+  for (const [, a, n] of order) {
+    if (!left) break;
+    if (shares[n] < a) {
+      shares[n]++;
+      left--;
+    }
+  }
+  return shares;
+}
 export function calculate(items, discount = "0") {
   check(
     Array.isArray(items) && items.length > 0 && items.length <= 50,
@@ -84,7 +108,9 @@ export function calculate(items, discount = "0") {
       Number.isSafeInteger(amount) && amount <= 9999999999,
       "Line total is too large.",
     );
-    return { description, quantity: quantity / 100, rate, amount };
+    const tax_rate = Number(item.tax_rate ?? 0);
+    check(TAX_RATES.includes(tax_rate), "Choose an SST rate of 0, 5, 6, 8 or 10%.");
+    return { description, quantity: quantity / 100, rate, amount, tax_rate };
   });
   const subtotal = clean.reduce((sum, i) => sum + i.amount, 0);
   const off = money(discount);
@@ -93,7 +119,20 @@ export function calculate(items, discount = "0") {
     "Discount cannot exceed subtotal.",
   );
   check(subtotal - off > 0, "Document total must be greater than zero.");
-  return { items: clean, subtotal, discount: off, total: subtotal - off };
+  // SST is charged on each line after its share of the document discount.
+  const shares = allocateDiscount(clean.map((i) => i.amount), off);
+  for (const [n, i] of clean.entries()) {
+    i.taxable = i.amount - shares[n];
+    i.tax = Math.round((i.taxable * i.tax_rate) / 100);
+  }
+  const tax = clean.reduce((s, i) => s + i.tax, 0);
+  return {
+    items: clean,
+    subtotal,
+    discount: off,
+    tax,
+    total: subtotal - off + tax,
+  };
 }
 export function addDays(value, n) {
   const d = new Date(value + "T00:00:00Z");
@@ -134,3 +173,11 @@ export const currency = (cents) =>
   new Intl.NumberFormat("en-MY", { style: "currency", currency: "MYR" }).format(
     cents / 100,
   );
+// Groups a document's lines by SST rate for display and reporting.
+export function taxSummary(items) {
+  const byRate = new Map();
+  for (const i of items)
+    if (i.tax_rate)
+      byRate.set(i.tax_rate, (byRate.get(i.tax_rate) || 0) + (i.tax || 0));
+  return [...byRate].sort((a, b) => a[0] - b[0]).map(([rate, tax]) => ({ rate, tax }));
+}

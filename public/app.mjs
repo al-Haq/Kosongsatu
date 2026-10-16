@@ -320,7 +320,7 @@ function clientProfile(id) {
           ? ""
           : button("New invoice", "client-invoice", c.id, true, "plus")),
     ) +
-    `<div class="profile-grid"><section class="panel"><div class="client-avatar">${E(c.name.slice(0, 2).toUpperCase())}</div><h2>${E(c.name)}</h2><dl class="detail"><dt>Billing contact</dt><dd>${E(c.contact || "Not provided")}</dd><dt>Email</dt><dd>${E(c.email || "Not provided")}</dd><dt>Phone</dt><dd>${E(c.phone || "Not provided")}</dd><dt>Billing address</dt><dd>${E(c.address || "Not provided")}</dd><dt>Payment terms</dt><dd>${c.terms} days</dd></dl></section><section class="panel"><div class="panel-head"><h2>Documents</h2>${badge("MYR")}</div>${invoiceTable(S.documents.filter((d) => d.client_id === c.id))}</section></div>`
+    `<div class="profile-grid"><section class="panel"><div class="client-avatar">${E(c.name.slice(0, 2).toUpperCase())}</div><h2>${E(c.name)}</h2><dl class="detail"><dt>Billing contact</dt><dd>${E(c.contact || "Not provided")}</dd><dt>Email</dt><dd>${E(c.email || "Not provided")}</dd><dt>Phone</dt><dd>${E(c.phone || "Not provided")}</dd><dt>Billing address</dt><dd>${E(c.address || "Not provided")}</dd><dt>Payment terms</dt><dd>${c.terms} days</dd><dt>Registration / TIN</dt><dd>${E([c.brn, c.tin].filter(Boolean).join(" / ") || "Not provided")}</dd></dl></section><section class="panel"><div class="panel-head"><h2>Documents</h2>${badge("MYR")}</div>${invoiceTable(S.documents.filter((d) => d.client_id === c.id))}</section></div>`
   );
 }
 function services() {
@@ -406,13 +406,26 @@ function settings() {
       "Workspace settings",
       "Your company identity, document defaults and payment instructions.",
     ) +
-    `<div class="grid-equal"><section class="panel"><div class="panel-head"><h2>Brand & company</h2></div>${logo()}<div class="palette"><div class="swatch teal-bg"><span></span>Teal<br>#0EA5A4</div><div class="swatch orange-bg"><span></span>Orange<br>#F97316</div><div class="swatch ink-bg"><span></span>Ink<br>#0F172A</div></div><form data-form="settings"><div class="form-grid">${input("Registered business name", "company", b.company, "text", true, 'maxlength="180"')}${input("Registration number", "registration", b.registration, "text", false, 'maxlength="80"')}${input("Billing email", "email", b.email, "email", false, 'maxlength="160"')}${input("Phone", "phone", b.phone, "text", false, 'maxlength="60"')}<div class="span-2">${area("Business address", "address", b.address, 600)}</div>${input("Invoice prefix", "invoicePrefix", b.invoicePrefix, "text", true, 'pattern="[A-Z][A-Z0-9-]{0,11}" maxlength="12"')}${input("Quotation prefix", "quotePrefix", b.quotePrefix, "text", true, 'pattern="[A-Z][A-Z0-9-]{0,11}" maxlength="12"')}<div class="span-2">${area("Default terms", "paymentTerms", b.paymentTerms)}</div>${input("Bank name", "bankName", b.bankName, "text", false, 'maxlength="100"')}${input("Account number", "bankAccount", b.bankAccount, "text", false, 'maxlength="60"')}<div class="span-2">${input("Account holder", "bankHolder", b.bankHolder, "text", false, 'maxlength="180"')}</div></div>${errorBlock()}<p class="field-hint">Issued documents keep a snapshot of the company and client details. Tax calculation is not configured.</p><div class="form-actions"><button class="btn primary" type="submit">Save settings</button></div></form></section><div class="stack"><section class="panel"><div class="panel-head"><h2>Access & integrations</h2></div><div class="setting-line"><div><h3>Owner access</h3><p>${E(session.email)}</p></div>${badge("Password protected")}</div><div class="setting-line"><div><h3>Client invoice links</h3><p>Document only / 1–90 days / revocable</p></div>${icon("shield")}</div><div class="setting-line"><div><h3>MyInvois / payment gateway</h3><p>Requires separate integration and validation</p></div>${badge("Not connected")}</div><div class="setting-line"><div><h3>Email & scheduled reminders</h3><p>Manual sharing in this release</p></div>${badge("Not connected")}</div></section><section class="panel"><div class="panel-head"><h2>Account password</h2></div><form data-form="password">${input("Current password", "current", "", "password", true, 'autocomplete="current-password"')}${input("New password (at least 12 characters)", "password", "", "password", true, 'minlength="12" maxlength="256" autocomplete="new-password"')}${S.security.enabled ? input("Authenticator or recovery code", "code", "", "text", true, 'autocomplete="one-time-code"') : ""}${errorBlock()}<button type="submit" class="btn">Change password & sign out</button></form></section><section class="panel"><div class="panel-head"><h2>Your business data</h2></div><p>Download a business data export, including documents, payments and audit history. Store it privately.</p><div class="actions mt22"><a class="btn" href="/api/backup">${icon("download")} Export JSON</a><a class="btn" href="/api/invoices.csv">Export CSV</a></div><p class="field-hint">For full disaster recovery, use the encrypted backup and restore procedure in the deployment guide.</p></section></div></div>`
+    `<div class="grid-equal"><section class="panel"><div class="panel-head"><h2>Brand & company</h2></div>${logo()}<div class="palette"><div class="swatch teal-bg"><span></span>Teal<br>#0EA5A4</div><div class="swatch orange-bg"><span></span>Orange<br>#F97316</div><div class="swatch ink-bg"><span></span>Ink<br>#0F172A</div></div><form data-form="settings"><div class="form-grid">${input("Registered business name", "company", b.company, "text", true, 'maxlength="180"')}${input("Registration number", "registration", b.registration, "text", false, 'maxlength="80"')}${input("Tax identification number (TIN)", "tin", b.tin || "", "text", false, 'maxlength="20"')}${input("SST registration number", "sstNumber", b.sstNumber || "", "text", false, 'maxlength="40"')}${input("Billing email", "email", b.email, "email", false, 'maxlength="160"')}${input("Phone", "phone", b.phone, "text", false, 'maxlength="60"')}<div class="span-2">${area("Business address", "address", b.address, 600)}</div>${input("Invoice prefix", "invoicePrefix", b.invoicePrefix, "text", true, 'pattern="[A-Z][A-Z0-9-]{0,11}" maxlength="12"')}${input("Quotation prefix", "quotePrefix", b.quotePrefix, "text", true, 'pattern="[A-Z][A-Z0-9-]{0,11}" maxlength="12"')}<div class="span-2">${area("Default terms", "paymentTerms", b.paymentTerms)}</div>${input("Bank name", "bankName", b.bankName, "text", false, 'maxlength="100"')}${input("Account number", "bankAccount", b.bankAccount, "text", false, 'maxlength="60"')}<div class="span-2">${input("Account holder", "bankHolder", b.bankHolder, "text", false, 'maxlength="180"')}</div></div>${errorBlock()}<p class="field-hint">Issued documents keep a snapshot of the company and client details. Tax calculation is not configured.</p><div class="form-actions"><button class="btn primary" type="submit">Save settings</button></div></form></section><div class="stack"><section class="panel"><div class="panel-head"><h2>Access & integrations</h2></div><div class="setting-line"><div><h3>Owner access</h3><p>${E(session.email)}</p></div>${badge("Password protected")}</div><div class="setting-line"><div><h3>Client invoice links</h3><p>Document only / 1–90 days / revocable</p></div>${icon("shield")}</div><div class="setting-line"><div><h3>MyInvois / payment gateway</h3><p>Requires separate integration and validation</p></div>${badge("Not connected")}</div><div class="setting-line"><div><h3>Email & scheduled reminders</h3><p>Manual sharing in this release</p></div>${badge("Not connected")}</div></section><section class="panel"><div class="panel-head"><h2>Account password</h2></div><form data-form="password">${input("Current password", "current", "", "password", true, 'autocomplete="current-password"')}${input("New password (at least 12 characters)", "password", "", "password", true, 'minlength="12" maxlength="256" autocomplete="new-password"')}${S.security.enabled ? input("Authenticator or recovery code", "code", "", "text", true, 'autocomplete="one-time-code"') : ""}${errorBlock()}<button type="submit" class="btn">Change password & sign out</button></form></section><section class="panel"><div class="panel-head"><h2>Your business data</h2></div><p>Download a business data export, including documents, payments and audit history. Store it privately.</p><div class="actions mt22"><a class="btn" href="/api/backup">${icon("download")} Export JSON</a><a class="btn" href="/api/invoices.csv">Export CSV</a></div><p class="field-hint">For full disaster recovery, use the encrypted backup and restore procedure in the deployment guide.</p></section></div></div>`
   );
 }
 function paper(d, publicView = false) {
   const b = d.business,
     c = d.client;
-  return `<section class="panel invoice-paper"><div class="paper-head"><div>${logo()}<div class="paper-company"><strong>${E(b.company)}</strong><p>${E([b.registration ? `Reg: ${b.registration}` : "", b.address, b.email, b.phone].filter(Boolean).join("\n"))}</p></div></div><div><h2>${d.kind === "quote" ? "QUOTATION" : "INVOICE"}</h2><p>${E(d.number || "Draft — not issued")}</p></div></div>${b.demo ? '<div class="notice">Demo document. No real transaction.</div>' : ""}<div class="billing-grid"><div><div class="eyebrow">Bill to</div><strong>${E(c.name)}</strong><p>${E([c.contact, c.address].filter(Boolean).join("\n"))}</p></div><div><div class="eyebrow">Document details</div><p>Issue date: ${dateLabel(d.issue_date)}<br>${d.kind === "quote" ? "Valid until" : "Due date"}: ${dateLabel(d.due_date)}<br>Currency: MYR</p></div></div><div class="table-wrap"><table><thead><tr><th>Description</th><th class="num line-qty">Qty</th><th class="num line-rate">Rate</th><th class="num">Amount</th></tr></thead><tbody>${d.items.map((i) => `<tr><td class="quote-scope">${E(i.description)}<small class="mobile-line-meta">${i.quantity} × ${money(i.rate)}</small></td><td class="num line-qty">${i.quantity}</td><td class="num line-rate">${money(i.rate)}</td><td class="num">${money(i.amount)}</td></tr>`).join("")}</tbody></table></div><div class="totals"><div class="total-row"><span>Subtotal</span><strong>${money(d.subtotal)}</strong></div>${d.discount ? `<div class="total-row"><span>Discount</span><strong>−${money(d.discount)}</strong></div>` : ""}<div class="total-row emphasis"><span>Original total</span><span>${money(d.total)}</span></div>${d.credit ? `<div class="total-row"><span>Credit notes</span><strong>−${money(d.credit)}</strong></div>` : ""}${d.debit ? `<div class="total-row"><span>Debit notes</span><strong>+${money(d.debit)}</strong></div>` : ""}${d.credit || d.debit ? `<div class="total-row emphasis"><span>Adjusted total</span><span>${money(d.adjusted_total)}</span></div>` : ""}${d.kind === "invoice" ? `<div class="total-row"><span>Paid</span><strong>${money(d.paid)}</strong></div><div class="total-row emphasis"><span>Balance due</span><span>${money(d.balance)}</span></div>` : ""}</div>${d.kind === "invoice" && d.state !== "void" ? `<div class="paper-notes"><h3>Payment information</h3>${b.bankAccount ? `<p>${E([b.bankName, b.bankHolder, b.bankAccount].filter(Boolean).join("\n"))}</p><p>Reference: ${E(d.number || "Not yet issued")}</p>` : "<p>Bank details are not configured. Contact Nawlogic before paying.</p>"}</div>` : ""}${d.terms ? `<div class="paper-notes"><h3>Terms</h3><p>${E(d.terms)}</p></div>` : ""}${d.notes ? `<div class="paper-notes"><h3>Notes</h3><p>${E(d.notes)}</p></div>` : ""}${publicView ? '<p class="field-hint">Business document. Not a validated MyInvois e-Invoice.</p>' : ""}</section>`;
+  return `<section class="panel invoice-paper"><div class="paper-head"><div>${logo()}<div class="paper-company"><strong>${E(b.company)}</strong><p>${E([b.registration ? `Reg: ${b.registration}` : "", b.address, b.email, b.phone].filter(Boolean).join("\n"))}</p></div></div><div><h2>${d.kind === "quote" ? "QUOTATION" : "INVOICE"}</h2><p>${E(d.number || "Draft — not issued")}</p></div></div>${b.demo ? '<div class="notice">Demo document. No real transaction.</div>' : ""}<div class="billing-grid"><div><div class="eyebrow">Bill to</div><strong>${E(c.name)}</strong><p>${E([c.contact, c.address].filter(Boolean).join("\n"))}</p></div><div><div class="eyebrow">Document details</div><p>Issue date: ${dateLabel(d.issue_date)}<br>${d.kind === "quote" ? "Valid until" : "Due date"}: ${dateLabel(d.due_date)}<br>Currency: MYR</p></div></div><div class="table-wrap"><table><thead><tr><th>Description</th><th class="num line-qty">Qty</th><th class="num line-rate">Rate</th><th class="num">Amount</th></tr></thead><tbody>${d.items.map((i) => `<tr><td class="quote-scope">${E(i.description)}<small class="mobile-line-meta">${i.quantity} × ${money(i.rate)}</small></td><td class="num line-qty">${i.quantity}</td><td class="num line-rate">${money(i.rate)}</td><td class="num">${money(i.amount)}</td></tr>`).join("")}</tbody></table></div><div class="totals"><div class="total-row"><span>Subtotal</span><strong>${money(d.subtotal)}</strong></div>${d.discount ? `<div class="total-row"><span>Discount</span><strong>−${money(d.discount)}</strong></div>` : ""}${taxRows(d.items)}<div class="total-row emphasis"><span>Original total</span><span>${money(d.total)}</span></div>${d.credit ? `<div class="total-row"><span>Credit notes</span><strong>−${money(d.credit)}</strong></div>` : ""}${d.debit ? `<div class="total-row"><span>Debit notes</span><strong>+${money(d.debit)}</strong></div>` : ""}${d.credit || d.debit ? `<div class="total-row emphasis"><span>Adjusted total</span><span>${money(d.adjusted_total)}</span></div>` : ""}${d.kind === "invoice" ? `<div class="total-row"><span>Paid</span><strong>${money(d.paid)}</strong></div><div class="total-row emphasis"><span>Balance due</span><span>${money(d.balance)}</span></div>` : ""}</div>${d.kind === "invoice" && d.state !== "void" ? `<div class="paper-notes"><h3>Payment information</h3>${b.bankAccount ? `<p>${E([b.bankName, b.bankHolder, b.bankAccount].filter(Boolean).join("\n"))}</p><p>Reference: ${E(d.number || "Not yet issued")}</p>` : "<p>Bank details are not configured. Contact Nawlogic before paying.</p>"}</div>` : ""}${d.terms ? `<div class="paper-notes"><h3>Terms</h3><p>${E(d.terms)}</p></div>` : ""}${d.notes ? `<div class="paper-notes"><h3>Notes</h3><p>${E(d.notes)}</p></div>` : ""}${publicView ? '<p class="field-hint">Business document. Not a validated MyInvois e-Invoice.</p>' : ""}</section>`;
+}
+function taxRows(items) {
+  const by = new Map();
+  for (const i of items)
+    if (i.tax_rate) by.set(i.tax_rate, (by.get(i.tax_rate) || 0) + (i.tax || 0));
+  return [...by]
+    .sort((a, b) => a[0] - b[0])
+    .map(([r, v]) => `<div class="total-row"><span>SST ${r}%</span><strong>${money(v)}</strong></div>`)
+    .join("");
+}
+function sstPanel() {
+  const from = addDays(S.today, -60);
+  return `<section class="panel mt22"><div class="panel-head"><div><h2>SST summary</h2><p>${S.settings.sstNumber ? "SST No. " + E(S.settings.sstNumber) : "Add your SST registration number above to charge SST."}</p></div>${badge(S.settings.sstNumber ? "Active" : "Not connected")}</div><form data-form="sst-report"><div class="form-grid">${input("From", "from", from, "date", true)}${input("To", "to", S.today, "date", true)}</div><p class="field-hint">Taxable value and SST by rate for issued invoices, by issue date. Use it to prepare the SST-02 return; credit and debit notes are listed for manual review.</p><div class="form-actions"><button class="btn primary" type="submit">Download CSV</button></div></form></section>`;
 }
 function emailHistory(list) {
   if (!list.length) return "";
@@ -525,7 +538,7 @@ function renderRoute() {
       html = payments();
       break;
     case "settings":
-      html = settings() + remindersPanel() + advanced.security();
+      html = settings() + sstPanel() + remindersPanel() + advanced.security();
       break;
     case "document":
       html = documentView(id);
@@ -553,7 +566,7 @@ function clientForm(id) {
   const c = S.clients.find((c) => c.id === id) || { terms: 14 };
   showModal(
     id ? "Edit client" : "Add client",
-    `<form data-form="client" data-id="${E(id || "")}"><div class="form-grid">${input("Billing name", "name", c.name, "text", true, 'maxlength="160"')}${input("Contact person", "contact", c.contact, "text", false, 'maxlength="120"')}${input("Email", "email", c.email, "email", false, 'maxlength="160"')}${input("Phone", "phone", c.phone, "text", false, 'maxlength="60"')}<div class="span-2">${area("Billing address", "address", c.address, 600)}</div>${input("Payment terms (days)", "terms", c.terms, "number", true, 'min="0" max="365" step="1"')}</div>${formEnd("Save client")}</form>`,
+    `<form data-form="client" data-id="${E(id || "")}"><div class="form-grid">${input("Billing name", "name", c.name, "text", true, 'maxlength="160"')}${input("Contact person", "contact", c.contact, "text", false, 'maxlength="120"')}${input("Email", "email", c.email, "email", false, 'maxlength="160"')}${input("Phone", "phone", c.phone, "text", false, 'maxlength="60"')}${input("Registration / IC number", "brn", c.brn || "", "text", false, 'maxlength="40"')}${input("Tax identification number (TIN)", "tin", c.tin || "", "text", false, 'maxlength="20"')}${input("SST registration (if any)", "sst_number", c.sst_number || "", "text", false, 'maxlength="40"')}<div class="span-2">${area("Billing address", "address", c.address, 600)}</div>${input("Payment terms (days)", "terms", c.terms, "number", true, 'min="0" max="365" step="1"')}</div>${formEnd("Save client")}</form>`,
   );
 }
 function serviceForm(id) {
@@ -570,6 +583,11 @@ function serviceForm(id) {
       ["Project", "Month", "Hour", "Day", "Item"].map((v) => [v, v]),
       s.unit,
     )}${input("Rate (MYR)", "rate", dec(s.rate), "number", true, 'min="0" max="99999999.99" step="0.01"')}${select(
+      "Default SST",
+      "tax_rate",
+      TAX_RATES.map((r) => [String(r), r ? r + "%" : "No SST"]),
+      String(s.tax_rate || 0),
+    )}${select(
       "Status",
       "active",
       [
@@ -580,8 +598,11 @@ function serviceForm(id) {
     )}</div>${formEnd("Save service")}</form>`,
   );
 }
+const TAX_RATES = [0, 5, 6, 8, 10];
+const sstEnabled = () => !!S.settings.sstNumber;
 function lineMarkup(i = { description: "", quantity: 1, rate: 0 }) {
-  return `<div class="line-item"><textarea aria-label="Line description" class="item-description" rows="1" maxlength="240" required>${E(i.description)}</textarea><input aria-label="Quantity" class="item-quantity" type="number" min="0.01" max="99999.99" step="0.01" value="${i.quantity}" required><input aria-label="Rate MYR" class="item-rate" type="number" min="0" max="99999999.99" step="0.01" value="${dec(i.rate)}" required><button class="btn ghost" type="button" data-action="remove-line" aria-label="Remove item">${icon("close")}</button></div>`;
+  const tax = Number(i.tax_rate || 0);
+  return `<div class="line-item"><textarea aria-label="Line description" class="item-description" rows="1" maxlength="240" required>${E(i.description)}</textarea><input aria-label="Quantity" class="item-quantity" type="number" min="0.01" max="99999.99" step="0.01" value="${i.quantity}" required><input aria-label="Rate MYR" class="item-rate" type="number" min="0" max="99999999.99" step="0.01" value="${dec(i.rate)}" required>${sstEnabled() ? `<select aria-label="SST rate" class="item-tax">${TAX_RATES.map((r) => `<option value="${r}" ${r === tax ? "selected" : ""}>${r ? r + "%" : "No SST"}</option>`).join("")}</select>` : ""}<button class="btn ghost" type="button" data-action="remove-line" aria-label="Remove item">${icon("close")}</button></div>`;
 }
 function documentForm(kind = "invoice", id = "", clientId = "") {
   if (!S.clients.length) {
@@ -603,7 +624,7 @@ function documentForm(kind = "invoice", id = "", clientId = "") {
   };
   showModal(
     d ? "Edit draft" : kind === "quote" ? "New quotation" : "New invoice",
-    `<form data-form="editor" data-id="${E(id)}" data-kind="${kind}"><div class="editor-grid"><div><div class="form-grid"><div class="span-2">${select("Bill to", "client_id", clientOptions(value.client_id), value.client_id)}</div>${input("Issue date", "issue_date", value.issue_date, "date", true)}${input(kind === "quote" ? "Valid until" : "Due date", "due_date", value.due_date, "date", true)}</div><div class="line-head"><span>DESCRIPTION</span><span>QTY</span><span>RATE (MYR)</span><span></span></div><div id="line-items">${value.items.map(lineMarkup).join("")}</div><div class="actions mt22">${button("Custom item", "add-line", "", "", "plus")}<label class="catalog-picker"><span class="sr-only">Add service from catalog</span><select id="catalog-service"><option value="">Add from catalog...</option>${S.services
+    `<form data-form="editor" data-id="${E(id)}" data-kind="${kind}"><div class="editor-grid ${sstEnabled() ? "with-tax" : ""}"><div><div class="form-grid"><div class="span-2">${select("Bill to", "client_id", clientOptions(value.client_id), value.client_id)}</div>${input("Issue date", "issue_date", value.issue_date, "date", true)}${input(kind === "quote" ? "Valid until" : "Due date", "due_date", value.due_date, "date", true)}</div><div class="line-head"><span>DESCRIPTION</span><span>QTY</span><span>RATE (MYR)</span>${sstEnabled() ? "<span>SST</span>" : ""}<span></span></div><div id="line-items">${value.items.map(lineMarkup).join("")}</div><div class="actions mt22">${button("Custom item", "add-line", "", "", "plus")}<label class="catalog-picker"><span class="sr-only">Add service from catalog</span><select id="catalog-service"><option value="">Add from catalog...</option>${S.services
       .filter((s) => s.active)
       .map(
         (s) =>
@@ -611,7 +632,7 @@ function documentForm(kind = "invoice", id = "", clientId = "") {
       )
       .join(
         "",
-      )}</select></label></div><div class="mt22">${input("Discount (MYR)", "discount", dec(value.discount), "number", true, 'min="0" max="99999999.99" step="0.01"')}${area("Payment / project terms", "terms", value.terms)}${area("Notes", "notes", value.notes, 2000)}</div></div><aside class="preview"><div class="eyebrow mb22">Live preview / draft</div><div id="live-preview"></div><p class="field-hint">MYR. Tax calculation is not configured. This preview is not a validated e-Invoice.</p></aside></div>${formEnd("Save draft & review")}</form>`,
+      )}</select></label></div><div class="mt22">${input("Discount (MYR)", "discount", dec(value.discount), "number", true, 'min="0" max="99999999.99" step="0.01"')}${area("Payment / project terms", "terms", value.terms)}${area("Notes", "notes", value.notes, 2000)}</div></div><aside class="preview"><div class="eyebrow mb22">Live preview / draft</div><div id="live-preview"></div><p class="field-hint">${sstEnabled() ? "MYR. SST is calculated per line after discount. The saved document is authoritative." : "MYR. Add your SST registration number in Settings to charge SST."} This preview is not a validated e-Invoice.</p></aside></div>${formEnd("Save draft & review")}</form>`,
     true,
   );
   updatePreview();
@@ -625,6 +646,7 @@ function editorData(form) {
       description: $(".item-description", row).value,
       quantity: $(".item-quantity", row).value,
       rate: $(".item-rate", row).value,
+      tax_rate: Number($(".item-tax", row)?.value || 0),
     })),
   };
 }
@@ -634,16 +656,45 @@ function updatePreview() {
   const b = editorData(form);
   const items = b.items.map((i) => ({
     ...i,
-    amount: Math.round(
-      (Math.round(Number(i.rate || 0) * 100) *
-        Math.round(Number(i.quantity || 0) * 100)) /
-        100,
+    amount: Math.max(
+      0,
+      Math.round(
+        (Math.round(Number(i.rate || 0) * 100) *
+          Math.round(Number(i.quantity || 0) * 100)) /
+          100,
+      ) || 0,
     ),
   }));
   const subtotal = items.reduce((s, i) => s + i.amount, 0);
   const discount = Math.round(Number(b.discount || 0) * 100);
+  // Mirrors the server's allocateDiscount: shares by line amount, remainders by largest fraction.
+  const off = Math.min(Math.max(discount, 0), subtotal);
+  const shares = items.map((i) => (subtotal ? Number((BigInt(off) * BigInt(i.amount)) / BigInt(subtotal)) : 0));
+  if (subtotal) {
+    let left = off - shares.reduce((s, v) => s + v, 0);
+    const order = items
+      .map((i, n) => [(BigInt(off) * BigInt(i.amount)) % BigInt(subtotal), i.amount, n])
+      .sort((x, y) => (x[0] === y[0] ? y[1] - x[1] : x[0] < y[0] ? 1 : -1));
+    for (const [, a, n] of order) {
+      if (!left) break;
+      if (shares[n] < a) {
+        shares[n]++;
+        left--;
+      }
+    }
+  }
+  const taxes = new Map();
+  items.forEach((i, n) => {
+    if (i.tax_rate)
+      taxes.set(
+        i.tax_rate,
+        (taxes.get(i.tax_rate) || 0) +
+          Math.round(((i.amount - shares[n]) * i.tax_rate) / 100),
+      );
+  });
+  const tax = [...taxes.values()].reduce((s, v) => s + v, 0);
   $("#live-preview").innerHTML =
-    `<div class="preview-paper">${logo()}<h3>${E(S.settings.company)}</h3><p class="field-hint">${E(S.clients.find((c) => c.id === b.client_id)?.name || "Select a client")}<br>Due / valid until: ${E(b.due_date)}</p><div class="mt22">${items.map((i) => `<div class="preview-row"><span>${E(i.description || "New line item")}</span><strong>${money(i.amount)}</strong></div>`).join("")}</div>${discount ? `<div class="preview-row"><span>Discount</span><strong>−${money(discount)}</strong></div>` : ""}<div class="preview-total"><span>Total</span><span class="teal">${money(subtotal - discount)}</span></div></div>`;
+    `<div class="preview-paper">${logo()}<h3>${E(S.settings.company)}</h3><p class="field-hint">${E(S.clients.find((c) => c.id === b.client_id)?.name || "Select a client")}<br>Due / valid until: ${E(b.due_date)}</p><div class="mt22">${items.map((i) => `<div class="preview-row"><span>${E(i.description || "New line item")}</span><strong>${money(i.amount)}</strong></div>`).join("")}</div>${discount ? `<div class="preview-row"><span>Discount</span><strong>−${money(discount)}</strong></div>` : ""}${[...taxes].map(([r, v]) => `<div class="preview-row"><span>SST ${r}%</span><strong>${money(v)}</strong></div>`).join("")}<div class="preview-total"><span>Total</span><span class="teal">${money(subtotal - discount + tax)}</span></div></div>`;
 }
 function paymentForm(id) {
   const d = S.documents.find((d) => d.id === id);
@@ -1014,6 +1065,7 @@ async function submitForm(form) {
     await api("/services" + (id ? "/" + id : ""), id ? "PUT" : "POST", {
       ...b,
       active: b.active === "1",
+      tax_rate: Number(b.tax_rate || 0),
     });
     modal.close();
     await refresh();
@@ -1094,6 +1146,10 @@ async function submitForm(form) {
     modal.close();
     await refresh();
     toast("Statement emailed.");
+    return;
+  }
+  if (type === "sst-report") {
+    location.href = `/api/reports/sst.csv?${new URLSearchParams({ from: b.from, to: b.to })}`;
     return;
   }
   if (type === "reminders") {
@@ -1182,6 +1238,7 @@ document.addEventListener("change", (event) => {
         description: s.description || s.name,
         quantity: 1,
         rate: s.rate,
+        tax_rate: s.tax_rate,
       });
     } else
       $("#line-items").insertAdjacentHTML(
@@ -1190,6 +1247,7 @@ document.addEventListener("change", (event) => {
           description: s.description || s.name,
           quantity: 1,
           rate: s.rate,
+          tax_rate: s.tax_rate,
         }),
       );
     event.target.value = "";

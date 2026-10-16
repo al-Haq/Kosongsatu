@@ -12,7 +12,7 @@ Use Node.js 24, one app instance and one writable persistent SQLite volume outsi
 4. Use a TLS reverse proxy, exact HTTPS `APP_URL`, `NODE_ENV=production` and persistent storage. Production requires HTTPS and Secure cookies.
 5. Restrict the Node port to the proxy. Apply expected-host and edge rate limits. App rate limits use the direct peer IP and do not trust forwarded headers; requests behind one proxy share that limit.
 6. Configure encrypted backups and a separate off-host copy; complete a disposable restore drill. Preserve the MFA key separately from the database.
-7. Review SST/MyInvois obligations separately. Commercial notes and invoice voids in this app are not validated tax submissions.
+7. If you are SST-registered, add the SST number and TIN in Settings and set each service's default rate. Review SST/MyInvois obligations with your accountant: the SST summary is a working aid, and credit/debit notes carry no SST breakdown or validated tax submission.
 
 ## Environment
 
