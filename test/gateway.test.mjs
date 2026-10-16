@@ -36,6 +36,11 @@ function fakeBillplz() {
       return json(200, bill);
     }
     const id = url.split("/bills/")[1];
+    if (init.method === "DELETE") {
+      const ok = bills.has(id) && !bills.get(id).paid;
+      if (ok) bills.get(id).state = "deleted";
+      return json(ok ? 200 : 422, {});
+    }
     return bills.has(id) ? json(200, bills.get(id)) : json(404, { error: "not found" });
   };
   const pay = (id) => Object.assign(bills.get(id), { paid: true, state: "paid", paid_amount: bills.get(id).amount, paid_at: today() + "T10:00:00.000+08:00" });
@@ -84,6 +89,12 @@ test("checkout creates one bill for the balance and reuses it", async () => {
     assert.equal(bill.amount, d.balance);
     assert.equal(bill.callback_url, "https://app.example/api/payments/billplz/callback");
     assert.equal(bill.redirect_url, "https://app.example/client/" + token);
+    // A changed balance creates a new bill and withdraws the old one.
+    s.adjustment(d.id, { kind: "credit", amount: "50.00", reason: "Discount", issue_date: today() });
+    await g.checkout(token, "https://app.example");
+    assert.equal(fake.bills.size, 2);
+    assert.equal(fake.bills.get("bill1").state, "deleted");
+    assert.equal(fake.bills.get("bill2").amount, 20000);
     const off = new Gateway(s, { config: null });
     await assert.rejects(off.checkout(token, "https://app.example"), (e) => e.status === 503);
   } finally {
@@ -98,8 +109,11 @@ test("a paid bill records one receipt, settles the invoice and ignores repeats",
     await g.checkout(token, "https://app.example");
     assert.equal((await g.settle("bill1")).state, "pending", "unpaid bills stay pending");
     fake.pay("bill1");
+    delete fake.bills.get("bill1").paid_at;
+    const yesterday = addDays(today(), -1);
+    assert.equal((await g.settle("bill1", yesterday + " 23:59:00 +0800")).state, "paid");
     assert.equal((await g.settle("bill1")).state, "paid");
-    assert.equal((await g.settle("bill1")).state, "paid");
+    assert.equal(s.receipts().find((r) => r.reference === "Billplz bill1").paid_date, yesterday);
     const doc = s.document(d.id);
     assert.equal(doc.balance, 0);
     assert.equal(doc.payments.length, 1);
@@ -166,6 +180,8 @@ test("HTTP callback and browser return need a valid signature", async () => {
     assert.equal(ok.status, 200);
     assert.equal(await ok.text(), "OK");
     assert.equal(s.document(d.id).payments.length, 1);
+    const unknown = await callback(signed({ id: "other-bill", paid: "true" }));
+    assert.equal(unknown.status, 200, "signed notices for other bills are acknowledged");
   } finally {
     await new Promise((r) => server.close(r));
     s.db.close();

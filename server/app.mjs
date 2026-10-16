@@ -248,7 +248,13 @@ export function createApp({
           const params = Object.fromEntries(
             new URLSearchParams(Buffer.concat(chunks).toString("utf8")),
           );
-          await gateway.settle(gateway.verify(params));
+          const notice = gateway.verify(params);
+          try {
+            await gateway.settle(notice.id, notice.paidAt);
+          } catch (e) {
+            // A validly signed notice for a bill this app did not create needs no retries.
+            if (e.status !== 404) throw e;
+          }
           return send(200, "OK", { "Content-Type": "text/plain; charset=utf-8" });
         }
         if (path === "/api/health" && method === "GET")
@@ -290,11 +296,15 @@ export function createApp({
           const [, token, action] = match;
           requestContext.getStore().actor = "client-link";
           allow("public:" + req.socket.remoteAddress, 120, 60000);
-          if (method === "GET" && !action)
+          if (method === "GET" && !action) {
+            const d = store.publicDocument(token, true);
             return send(200, {
-              ...safeDoc(store.publicDocument(token, true)),
-              online_payment: gateway.status().configured,
+              ...safeDoc(d),
+              online_payment:
+                gateway.status().configured &&
+                !!(d.client.email || d.client.phone || store.settings().email),
             });
+          }
           if (method === "POST" && action === "checkout") {
             allow("checkout:" + req.socket.remoteAddress, 10, 60000);
             return send(200, await gateway.checkout(token, allowedOrigin));
@@ -310,7 +320,7 @@ export function createApp({
                 .filter(([k, v]) => /^billplz\[[a-z_]+\]$/.test(k) && typeof v === "string")
                 .slice(0, 10),
             );
-            const billId = gateway.verify(params);
+            const { id: billId, paidAt } = gateway.verify(params);
             check(
               store.db
                 .prepare("SELECT 1 FROM online_payments WHERE bill_id=? AND invoice_id=?")
@@ -318,7 +328,7 @@ export function createApp({
               "Payment not found.",
               404,
             );
-            const r = await gateway.settle(billId);
+            const r = await gateway.settle(billId, paidAt);
             return send(200, { state: r.state });
           }
           if (method === "GET" && action === "pdf") {

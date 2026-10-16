@@ -122,9 +122,16 @@ export class Gateway {
       .get(d.id, d.balance, recent);
     if (existing) return { url: existing.url };
     const business = this.store.settings();
+    const email = d.client.email || business.email;
+    const mobile = (d.client.phone || "").replace(/[^\d+]/g, "");
+    check(email || mobile, "Online payment needs an email address on the invoice. Contact the sender.", 409);
+    const stale = this.store.db
+      .prepare("SELECT bill_id FROM online_payments WHERE invoice_id=? AND state='pending'")
+      .all(d.id);
     const bill = await this.api("/bills", {
       collection_id: this.config.collectionId,
-      email: d.client.email || business.email,
+      ...(email ? { email } : {}),
+      ...(mobile ? { mobile } : {}),
       name: d.client.name.slice(0, 255),
       amount: String(d.balance),
       callback_url: `${origin}/api/payments/billplz/callback`,
@@ -150,6 +157,14 @@ export class Gateway {
         .run(randomUUID(), d.id, "billplz", bill.id, d.balance, bill.url, new Date().toISOString());
       this.store.audit("online_payment.started", d.id, `Billplz ${bill.id}: ${d.balance} sen`);
     });
+    // Older bills were for a different balance; withdraw them so the client cannot overpay.
+    // Billplz refuses to delete a bill that is already paid, and such a payment still settles.
+    for (const s of stale)
+      await this.fetcher(this.config.base + "/bills/" + encodeURIComponent(s.bill_id), {
+        method: "DELETE",
+        headers: { Authorization: "Basic " + Buffer.from(this.config.apiKey + ":").toString("base64") },
+        signal: AbortSignal.timeout(15000),
+      }).catch(() => {});
     return { url: bill.url };
   }
   verify(params) {
@@ -162,11 +177,11 @@ export class Gateway {
     );
     const id = params.id ?? params["billplz[id]"];
     check(typeof id === "string" && /^[\w-]{1,40}$/.test(id), "Invalid bill.", 400);
-    return id;
+    return { id, paidAt: params.paid_at ?? params["billplz[paid_at]"] };
   }
   // The signed notification only tells us which bill changed. The amount and
   // paid state are always read back from the provider before money is recorded.
-  async settle(billId) {
+  async settle(billId, paidAt) {
     const row = this.store.db
       .prepare("SELECT * FROM online_payments WHERE bill_id=?")
       .get(billId);
@@ -189,10 +204,11 @@ export class Gateway {
       // If the invoice was settled another way meanwhile, the extra money stays
       // as customer funds for the owner to allocate or refund.
       const applied = d.state === "issued" ? Math.min(d.balance, paid) : 0;
-      const paidDate =
-        typeof bill.paid_at === "string" && /^\d{4}-\d{2}-\d{2}/.test(bill.paid_at)
-          ? bill.paid_at.slice(0, 10)
-          : today();
+      // Prefer the provider's paid time (from the bill or the signed notification).
+      const stamp = [bill.paid_at, paidAt].find(
+        (v) => typeof v === "string" && /^\d{4}-\d{2}-\d{2}/.test(v),
+      );
+      const paidDate = stamp ? stamp.slice(0, 10) : today();
       const receipt = this.store.receive({
         client_id: d.client_id,
         amount: (paid / 100).toFixed(2),
