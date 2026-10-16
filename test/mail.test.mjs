@@ -96,6 +96,12 @@ test("delivery failures are logged and reported without leaking server errors", 
       return true;
     });
     assert.equal(s.emailLog()[0].status, "failed");
+    const link = s.share(d.id);
+    await assert.rejects(
+      mailer.sendDocument(d.id, { to: "client@example.com", include_link: true }, String),
+      /could not be sent/,
+    );
+    assert.equal(s.publicDocument(link.token).number, d.number, "the existing link keeps working");
     const off = new Mailer(s, { config: null });
     await assert.rejects(off.sendDocument(d.id, { to: "client@example.com" }, String), /not configured/);
   } finally {
@@ -164,6 +170,12 @@ test("statement shows opening balance, movements, closing balance and aging", as
     const pdf = await renderStatementPdf(st);
     assert.equal(pdf.subarray(0, 4).toString(), "%PDF");
     assert.throws(() => s.statement(c.id, { from_date: today(), to_date: addDays(today(), -1) }), /valid statement period/);
+    // An ended statement ignores later invoices, payments and notes.
+    const ended = s.statement(c.id, { from_date: addDays(today(), -30), to_date: addDays(today(), -3) });
+    assert.equal(ended.closing, 50000);
+    assert.equal(ended.outstanding, ended.closing);
+    assert.deepEqual(ended.open.map((o) => o.balance).sort(), [20000, 30000]);
+    assert.equal(ended.aging.over90, 30000);
   } finally {
     s.db.close();
   }

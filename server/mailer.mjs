@@ -179,9 +179,13 @@ export class Mailer {
       true,
     );
     const message = text(b.message || "", 4000);
-    let link = "";
+    let link = "",
+      previous = null;
     if (b.include_link) {
-      const r = this.store.share(did, b.link_days ?? 30);
+      previous = this.store.db
+        .prepare("SELECT token_hash,token_expires FROM documents WHERE id=?")
+        .get(did);
+      const r = this.store.share(did);
       link = linkFor(r.token);
     }
     const lines = [
@@ -200,16 +204,27 @@ export class Mailer {
       "",
       d.business.company,
     ];
-    return this.deliver({
-      kind: "document",
-      documentId: did,
-      clientId: d.client_id,
-      to,
-      cc,
-      subject,
-      body: lines.filter((l) => l !== undefined).join("\n"),
-      attachments: [{ filename: `${d.number}.pdf`, content: await renderPdf(d), contentType: "application/pdf" }],
-    });
+    try {
+      return await this.deliver({
+        kind: "document",
+        documentId: did,
+        clientId: d.client_id,
+        to,
+        cc,
+        subject,
+        body: lines.filter((l) => l !== undefined).join("\n"),
+        attachments: [{ filename: `${d.number}.pdf`, content: await renderPdf(d), contentType: "application/pdf" }],
+      });
+    } catch (e) {
+      // The new link never reached anyone, so put the previous link back.
+      if (previous) {
+        this.store.db
+          .prepare("UPDATE documents SET token_hash=?,token_expires=? WHERE id=?")
+          .run(previous.token_hash, previous.token_expires, did);
+        this.store.audit("link.restored", did, "Email failed; previous link kept.");
+      }
+      throw e;
+    }
   }
   async sendStatement(cid, b) {
     const statement = this.store.statement(cid, b);
@@ -342,8 +357,19 @@ export function attachMail(Store) {
       const lines = entries
         .filter((e) => e.date >= from && e.date <= to)
         .map((e) => ({ ...e, balance: (running += net(e)) }));
+      // Balances are taken as at the statement end date, so later activity
+      // never changes a statement that has already ended.
+      const atEnd = docs
+        .filter((d) => d.issue_date <= to)
+        .map((d) => {
+          let balance = d.total;
+          for (const a of d.adjustments)
+            if (a.issue_date <= to) balance += a.kind === "debit" ? a.amount : -a.amount;
+          for (const p of d.payments) if (p.paid_date <= to) balance -= p.applied;
+          return { ...d, balance };
+        });
       const aging = { current: 0, d30: 0, d60: 0, d90: 0, over90: 0 };
-      for (const d of docs) {
+      for (const d of atEnd) {
         if (d.balance <= 0) continue;
         const late = Math.round((Date.parse(to + "T00:00:00Z") - Date.parse(d.due_date + "T00:00:00Z")) / 86400000);
         const bucket = late <= 0 ? "current" : late <= 30 ? "d30" : late <= 60 ? "d60" : late <= 90 ? "d90" : "over90";
@@ -357,9 +383,9 @@ export function attachMail(Store) {
         opening,
         lines,
         closing: running,
-        outstanding: docs.reduce((s, d) => s + d.balance, 0),
+        outstanding: atEnd.reduce((s, d) => s + d.balance, 0),
         aging,
-        open: docs
+        open: atEnd
           .filter((d) => d.balance > 0)
           .map((d) => ({ number: d.number, issue_date: d.issue_date, due_date: d.due_date, balance: d.balance })),
       };
