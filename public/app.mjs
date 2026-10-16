@@ -76,7 +76,7 @@ const logo = () =>
 const badge = (s) =>
   `<span class="badge ${{ Paid: "green", Accepted: "green", Active: "green", "Part-paid": "orange", "Pending review": "orange", Overdue: "red", Void: "red", Declined: "red", Viewed: "blue", Issued: "blue", Expired: "orange" }[s] || ""}"><span class="dot"></span>${E(s)}</span>`;
 const button = (label, action, id = "", primary = false, iconName = "") =>
-  `<button class="btn ${primary ? "primary" : ""}" data-action="${action}" data-id="${E(id)}">${iconName ? icon(iconName) : ""}${E(label)}</button>`;
+  `<button type="button" class="btn ${primary ? "primary" : ""}" data-action="${action}" data-id="${E(id)}">${iconName ? icon(iconName) : ""}${E(label)}</button>`;
 const empty = (title, body = "", cta = "") =>
   `<div class="empty">${icon("doc")}<h2>${E(title)}</h2><p>${E(body)}</p>${cta}</div>`;
 function toast(message, error = false) {
@@ -125,7 +125,7 @@ async function refresh() {
 }
 function showModal(title, body, wide = false) {
   modal.className = wide ? "wide" : "";
-  modal.innerHTML = `<div class="modal-head"><h2>${E(title)}</h2><button class="btn ghost" data-action="close-modal" aria-label="Close dialog">${icon("close")}</button></div><div class="modal-body">${body}</div>`;
+  modal.innerHTML = `<div class="modal-head"><h2>${E(title)}</h2><button type="button" class="btn ghost" data-action="close-modal" aria-label="Close dialog">${icon("close")}</button></div><div class="modal-body">${body}</div>`;
   modal.showModal();
   modal.querySelector("input:not([readonly]),select,textarea")?.focus();
 }
@@ -140,8 +140,8 @@ const input = (
   `<label>${E(label)}<input name="${name}" type="${type}" value="${E(value)}" ${required ? "required" : ""} ${extra}></label>`;
 const area = (label, name, value = "", max = 1000) =>
   `<label>${E(label)}<textarea name="${name}" maxlength="${max}">${E(value)}</textarea></label>`;
-const select = (label, name, options, selected = "") =>
-  `<label>${E(label)}<select name="${name}" required>${options.map(([v, t]) => `<option value="${E(v)}" ${String(v) === String(selected) ? "selected" : ""}>${E(t)}</option>`).join("")}</select></label>`;
+const select = (label, name, options, selected = "", required = true) =>
+  `<label>${E(label)}<select name="${name}" ${required ? "required" : ""}>${options.map(([v, t]) => `<option value="${E(v)}" ${String(v) === String(selected) ? "selected" : ""}>${E(t)}</option>`).join("")}</select></label>`;
 const errorBlock = () => '<div class="form-error" role="alert"></div>';
 const formEnd = (label = "Save") =>
   `${errorBlock()}<div class="form-actions">${button("Cancel", "close-modal")}<button class="btn primary" type="submit">${E(label)}</button></div>`;
@@ -268,7 +268,11 @@ function documentList(kind) {
 function matches(d, f) {
   return (
     f === "All" ||
-    (f === "Unpaid" ? d.state === "issued" && d.balance > 0 : d.status === f)
+    (f === "Unpaid"
+      ? d.state === "issued" && d.balance > 0
+      : f === "Issued"
+        ? ["Issued", "Viewed"].includes(d.status)
+        : d.status === f)
   );
 }
 function filteredDocs(kind) {
@@ -327,7 +331,7 @@ function recurring() {
             .map((s) => {
               const c = S.clients.find((c) => c.id === s.client_id),
                 service = S.services.find((v) => v.id === s.service_id);
-              return `<tr><td><strong>${E(c?.name)}</strong><small>${E(service?.name)}</small></td><td>${dateLabel(s.next_date)}</td><td class="num">${money(service?.rate)}</td><td>${badge(s.active ? "Active" : "Paused")}</td><td><div class="actions">${s.active && s.next_date <= S.today ? button("Generate draft", "run-schedule", s.id, true) : ""}${button(s.active ? "Pause" : "Resume", s.active ? "pause-schedule" : "resume-schedule", s.id)}</div></td></tr>`;
+              return `<tr><td><strong>${E(c?.name)}</strong><small>${E(service?.name)}</small></td><td>${dateLabel(s.next_date)}</td><td class="num">${money(service?.rate)}</td><td>${badge(!s.active ? "Paused" : service?.active ? "Active" : "Service inactive")}</td><td><div class="actions">${s.active && service?.active && s.next_date <= S.today ? button("Generate draft", "run-schedule", s.id, true) : ""}${button(s.active ? "Pause" : "Resume", s.active ? "pause-schedule" : "resume-schedule", s.id)}</div></td></tr>`;
             })
             .join("")}</tbody></table></div>`
         : empty(
@@ -601,7 +605,7 @@ function paymentForm(id) {
       "Payment method",
       "method",
       ["Bank transfer", "Cash", "Card", "Other"].map((v) => [v, v]),
-    )}${input("Transaction reference", "reference", "", "text", true, 'maxlength="120"')}<div class="span-2">${area("Internal note", "note", "", 500)}</div>${d.proofs.some((p) => p.status === "pending") ? `<div class="span-2">${select("Match a client reference (optional)", "proof_id", [["", "No submitted reference"], ...d.proofs.filter((p) => p.status === "pending").map((p) => [p.id, p.reference])])}</div>` : ""}</div><label class="check-row"><input type="checkbox" name="confirmed" required> I have checked that this payment was received.</label>${formEnd("Confirm & create receipt")}</form>`,
+    )}${input("Transaction reference", "reference", "", "text", true, 'maxlength="120"')}<div class="span-2">${area("Internal note", "note", "", 500)}</div>${d.proofs.some((p) => p.status === "pending") ? `<div class="span-2">${select("Match a client reference (optional)", "proof_id", [["", "No submitted reference"], ...d.proofs.filter((p) => p.status === "pending").map((p) => [p.id, p.reference])], "", false)}</div>` : ""}</div><label class="check-row"><input type="checkbox" name="confirmed" required> I have checked that this payment was received.</label>${formEnd("Confirm & create receipt")}</form>`,
   );
 }
 function scheduleForm() {

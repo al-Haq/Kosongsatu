@@ -244,7 +244,7 @@ export function attachSales(Store) {
               .filter(Boolean)
               .join("\n");
             check(
-              notes.length <= 1000,
+              notes.length <= 2000,
               "Make room for the PO reference in the invoice draft notes, then retry.",
             );
             this.db
@@ -415,15 +415,28 @@ export function attachSales(Store) {
         .prepare("SELECT * FROM automation_runs WHERE id=? AND state='failed'")
         .get(runId);
       check(run, "Failed run not found.", 404);
-      this.db.prepare("DELETE FROM automation_runs WHERE id=?").run(runId);
-      this.db
-        .prepare("UPDATE automation_events SET processed=0 WHERE id=?")
-        .run(run.event_id);
-      this.audit(
-        "automation.retry.requested",
-        runId,
-        "Prior failure retained in audit",
+      const rule = this.db
+        .prepare("SELECT * FROM automation_rules WHERE id=?")
+        .get(run.rule_id);
+      // Without this, the reset event would be skipped and marked processed, silently dropping the failure.
+      check(
+        rule?.enabled && run.event_id > rule.enabled_after,
+        "Enable this rule before retrying. Events from before the rule was last enabled cannot be retried; handle them manually.",
+        409,
       );
+      this.tx(() => {
+        this.db.prepare("DELETE FROM automation_runs WHERE id=?").run(runId);
+        this.db
+          .prepare("UPDATE automation_events SET processed=0 WHERE id=?")
+          .run(run.event_id);
+        this.audit(
+          "automation.retry.requested",
+          runId,
+          "Prior failure retained in audit",
+          run,
+          null,
+        );
+      });
       return this.runAutomations();
     },
   });

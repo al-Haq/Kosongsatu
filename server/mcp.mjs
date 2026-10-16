@@ -3,6 +3,8 @@ import { serveStdio } from "@modelcontextprotocol/server/stdio";
 import { TOOL_DEFINITIONS } from "./automation.mjs";
 import { fileURLToPath } from "node:url";
 import { resolve } from "node:path";
+// Errors whose message is safe and useful to show the MCP host.
+class ConnectorError extends Error {}
 export function createMcpServer({
   base = process.env.NAWLOGIC_URL,
   token = process.env.NAWLOGIC_CONNECTOR_TOKEN,
@@ -62,7 +64,7 @@ export function createMcpServer({
           for await (const chunk of response.body) {
             size += chunk.length;
             if (size > 128000)
-              throw new Error(
+              throw new ConnectorError(
                 "Connector response too large. Narrow the search.",
               );
             chunks.push(chunk);
@@ -72,18 +74,21 @@ export function createMcpServer({
           try {
             data = JSON.parse(raw);
           } catch {
-            throw new Error("Connector response was not JSON.");
+            throw new ConnectorError("Connector response was not JSON.");
           }
           return {
             content: [{ type: "text", text: JSON.stringify(data) }],
             isError: !response.ok,
           };
-        } catch {
+        } catch (e) {
           return {
             content: [
               {
                 type: "text",
-                text: "Connector unavailable. Check URL/token and server status.",
+                text:
+                  e instanceof ConnectorError
+                    ? e.message
+                    : "Connector unavailable. Check URL/token and server status.",
               },
             ],
             isError: true,

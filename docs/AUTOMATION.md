@@ -114,7 +114,7 @@ Schema v3 adds tables without changing existing invoice/receipt totals. File dat
 
 Restore revokes owner sessions, customer links and connector tokens, disables rules and marks interrupted AI runs failed. Review data and re-enable rules deliberately after a restore. Active MFA still requires its original key, independently of the backup encryption key.
 
-Automated tests exercise sales/PO invariants, review and retry behavior, scope enforcement, strict schemas, provider tool loops with deterministic fake responses, and a real stdio MCP client handshake through the HTTP connector. Browser checks exercise desktop/mobile sales → proposal → quote → verified acceptance → PO → invoice, token-once display and a test-provider chat turn. No paid/live model or external automation account has been tested or connected.
+Automated tests exercise sales/PO invariants, review and retry behavior, scope enforcement, strict schemas, provider tool loops with deterministic fake responses, and a real stdio MCP client handshake through the HTTP connector. The desktop/mobile browser flow (sales → proposal → quote → verified acceptance → PO → invoice, token-once display and a test-provider chat turn) is a manual check in [ACCEPTANCE.md](ACCEPTANCE.md), not an automated test. No paid/live model or external automation account has been tested or connected.
 
 Primary protocol references: [official SDK first-server guide](https://github.com/modelcontextprotocol/typescript-sdk/blob/main/docs/get-started/first-server.md), [MCP specification](https://modelcontextprotocol.io/specification/2026-07-28), [Ollama compatible API](https://docs.ollama.com/api/openai-compatibility).
 

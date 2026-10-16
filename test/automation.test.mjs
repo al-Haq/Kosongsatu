@@ -327,3 +327,52 @@ test("PO workflow reuses an existing draft and adds its reference; it does not r
     s.db.close();
   }
 });
+test("retry of a failed run is refused while its rule is disabled, and the failure stays visible", () => {
+  const { s, q, accept } = fixture();
+  try {
+    s.setRule("customer_po_invoice", true);
+    const quote = q();
+    accept(quote);
+    s.registerPO({ quote_id: quote.id, reference: "OFF-PO", amount: 100 });
+    const convert = s.convert;
+    s.convert = () => {
+      throw new Error("Simulated failure");
+    };
+    s.runAutomations();
+    s.convert = convert;
+    const failed = s.automationState().runs.find((r) => r.state === "failed");
+    s.setRule("customer_po_invoice", false);
+    assert.throws(() => s.retryAutomation(failed.id), /Enable this rule/);
+    assert.ok(
+      s.automationState().runs.find((r) => r.id === failed.id),
+      "failed run must not be deleted by a refused retry",
+    );
+  } finally {
+    s.db.close();
+  }
+});
+test("proposal fingerprints ignore key order and prototype names are not proposal kinds", () => {
+  const { s, c } = fixture();
+  try {
+    const a = s.propose(
+      "sales",
+      { client_id: c.id, title: "Order test", expected_amount: "10.00" },
+      "test",
+      "proposal-order-000001",
+    );
+    const b = s.propose(
+      "sales",
+      { expected_amount: "10.00", title: "Order test", client_id: c.id },
+      "test",
+      "proposal-order-000001",
+    );
+    assert.equal(a.id, b.id);
+    for (const kind of ["constructor", "__proto__", "toString"])
+      assert.throws(
+        () => s.propose(kind, {}, "test", "proposal-proto-000001"),
+        /Unknown proposal type/,
+      );
+  } finally {
+    s.db.close();
+  }
+});

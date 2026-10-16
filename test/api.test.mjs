@@ -336,3 +336,12 @@ test("HTTP MFA requires password and a second factor; recovery codes are one-use
     await f.close();
   }
 });
+test("malformed static URLs return 404, not a server error", async () => {
+  const f = await fixture();
+  try {
+    assert.equal((await f.request("/%")).status, 404);
+    assert.equal((await f.request("/assets/%E0%A4%A")).status, 404);
+  } finally {
+    await f.close();
+  }
+});
