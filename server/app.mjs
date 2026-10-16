@@ -468,7 +468,7 @@ export function createApp({
             return send(
               200,
               {
-                schemaVersion: 5,
+                schemaVersion: 6,
                 exported: new Date().toISOString(),
                 ...store.workspace(),
                 finance: store.finance(),
@@ -517,6 +517,46 @@ export function createApp({
                 "Content-Type": "text/csv; charset=utf-8",
                 "Content-Disposition":
                   'attachment; filename="nawlogic-invoices.csv"',
+              },
+            );
+          }
+          if (path === "/api/reports/sst" && method === "GET")
+            return send(
+              200,
+              store.sstReport({
+                from: url.searchParams.get("from") || undefined,
+                to: url.searchParams.get("to") || undefined,
+              }),
+            );
+          if (path === "/api/reports/sst.csv" && method === "GET") {
+            const r = store.sstReport({
+              from: url.searchParams.get("from") || undefined,
+              to: url.searchParams.get("to") || undefined,
+            });
+            const lines = [
+              ["Invoice", "Issue date", "Client", "Client TIN", "SST rate %", "Taxable MYR", "SST MYR"],
+              ...r.rows.map((x) => [
+                x.number,
+                x.issue_date,
+                x.client,
+                x.client_tin,
+                x.rate,
+                (x.taxable / 100).toFixed(2),
+                (x.tax / 100).toFixed(2),
+              ]),
+              [],
+              ["Rate summary"],
+              ...r.rates.map((x) => ["", "", "", "", x.rate, (x.taxable / 100).toFixed(2), (x.tax / 100).toFixed(2)]),
+              [],
+              ["Credit/debit notes in period (no SST breakdown; review manually)"],
+              ...r.notes.map((n) => [n.number, n.issue_date, n.invoice, "", n.kind, (n.amount / 100).toFixed(2), ""]),
+            ];
+            return send(
+              200,
+              "\uFEFF" + lines.map((l) => l.map(csvCell).join(",")).join("\r\n"),
+              {
+                "Content-Type": "text/csv; charset=utf-8",
+                "Content-Disposition": `attachment; filename="sst-${r.from}-${r.to}.csv"`,
               },
             );
           }

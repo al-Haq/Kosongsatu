@@ -160,6 +160,7 @@ export function attachRecords(Store) {
             description: i.description,
             quantity: String(i.quantity),
             rate: (i.rate / 100).toFixed(2),
+            tax_rate: i.tax_rate ?? 0,
           })),
           discount: (d.discount / 100).toFixed(2),
           notes: d.notes,

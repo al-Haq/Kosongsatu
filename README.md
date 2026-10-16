@@ -43,6 +43,8 @@ See [AI, MCP and sales setup](docs/AUTOMATION.md) for configuration, tool scopes
 - Email issued invoices and quotations with the PDF attached and an optional private link, through your own SMTP server. Every message is logged on the document.
 - Opt-in automatic payment reminders before and after the due date (default 3 days before; 1, 7 and 14 days after). Each invoice gets each reminder once, and a missed reminder is skipped instead of sent late.
 - Statement of account per client for any period, with opening/closing balance and aging (current, 1–30, 31–60, 61–90, 90+ days), as a PDF or by email.
+- SST per line (0, 5, 6, 8 or 10%) once your SST registration number is set, charged after each line's share of the discount. Services carry a default rate. PDFs show your SST number and TIN, and the buyer's registration number, TIN and SST number.
+- SST summary by rate for any period as CSV, to help prepare the SST-02 return.
 - Draft quotations and invoices with live preview, quantities to 2 decimals, line rounding in integer sen, discounts and MYR totals.
 - Issue-time numbering and immutable snapshots of client/business details. Issued documents cannot be silently rewritten.
 - Unicode-capable, branded downloadable PDF invoices, quotations and payment receipts. Long documents paginate.
@@ -63,7 +65,7 @@ See [AI, MCP and sales setup](docs/AUTOMATION.md) for configuration, tool scopes
 ## Not connected in this release
 
 - LHDN MyInvois e-Invoice submission, validation, cancellation or validated tax notes.
-- SST registration, tax calculation or tax reporting. The app must not be represented as tax-compliant software without a separate review and integration.
+- SST-02 submission, exemptions and tax on credit/debit notes. The SST summary is a working aid; check it with your accountant before filing. The app must not be represented as tax-compliant software without a separate review.
 - Payment gateways, automatic bank feeds or direct debit. Email needs your own SMTP account; none is connected by default.
 - Payment-slip file uploads (clients submit a transaction reference and message), multiple staff roles, multi-company tenancy or self-registration.
 - Fully automatic recurring scheduling. An owner deliberately generates due drafts; no job sends/charges automatically.

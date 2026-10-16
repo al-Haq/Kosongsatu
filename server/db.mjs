@@ -1,6 +1,7 @@
 import { migrateAutomation } from "./automation-migration.mjs";
 import { migrateRecords, attachRecords } from "./records.mjs";
 import { migrateMail, attachMail } from "./mailer.mjs";
+import { migrateTax, attachTax } from "./tax.mjs";
 import { attachSales } from "./sales.mjs";
 import { attachAutomation } from "./automation.mjs";
 import { migrate } from "./migrations.mjs";
@@ -55,6 +56,7 @@ export function openDatabase(path) {
   migrateAutomation(db, path);
   migrateRecords(db, path);
   migrateMail(db, path);
+  migrateTax(db, path);
   const store = new Store(db);
   store.path = path;
   try {
@@ -121,6 +123,8 @@ export class Store {
       bankName: 100,
       bankAccount: 60,
       bankHolder: 180,
+      sstNumber: 40,
+      tin: 20,
       paymentTerms: 1000,
       invoicePrefix: 12,
       quotePrefix: 12,
@@ -151,6 +155,9 @@ export class Store {
       phone: text(b.phone || "", 60),
       address: text(b.address || "", 600),
       contact: text(b.contact || "", 120),
+      tin: text(b.tin || "", 20).toUpperCase(),
+      brn: text(b.brn || "", 40),
+      sst_number: text(b.sst_number || "", 40).toUpperCase(),
       terms: integer(b.terms ?? 14, 0, 365),
       created: now(),
     };
@@ -160,7 +167,7 @@ export class Store {
     );
     this.db
       .prepare(
-        "INSERT INTO clients(id,name,email,phone,address,contact,terms,created) VALUES(:id,:name,:email,:phone,:address,:contact,:terms,:created) ON CONFLICT(id) DO UPDATE SET name=excluded.name,email=excluded.email,phone=excluded.phone,address=excluded.address,contact=excluded.contact,terms=excluded.terms",
+        "INSERT INTO clients(id,name,email,phone,address,contact,tin,brn,sst_number,terms,created) VALUES(:id,:name,:email,:phone,:address,:contact,:tin,:brn,:sst_number,:terms,:created) ON CONFLICT(id) DO UPDATE SET name=excluded.name,email=excluded.email,phone=excluded.phone,address=excluded.address,contact=excluded.contact,tin=excluded.tin,brn=excluded.brn,sst_number=excluded.sst_number,terms=excluded.terms",
       )
       .run(c);
     this.audit("client.saved", idv);
@@ -173,11 +180,12 @@ export class Store {
       description: text(b.description || "", 240),
       unit: text(b.unit || "Project", 30, true),
       rate: money(b.rate),
+      tax_rate: integer(b.tax_rate ?? 0, 0, 10),
       active: b.active === false ? 0 : 1,
     };
     this.db
       .prepare(
-        "INSERT INTO services(id,name,description,unit,rate,active) VALUES(:id,:name,:description,:unit,:rate,:active) ON CONFLICT(id) DO UPDATE SET name=excluded.name,description=excluded.description,unit=excluded.unit,rate=excluded.rate,active=excluded.active",
+        "INSERT INTO services(id,name,description,unit,rate,tax_rate,active) VALUES(:id,:name,:description,:unit,:rate,:tax_rate,:active) ON CONFLICT(id) DO UPDATE SET name=excluded.name,description=excluded.description,unit=excluded.unit,rate=excluded.rate,tax_rate=excluded.tax_rate,active=excluded.active",
       )
       .run(s);
     this.audit("service.saved", idv);
@@ -239,6 +247,10 @@ export class Store {
       due = date(b.due_date);
     check(due >= issued, "Due date must be on or after issue date.");
     const amounts = calculate(b.items, b.discount ?? "0");
+    check(
+      !amounts.tax || this.settings().sstNumber,
+      "Add your SST registration number in Settings before charging SST.",
+    );
     const d = {
       id: idv,
       kind,
@@ -248,6 +260,7 @@ export class Store {
       items: JSON.stringify(amounts.items),
       subtotal: amounts.subtotal,
       discount: amounts.discount,
+      tax: amounts.tax,
       total: amounts.total,
       notes: text(b.notes || "", 2000),
       terms: text(b.terms ?? this.settings().paymentTerms, 1000),
@@ -256,7 +269,7 @@ export class Store {
     };
     this.db
       .prepare(
-        "INSERT INTO documents(id,kind,client_id,issue_date,due_date,items,subtotal,discount,total,notes,terms,created,updated) VALUES(:id,:kind,:client_id,:issue_date,:due_date,:items,:subtotal,:discount,:total,:notes,:terms,:created,:updated) ON CONFLICT(id) DO UPDATE SET client_id=excluded.client_id,issue_date=excluded.issue_date,due_date=excluded.due_date,items=excluded.items,subtotal=excluded.subtotal,discount=excluded.discount,total=excluded.total,notes=excluded.notes,terms=excluded.terms,updated=excluded.updated",
+        "INSERT INTO documents(id,kind,client_id,issue_date,due_date,items,subtotal,discount,tax,total,notes,terms,created,updated) VALUES(:id,:kind,:client_id,:issue_date,:due_date,:items,:subtotal,:discount,:tax,:total,:notes,:terms,:created,:updated) ON CONFLICT(id) DO UPDATE SET client_id=excluded.client_id,issue_date=excluded.issue_date,due_date=excluded.due_date,items=excluded.items,subtotal=excluded.subtotal,discount=excluded.discount,tax=excluded.tax,total=excluded.total,notes=excluded.notes,terms=excluded.terms,updated=excluded.updated",
       )
       .run(d);
     this.audit("document.draft.saved", idv);
@@ -561,6 +574,7 @@ export class Store {
             description: `${service.name} - ${s.next_date.slice(0, 7)}`,
             quantity: 1,
             rate: (service.rate / 100).toFixed(2),
+            tax_rate: service.tax_rate ?? 0,
           },
         ],
       });
@@ -598,3 +612,4 @@ attachSales(Store);
 attachAutomation(Store);
 attachRecords(Store);
 attachMail(Store);
+attachTax(Store);

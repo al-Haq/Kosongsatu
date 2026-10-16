@@ -52,3 +52,10 @@ No live bank payment, email delivery, MyInvois submission, production TLS deploy
 - With a wrong SMTP password, confirm the app shows a send failure and the log shows "Failed".
 - Enable reminders in Settings with an invoice due in 3 days and one overdue by 1 day. Run "Send due reminders now"; confirm one email each, then run again and confirm nothing is resent.
 - Download a client statement for the last 90 days; check opening balance, movements, closing balance and aging against the invoices and payments.
+
+## v0.6 SST and buyer details
+
+- Without an SST number, confirm the editor has no SST column and a line with SST is refused.
+- Add the SST number and TIN in Settings. Create an invoice with one 8% line, one 10% line, one exempt line and a discount; confirm the preview, saved document and PDF show the same SST per rate.
+- Add a client's registration number and TIN; confirm they appear on the PDF.
+- Download the SST summary CSV for the period; confirm the issued invoice is listed and drafts are not.
