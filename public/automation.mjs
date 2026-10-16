@@ -26,7 +26,9 @@ export function automationUI(h) {
   const quote = (id) => get().documents.find((d) => d.id === id);
   const customerOpts = () => [
     ["", "Select a customer"],
-    ...get().clients.map((c) => [c.id, c.name]),
+    ...get()
+      .clients.filter((c) => !c.archived)
+      .map((c) => [c.id, c.name]),
   ];
   let chatKey = crypto.randomUUID();
   function sales() {
@@ -39,7 +41,7 @@ export function automationUI(h) {
         "Track customer opportunities from quotation to accepted order and invoice draft.",
         button("New opportunity", "sales-new", "", true),
       ) +
-      `<div class="sales-stages">${stages.map((stage) => `<div class="metric"><div class="label">${E(stage)}</div><div class="value">${a.opportunities.filter((o) => o.stage === stage).length}</div><div class="hint">${money(a.opportunities.filter((o) => o.stage === stage).reduce((n, o) => n + o.expected_amount, 0))} expected</div></div>`).join("")}</div><section class="panel mt22"><div class="panel-head"><h2>Opportunities</h2></div>${a.opportunities.length ? `<div class="table-wrap"><table><thead><tr><th>Opportunity / customer</th><th>Stage</th><th>Expected</th><th>Quotation</th><th>Actions</th></tr></thead><tbody>${a.opportunities.map((o) => `<tr><td><strong>${E(o.title)}</strong><small>${E(clientName(o.client_id))}</small></td><td>${badge(o.stage)}</td><td>${money(o.expected_amount)}</td><td>${o.quote_id ? `<a href="#/document/${o.quote_id}">${E(quote(o.quote_id)?.number || "Draft quote")}</a>` : "—"}</td><td><div class="actions">${button("Edit", "sales-edit", o.id)}${!o.quote_id ? button("Prepare quote", "sales-quote", o.id) : ""}</div></td></tr>`).join("")}</tbody></table></div>` : empty("Start with a customer opportunity", "Add the customer in Clients, then record the scope and expected value.")}</section><section class="panel mt22"><div class="panel-head"><h2>Customer purchase orders</h2>${button("Register customer PO", "po-new")}</div><p class="field-hint">POs issued by your customer to Nawlogic. Full-value MYR orders against accepted quotations; supplier purchasing is a separate future workflow.</p>${a.purchaseOrders.length ? `<div class="table-wrap mt22"><table><thead><tr><th>Customer PO</th><th>Quotation</th><th>Value</th><th>Invoice</th></tr></thead><tbody>${a.purchaseOrders.map((p) => `<tr><td><strong>${E(p.reference)}</strong><small>${E(clientName(p.client_id))} / ${dateLabel(p.po_date)}</small></td><td><a href="#/document/${p.quote_id}">${E(quote(p.quote_id)?.number)}</a></td><td>${money(p.amount)}</td><td>${p.invoice_id ? `<a href="#/document/${p.invoice_id}">${E(quote(p.invoice_id)?.number || "Open invoice draft")}</a>` : button("Create invoice draft", "po-invoice", p.id)}</td></tr>`).join("")}</tbody></table></div>` : empty("No customer POs yet", "Record customer acceptance first, then register the PO reference and value.")}</section><section class="panel mt22"><h2>Record customer acceptance</h2><p class="field-hint">For acceptance received outside the client portal, enter the customer name and evidence. This records what you verified; it does not impersonate a portal signature.</p>${
+      `<div class="sales-stages">${stages.map((stage) => `<div class="metric"><div class="label">${E(stage)}</div><div class="value">${a.opportunities.filter((o) => o.stage === stage).length}</div><div class="hint">${money(a.opportunities.filter((o) => o.stage === stage).reduce((n, o) => n + o.expected_amount, 0))} expected</div></div>`).join("")}</div><section class="panel mt22"><div class="panel-head"><h2>Opportunities</h2></div>${a.opportunities.length ? `<div class="table-wrap"><table><thead><tr><th>Opportunity / customer</th><th>Stage</th><th>Expected</th><th>Quotation</th><th>Actions</th></tr></thead><tbody>${a.opportunities.map((o) => `<tr><td><strong>${E(o.title)}</strong><small>${E(clientName(o.client_id))}</small></td><td>${badge(o.stage)}</td><td>${money(o.expected_amount)}</td><td>${o.quote_id ? `<a href="#/document/${o.quote_id}">${E(quote(o.quote_id)?.number || "Draft quote")}</a>` : "—"}</td><td><div class="actions">${button("Edit", "sales-edit", o.id)}${!o.quote_id ? button("Prepare quote", "sales-quote", o.id) + button("Delete", "sales-delete", o.id) : ""}</div></td></tr>`).join("")}</tbody></table></div>` : empty("Start with a customer opportunity", "Add the customer in Clients, then record the scope and expected value.")}</section><section class="panel mt22"><div class="panel-head"><h2>Customer purchase orders</h2>${button("Register customer PO", "po-new")}</div><p class="field-hint">POs issued by your customer to Nawlogic. Full-value MYR orders against accepted quotations; supplier purchasing is a separate future workflow.</p>${a.purchaseOrders.length ? `<div class="table-wrap mt22"><table><thead><tr><th>Customer PO</th><th>Quotation</th><th>Value</th><th>Invoice</th></tr></thead><tbody>${a.purchaseOrders.map((p) => `<tr><td><strong>${E(p.reference)}</strong><small>${E(clientName(p.client_id))} / ${dateLabel(p.po_date)}</small></td><td><a href="#/document/${p.quote_id}">${E(quote(p.quote_id)?.number)}</a></td><td>${money(p.amount)}</td><td>${p.invoice_id ? `<a href="#/document/${p.invoice_id}">${E(quote(p.invoice_id)?.number || "Open invoice draft")}</a>` : button("Create invoice draft", "po-invoice", p.id)}</td></tr>`).join("")}</tbody></table></div>` : empty("No customer POs yet", "Record customer acceptance first, then register the PO reference and value.")}</section><section class="panel mt22"><h2>Record customer acceptance</h2><p class="field-hint">For acceptance received outside the client portal, enter the customer name and evidence. This records what you verified; it does not impersonate a portal signature.</p>${
         S.documents
           .filter(
             (d) =>
@@ -183,6 +185,14 @@ export function automationUI(h) {
         break;
       case "sales-edit":
         opportunityForm(sid);
+        break;
+      case "sales-delete":
+        if (!confirm("Delete this opportunity? The audit history keeps a record."))
+          break;
+        await api("/sales/opportunities/" + sid, "DELETE");
+        await refresh();
+        renderRoute();
+        toast("Opportunity deleted.");
         break;
       case "sales-quote":
         quoteForm(sid);

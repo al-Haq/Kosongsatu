@@ -74,7 +74,7 @@ const icon = (n) =>
 const logo = () =>
   '<img class="logo" src="/assets/nawlogic-logo.png" alt="Nawlogic">';
 const badge = (s) =>
-  `<span class="badge ${{ Paid: "green", Accepted: "green", Active: "green", "Part-paid": "orange", "Pending review": "orange", Overdue: "red", Void: "red", Declined: "red", Viewed: "blue", Issued: "blue", Expired: "orange" }[s] || ""}"><span class="dot"></span>${E(s)}</span>`;
+  `<span class="badge ${{ Paid: "green", Accepted: "green", Active: "green", "Part-paid": "orange", "Pending review": "orange", Overdue: "red", Void: "red", Declined: "red", Viewed: "blue", Issued: "blue", Expired: "orange", Archived: "orange" }[s] || ""}"><span class="dot"></span>${E(s)}</span>`;
 const button = (label, action, id = "", primary = false, iconName = "") =>
   `<button type="button" class="btn ${primary ? "primary" : ""}" data-action="${action}" data-id="${E(id)}">${iconName ? icon(iconName) : ""}${E(label)}</button>`;
 const empty = (title, body = "", cta = "") =>
@@ -145,10 +145,18 @@ const select = (label, name, options, selected = "", required = true) =>
 const errorBlock = () => '<div class="form-error" role="alert"></div>';
 const formEnd = (label = "Save") =>
   `${errorBlock()}<div class="form-actions">${button("Cancel", "close-modal")}<button class="btn primary" type="submit">${E(label)}</button></div>`;
-const clientOptions = () => [
+// Archived clients stay selectable only on records that already use them.
+const clientOptions = (selected = "") => [
   ["", "Select a client"],
-  ...S.clients.map((c) => [c.id, c.name]),
+  ...S.clients
+    .filter((c) => !c.archived || c.id === selected)
+    .map((c) => [c.id, c.name]),
 ];
+const confirmModal = (title, message, action, id, label) =>
+  showModal(
+    title,
+    `<p>${E(message)}</p><div class="form-error" role="alert"></div><div class="form-actions">${button("Cancel", "close-modal")}${button(label, action, id, true)}</div>`,
+  );
 function renderLogin() {
   app.innerHTML = `<div class="login-screen"><section class="login-brand"><span class="eyebrow">NAWLOGIC / BILLING WORKSPACE</span><h1>Good work deserves<br><span class="accent">a clear invoice.</span></h1><p>From the first quotation to the final receipt. A quieter way to keep your business moving.</p><div class="login-points"><span>${icon("doc")}Create with confidence</span><span>${icon("wallet")}Track every payment</span><span>${icon("shield")}Your private workspace</span></div></section><section class="login-form"><div class="login-inner">${logo()}<h2>Welcome back.</h2><p>Sign in to your Nawlogic workspace.</p><form data-form="login">${input("Email address", "email", "", "email", true, 'autocomplete="username" maxlength="160"')}${input("Password", "password", "", "password", true, 'autocomplete="current-password" maxlength="256"')}${input("Authenticator or recovery code (if enabled)", "code", "", "text", false, 'autocomplete="one-time-code" maxlength="40"')}${errorBlock()}<button class="btn primary" type="submit">Sign in ${icon("arrow")}</button></form><div class="login-footer">${icon("shield")} Owner access only. Customer invoices use a separate private link.</div></div></section></div>`;
 }
@@ -292,7 +300,7 @@ function clients() {
       "One place for every contact, quotation and billing history.",
       button("Add client", "new-client", "", true, "plus"),
     ) +
-    `<section class="panel">${S.clients.length ? `<div class="table-wrap"><table><thead><tr><th>Client</th><th>Contact</th><th>Payment terms</th><th class="num">Outstanding</th><th>Action</th></tr></thead><tbody>${S.clients.map((c) => `<tr><td><button class="link-button" data-action="open-client" data-id="${c.id}">${E(c.name)}</button><small>${E(c.email)}</small></td><td>${E(c.contact || "—")}</td><td>${c.terms} days</td><td class="num">${money(S.documents.filter((d) => d.client_id === c.id && d.kind === "invoice" && d.state === "issued").reduce((s, d) => s + d.balance, 0))}</td><td>${button("Edit", "edit-client", c.id)}</td></tr>`).join("")}</tbody></table></div>` : empty("Your first client starts here", "Add their billing name and contact details.", button("Add client", "new-client", "", true))}</section>`
+    `<section class="panel">${S.clients.length ? `<div class="table-wrap"><table><thead><tr><th>Client</th><th>Contact</th><th>Payment terms</th><th class="num">Outstanding</th><th>Action</th></tr></thead><tbody>${S.clients.map((c) => `<tr><td><button class="link-button" data-action="open-client" data-id="${c.id}">${E(c.name)}</button><small>${E(c.email)}</small></td><td>${E(c.contact || "—")}</td><td>${c.terms} days${c.archived ? " " + badge("Archived") : ""}</td><td class="num">${money(S.documents.filter((d) => d.client_id === c.id && d.kind === "invoice" && d.state === "issued").reduce((s, d) => s + d.balance, 0))}</td><td>${button("Edit", "edit-client", c.id)}</td></tr>`).join("")}</tbody></table></div>` : empty("Your first client starts here", "Add their billing name and contact details.", button("Add client", "new-client", "", true))}</section>`
   );
 }
 function clientProfile(id) {
@@ -303,7 +311,13 @@ function clientProfile(id) {
       c.name,
       "Client profile and billing history.",
       button("Edit client", "edit-client", c.id) +
-        button("New invoice", "client-invoice", c.id, true, "plus"),
+        (c.archived
+          ? button("Restore client", "restore-client", c.id)
+          : button("Archive client", "archive-client", c.id)) +
+        button("Delete client", "delete-client", c.id) +
+        (c.archived
+          ? ""
+          : button("New invoice", "client-invoice", c.id, true, "plus")),
     ) +
     `<div class="profile-grid"><section class="panel"><div class="client-avatar">${E(c.name.slice(0, 2).toUpperCase())}</div><h2>${E(c.name)}</h2><dl class="detail"><dt>Billing contact</dt><dd>${E(c.contact || "Not provided")}</dd><dt>Email</dt><dd>${E(c.email || "Not provided")}</dd><dt>Phone</dt><dd>${E(c.phone || "Not provided")}</dd><dt>Billing address</dt><dd>${E(c.address || "Not provided")}</dd><dt>Payment terms</dt><dd>${c.terms} days</dd></dl></section><section class="panel"><div class="panel-head"><h2>Documents</h2>${badge("MYR")}</div>${invoiceTable(S.documents.filter((d) => d.client_id === c.id))}</section></div>`
   );
@@ -315,7 +329,7 @@ function services() {
       "Reusable line items. Tailor the final scope and price for each project.",
       button("Add service", "new-service", "", true, "plus"),
     ) +
-    `<section class="panel">${S.services.length ? `<div class="table-wrap"><table><thead><tr><th>Service</th><th>Unit</th><th class="num">Default rate</th><th>Status</th><th>Action</th></tr></thead><tbody>${S.services.map((s) => `<tr><td><strong>${E(s.name)}</strong><small>${E(s.description)}</small></td><td>${E(s.unit)}</td><td class="num">${money(s.rate)}</td><td>${badge(s.active ? "Active" : "Inactive")}</td><td>${button("Edit", "edit-service", s.id)}</td></tr>`).join("")}</tbody></table></div>` : empty("Build your service catalog", "Add a service or use custom items directly on an invoice.", button("Add service", "new-service", "", true))}</section>`
+    `<section class="panel">${S.services.length ? `<div class="table-wrap"><table><thead><tr><th>Service</th><th>Unit</th><th class="num">Default rate</th><th>Status</th><th>Action</th></tr></thead><tbody>${S.services.map((s) => `<tr><td><strong>${E(s.name)}</strong><small>${E(s.description)}</small></td><td>${E(s.unit)}</td><td class="num">${money(s.rate)}</td><td>${badge(s.active ? "Active" : "Inactive")}</td><td><div class="actions">${button("Edit", "edit-service", s.id)}${button("Delete", "delete-service", s.id)}</div></td></tr>`).join("")}</tbody></table></div>` : empty("Build your service catalog", "Add a service or use custom items directly on an invoice.", button("Add service", "new-service", "", true))}</section>`
   );
 }
 function recurring() {
@@ -331,7 +345,7 @@ function recurring() {
             .map((s) => {
               const c = S.clients.find((c) => c.id === s.client_id),
                 service = S.services.find((v) => v.id === s.service_id);
-              return `<tr><td><strong>${E(c?.name)}</strong><small>${E(service?.name)}</small></td><td>${dateLabel(s.next_date)}</td><td class="num">${money(service?.rate)}</td><td>${badge(!s.active ? "Paused" : service?.active ? "Active" : "Service inactive")}</td><td><div class="actions">${s.active && service?.active && s.next_date <= S.today ? button("Generate draft", "run-schedule", s.id, true) : ""}${button(s.active ? "Pause" : "Resume", s.active ? "pause-schedule" : "resume-schedule", s.id)}</div></td></tr>`;
+              return `<tr><td><strong>${E(c?.name)}</strong><small>${E(service?.name)}</small></td><td>${dateLabel(s.next_date)}</td><td class="num">${money(service?.rate)}</td><td>${badge(!s.active ? "Paused" : service?.active ? "Active" : "Service inactive")}</td><td><div class="actions">${s.active && service?.active && s.next_date <= S.today ? button("Generate draft", "run-schedule", s.id, true) : ""}${button(s.active ? "Pause" : "Resume", s.active ? "pause-schedule" : "resume-schedule", s.id)}${button("Edit", "edit-schedule", s.id)}${button("Delete", "delete-schedule", s.id)}</div></td></tr>`;
             })
             .join("")}</tbody></table></div>`
         : empty(
@@ -405,10 +419,12 @@ function documentView(id) {
   const actions =
     (d.state === "draft"
       ? button("Edit draft", "edit-document", id) +
+        button("Delete draft", "delete-draft", id) +
         button("Issue document", "issue-document", id, true)
       : d.state === "void"
         ? ""
         : button("Client link", "share-document", id, true, "copy")) +
+    button("Duplicate", "duplicate-document", id) +
     `<a class="btn" href="/api/documents/${id}/pdf">${icon("download")} PDF</a>`;
   const events = S.audit.filter((a) => a.entity_id === id).slice(0, 8);
   return (
@@ -553,7 +569,7 @@ function documentForm(kind = "invoice", id = "", clientId = "") {
   };
   showModal(
     d ? "Edit draft" : kind === "quote" ? "New quotation" : "New invoice",
-    `<form data-form="editor" data-id="${E(id)}" data-kind="${kind}"><div class="editor-grid"><div><div class="form-grid"><div class="span-2">${select("Bill to", "client_id", clientOptions(), value.client_id)}</div>${input("Issue date", "issue_date", value.issue_date, "date", true)}${input(kind === "quote" ? "Valid until" : "Due date", "due_date", value.due_date, "date", true)}</div><div class="line-head"><span>DESCRIPTION</span><span>QTY</span><span>RATE (MYR)</span><span></span></div><div id="line-items">${value.items.map(lineMarkup).join("")}</div><div class="actions mt22">${button("Custom item", "add-line", "", "", "plus")}<label class="catalog-picker"><span class="sr-only">Add service from catalog</span><select id="catalog-service"><option value="">Add from catalog...</option>${S.services
+    `<form data-form="editor" data-id="${E(id)}" data-kind="${kind}"><div class="editor-grid"><div><div class="form-grid"><div class="span-2">${select("Bill to", "client_id", clientOptions(value.client_id), value.client_id)}</div>${input("Issue date", "issue_date", value.issue_date, "date", true)}${input(kind === "quote" ? "Valid until" : "Due date", "due_date", value.due_date, "date", true)}</div><div class="line-head"><span>DESCRIPTION</span><span>QTY</span><span>RATE (MYR)</span><span></span></div><div id="line-items">${value.items.map(lineMarkup).join("")}</div><div class="actions mt22">${button("Custom item", "add-line", "", "", "plus")}<label class="catalog-picker"><span class="sr-only">Add service from catalog</span><select id="catalog-service"><option value="">Add from catalog...</option>${S.services
       .filter((s) => s.active)
       .map(
         (s) =>
@@ -608,7 +624,15 @@ function paymentForm(id) {
     )}${input("Transaction reference", "reference", "", "text", true, 'maxlength="120"')}<div class="span-2">${area("Internal note", "note", "", 500)}</div>${d.proofs.some((p) => p.status === "pending") ? `<div class="span-2">${select("Match a client reference (optional)", "proof_id", [["", "No submitted reference"], ...d.proofs.filter((p) => p.status === "pending").map((p) => [p.id, p.reference])], "", false)}</div>` : ""}</div><label class="check-row"><input type="checkbox" name="confirmed" required> I have checked that this payment was received.</label>${formEnd("Confirm & create receipt")}</form>`,
   );
 }
-function scheduleForm() {
+function scheduleForm(sid) {
+  const s = S.schedules.find((x) => x.id === sid);
+  if (s) {
+    showModal(
+      "Edit monthly schedule",
+      `<form data-form="schedule" data-id="${E(sid)}"><p>${E(S.clients.find((c) => c.id === s.client_id)?.name || "")}</p>${select("Monthly service", "service_id", [["", "Select a service"], ...S.services.filter((v) => v.active || v.id === s.service_id).map((v) => [v.id, `${v.name} / ${money(v.rate)}`])], s.service_id)}<div class="form-grid">${input("Next run date", "next_date", s.next_date, "date", true)}${input("Payment terms (days)", "terms", s.terms, "number", true, 'min="0" max="365" step="1"')}</div><label class="check-row"><input type="checkbox" name="month_end" ${s.month_end ? "checked" : ""}>Bill on the last day of each month.</label>${formEnd("Save schedule")}</form>`,
+    );
+    return;
+  }
   if (!S.clients.length || !S.services.some((s) => s.active)) {
     toast("Add a client and an active service first.");
     return;
@@ -786,6 +810,85 @@ async function runAction(action, id, el) {
     case "new-schedule":
       scheduleForm();
       break;
+    case "edit-schedule":
+      scheduleForm(id);
+      break;
+    case "delete-schedule":
+      confirmModal(
+        "Delete schedule?",
+        "Only schedules that never generated an invoice can be deleted. Pause a used schedule instead.",
+        "confirm-delete-schedule",
+        id,
+        "Delete schedule",
+      );
+      break;
+    case "delete-draft":
+      confirmModal(
+        "Delete this draft?",
+        "The draft is removed permanently. The deletion is kept in the audit history.",
+        "confirm-delete-draft",
+        id,
+        "Delete draft",
+      );
+      break;
+    case "delete-client":
+      confirmModal(
+        "Delete client?",
+        "Only clients with no documents, receipts, schedules or sales records can be deleted. Archive a client with history instead.",
+        "confirm-delete-client",
+        id,
+        "Delete client",
+      );
+      break;
+    case "delete-service":
+      confirmModal(
+        "Delete service?",
+        "Existing documents keep their line text and rates. A service used by a schedule must be marked inactive instead.",
+        "confirm-delete-service",
+        id,
+        "Delete service",
+      );
+      break;
+    case "confirm-delete-schedule":
+    case "confirm-delete-draft":
+    case "confirm-delete-client":
+    case "confirm-delete-service": {
+      const target = action.slice("confirm-delete-".length);
+      try {
+        await api(
+          `/${{ schedule: "schedules", draft: "documents", client: "clients", service: "services" }[target]}/${id}`,
+          "DELETE",
+        );
+      } catch (e) {
+        modal.querySelector(".form-error").textContent = e.message;
+        break;
+      }
+      modal.close();
+      await refresh();
+      if (target === "draft") navigate(location.hash.includes("quote") ? "quotes" : "invoices");
+      else if (target === "client") navigate("clients");
+      else renderRoute();
+      toast("Deleted. The audit history keeps a record.");
+      break;
+    }
+    case "archive-client":
+    case "restore-client":
+      await api(
+        `/clients/${id}/${action === "archive-client" ? "archive" : "restore"}`,
+        "POST",
+        {},
+      );
+      await refresh();
+      renderRoute();
+      toast(action === "archive-client" ? "Client archived." : "Client restored.");
+      break;
+    case "duplicate-document": {
+      const d = await api(`/documents/${id}/duplicate`, "POST", {});
+      await refresh();
+      navigate("document/" + d.id);
+      toast("Copy created as a new draft. Review the dates before issuing.");
+      break;
+    }
     case "run-schedule": {
       const d = await api(`/schedules/${id}/run`, "POST", {});
       await refresh();
@@ -919,11 +1022,14 @@ async function submitForm(form) {
     return;
   }
   if (type === "schedule") {
-    await api("/schedules", "POST", { ...b, month_end: b.month_end === "on" });
+    await api(id ? "/schedules/" + id : "/schedules", id ? "PUT" : "POST", {
+      ...b,
+      month_end: b.month_end === "on",
+    });
     modal.close();
     await refresh();
     renderRoute();
-    toast("Monthly schedule created.");
+    toast(id ? "Schedule updated." : "Monthly schedule created.");
     return;
   }
   if (type === "accept") {

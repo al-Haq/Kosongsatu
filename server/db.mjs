@@ -1,4 +1,5 @@
 import { migrateAutomation } from "./automation-migration.mjs";
+import { migrateRecords, attachRecords } from "./records.mjs";
 import { attachSales } from "./sales.mjs";
 import { attachAutomation } from "./automation.mjs";
 import { migrate } from "./migrations.mjs";
@@ -51,6 +52,7 @@ export function openDatabase(path) {
   );
   migrate(db, path);
   migrateAutomation(db, path);
+  migrateRecords(db, path);
   const store = new Store(db);
   store.path = path;
   try {
@@ -592,3 +594,4 @@ attachBanking(Store);
 
 attachSales(Store);
 attachAutomation(Store);
+attachRecords(Store);

@@ -38,7 +38,8 @@ See [AI, MCP and sales setup](docs/AUTOMATION.md) for configuration, tool scopes
 
 - Owner login, hashed passwords, expiring server-side sessions, CSRF and origin checks, login throttling, password changes and sign-out.
 - Dashboard with issued invoice value, confirmed collections, outstanding balances and overdue invoices. Monthly and all-date metrics are explicitly distinguished.
-- Client and service catalogs, including editable payment terms and default rates.
+- Client and service catalogs, including editable payment terms and default rates. Clients with history can be archived and restored; unused clients, services, schedules, opportunities and drafts can be deleted, with the deletion kept in the audit history.
+- Duplicate any document into a new draft.
 - Draft quotations and invoices with live preview, quantities to 2 decimals, line rounding in integer sen, discounts and MYR totals.
 - Issue-time numbering and immutable snapshots of client/business details. Issued documents cannot be silently rewritten.
 - Unicode-capable, branded downloadable PDF invoices, quotations and payment receipts. Long documents paginate.
