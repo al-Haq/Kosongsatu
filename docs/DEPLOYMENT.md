@@ -10,7 +10,7 @@ Use Node.js 24, one app instance and one writable persistent SQLite volume outsi
 2. Complete the company registration, business address, contact and bank instructions. Real issuance requires registration, address and at least one contact. Issued documents retain their snapshots.
 3. Test PDFs, customer links and payment corrections with disposable data. Review any migrated legacy duplicates and recurring dates.
 4. Use a TLS reverse proxy, exact HTTPS `APP_URL`, `NODE_ENV=production` and persistent storage. Production requires HTTPS and Secure cookies.
-5. Restrict the Node port to the proxy. Apply expected-host and edge rate limits. App rate limits use the direct peer IP and do not trust forwarded headers; requests behind one proxy share that limit.
+5. Restrict the Node port to the proxy. Apply expected-host and edge rate limits. Behind a reverse proxy, set `TRUST_PROXY=1` (or the number of proxies) so login and public-link rate limits use each client's address. The proxy must overwrite or append `X-Forwarded-For`, and Node must not be reachable except through the proxy. Without it, all requests through the proxy share one limit.
 6. Configure encrypted backups and a separate off-host copy; complete a disposable restore drill. Preserve the MFA key separately from the database.
 7. If you are SST-registered, add the SST number and TIN in Settings and set each service's default rate. Review SST/MyInvois obligations with your accountant: the SST summary is a working aid, and credit/debit notes carry no SST breakdown or validated tax submission.
 
@@ -31,6 +31,7 @@ Use Node.js 24, one app instance and one writable persistent SQLite volume outsi
 | `SMTP_USER` / `SMTP_PASS` | unset                                     | SMTP credentials; use an app password, never commit it          |
 | `MAIL_FROM`          | unset                                          | Sender, e.g. `Nawlogic Billing <billing@your-domain>`           |
 | `MAIL_REPLY_TO`      | unset                                          | Optional reply-to address                                       |
+| `TRUST_PROXY`        | unset                                          | Number of reverse proxies that append `X-Forwarded-For` (`true` = 1) |
 | `BILLPLZ_API_KEY`    | unset                                          | Billplz secret key; online payment stays off when unset         |
 | `BILLPLZ_COLLECTION_ID` | unset                                       | Billplz collection that new bills are created in                |
 | `BILLPLZ_X_SIGNATURE_KEY` | unset                                     | Verifies callbacks and redirects; X Signature must be enabled   |

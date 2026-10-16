@@ -5,6 +5,7 @@ import { renderStatementPdf } from "./statement.mjs";
 import { TOOL_DEFINITIONS } from "./automation.mjs";
 import { z } from "zod";
 import http from "node:http";
+import { isIP } from "node:net";
 import { readFile } from "node:fs/promises";
 import { resolve, extname, sep } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -72,6 +73,15 @@ function safeDoc(d) {
     })),
   };
 }
+// TRUST_PROXY is the number of reverse proxies in front of the app that append
+// to X-Forwarded-For. Leave it unset when Node is reachable directly.
+export function proxyHops(value) {
+  if (value === undefined || value === "" || value === "false") return 0;
+  if (value === "true") return 1;
+  const n = Number(value);
+  check(Number.isInteger(n) && n >= 0 && n <= 5, "TRUST_PROXY must be true, false or 0-5.");
+  return n;
+}
 const csvCell = (v) => {
   let s = String(v ?? "");
   if (/^[\s]*[=+@\-\t\r]/.test(s)) s = "'" + s;
@@ -87,6 +97,7 @@ export function createApp({
   mailTransport,
   gatewayConfig,
   gatewayFetch,
+  trustProxy = 0,
   backupConfig = {
     directory: process.env.BACKUP_DIRECTORY,
     key: process.env.BACKUP_KEY,
@@ -95,6 +106,18 @@ export function createApp({
   check(store, "Store required.");
   const allowedOrigin = new URL(appUrl).origin;
   const limits = new Map();
+  const ipOf = (req) => {
+    const peer = req.socket.remoteAddress;
+    if (!trustProxy) return peer;
+    // Only the last trustProxy entries were written by our own proxies; anything
+    // further left is client-supplied and must not be used.
+    const list = String(req.headers["x-forwarded-for"] || "")
+      .split(",")
+      .map((v) => v.trim())
+      .filter(Boolean);
+    const ip = list[list.length - trustProxy];
+    return ip && isIP(ip) ? ip : peer;
+  };
   const backups = new BackupManager(store, backupConfig);
   const mailer = new Mailer(store, {
     ...(mailConfig !== undefined ? { config: mailConfig } : {}),
@@ -192,7 +215,7 @@ export function createApp({
           }
         };
         if (path.startsWith("/api/integrations/")) {
-          allow("connector-ip:" + req.socket.remoteAddress, 120, 60000);
+          allow("connector-ip:" + ipOf(req), 120, 60000);
           const raw = req.headers.authorization || "";
           check(
             raw.startsWith("Bearer "),
@@ -229,7 +252,7 @@ export function createApp({
         }
         if (path === "/api/payments/billplz/callback" && method === "POST") {
           // Server-to-server notification from Billplz, authenticated by its X Signature.
-          allow("gateway:" + req.socket.remoteAddress, 120, 60000);
+          allow("gateway:" + ipOf(req), 120, 60000);
           requestContext.getStore().actor = "gateway:billplz";
           check(
             (req.headers["content-type"] || "").startsWith(
@@ -260,7 +283,7 @@ export function createApp({
         if (path === "/api/health" && method === "GET")
           return send(200, { ok: true });
         if (path === "/api/login" && method === "POST") {
-          allow("login:" + req.socket.remoteAddress, 10, 15 * 60000);
+          allow("login:" + ipOf(req), 10, 15 * 60000);
           const b = await body();
           const email = text(b.email || "", 160).toLowerCase();
           const owner = store.db
@@ -295,7 +318,7 @@ export function createApp({
           check(match, "Not found.", 404);
           const [, token, action] = match;
           requestContext.getStore().actor = "client-link";
-          allow("public:" + req.socket.remoteAddress, 120, 60000);
+          allow("public:" + ipOf(req), 120, 60000);
           if (method === "GET" && !action) {
             const d = store.publicDocument(token, true);
             return send(200, {
@@ -306,13 +329,13 @@ export function createApp({
             });
           }
           if (method === "POST" && action === "checkout") {
-            allow("checkout:" + req.socket.remoteAddress, 10, 60000);
+            allow("checkout:" + ipOf(req), 10, 60000);
             return send(200, await gateway.checkout(token, allowedOrigin));
           }
           if (method === "POST" && action === "payment-return") {
             // The browser comes back with signed billplz[...] query values; the
             // payment is confirmed with the provider before anything is recorded.
-            allow("submit:" + req.socket.remoteAddress, 12, 60000);
+            allow("submit:" + ipOf(req), 12, 60000);
             const d = store.publicDocument(token);
             const b = await body();
             const params = Object.fromEntries(
@@ -339,12 +362,12 @@ export function createApp({
             });
           }
           if (method === "POST" && action === "accept") {
-            allow("submit:" + req.socket.remoteAddress, 12, 60000);
+            allow("submit:" + ipOf(req), 12, 60000);
             const b = await body();
             return send(200, safeDoc(store.accept(token, b.name)));
           }
           if (method === "POST" && action === "payment-reference") {
-            allow("submit:" + req.socket.remoteAddress, 12, 60000);
+            allow("submit:" + ipOf(req), 12, 60000);
             return send(201, store.proof(token, await body()));
           }
           throw new AppError("Not found.", 404);
@@ -854,6 +877,42 @@ export function createApp({
               ),
             );
           }
+          if (path === "/api/documents" && method === "GET") {
+            // Paged, searchable document list for integrations and large workspaces.
+            const q = (url.searchParams.get("q") || "").toLowerCase().slice(0, 120);
+            const kind = url.searchParams.get("kind");
+            const state = url.searchParams.get("state");
+            const limit = Math.min(Math.max(Number(url.searchParams.get("limit")) || 50, 1), 200);
+            const offset = Math.max(Number(url.searchParams.get("offset")) || 0, 0);
+            const all = store
+              .documents()
+              .filter(
+                (d) =>
+                  (!kind || d.kind === kind) &&
+                  (!state || d.state === state) &&
+                  (!q ||
+                    `${d.number || ""} ${d.client.name} ${d.client.email || ""}`
+                      .toLowerCase()
+                      .includes(q)),
+              );
+            return send(200, {
+              total: all.length,
+              limit,
+              offset,
+              items: all.slice(offset, offset + limit).map((d) => ({
+                id: d.id,
+                kind: d.kind,
+                number: d.number,
+                state: d.state,
+                status: d.status,
+                client: { id: d.client_id, name: d.client.name },
+                issue_date: d.issue_date,
+                due_date: d.due_date,
+                total: d.total,
+                balance: d.balance,
+              })),
+            });
+          }
           if (path === "/api/documents" && method === "POST") {
             const b = await body();
             return send(
@@ -1084,7 +1143,12 @@ if (
       "UPDATE assistant_runs SET state='failed',response='Interrupted by server restart' WHERE state='running'",
     )
     .run();
-  const server = createApp({ store, appUrl, secure: production });
+  const server = createApp({
+    store,
+    appUrl,
+    secure: production,
+    trustProxy: proxyHops(process.env.TRUST_PROXY),
+  });
   server.listen(port, host, () => {
     console.log(`Nawlogic Invoice: ${appUrl}`);
     server.backups.start();

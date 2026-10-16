@@ -1627,3 +1627,16 @@ select:disabled {
     font-size: 26px;
   }
 }
+.pager {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 14px 18px;
+  font-size: 13px;
+  color: var(--muted, #64748b);
+}
+.pager .btn[disabled] {
+  opacity: 0.45;
+  cursor: default;
+}
