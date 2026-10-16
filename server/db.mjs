@@ -2,6 +2,7 @@ import { migrateAutomation } from "./automation-migration.mjs";
 import { migrateRecords, attachRecords } from "./records.mjs";
 import { migrateMail, attachMail } from "./mailer.mjs";
 import { migrateTax, attachTax } from "./tax.mjs";
+import { migrateGateway } from "./gateway.mjs";
 import { attachSales } from "./sales.mjs";
 import { attachAutomation } from "./automation.mjs";
 import { migrate } from "./migrations.mjs";
@@ -57,6 +58,7 @@ export function openDatabase(path) {
   migrateRecords(db, path);
   migrateMail(db, path);
   migrateTax(db, path);
+  migrateGateway(db, path);
   const store = new Store(db);
   store.path = path;
   try {

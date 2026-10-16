@@ -1,5 +1,6 @@
 import { Assistant } from "./assistant.mjs";
 import { Mailer } from "./mailer.mjs";
+import { Gateway } from "./gateway.mjs";
 import { renderStatementPdf } from "./statement.mjs";
 import { TOOL_DEFINITIONS } from "./automation.mjs";
 import { z } from "zod";
@@ -84,6 +85,8 @@ export function createApp({
   aiFetch,
   mailConfig,
   mailTransport,
+  gatewayConfig,
+  gatewayFetch,
   backupConfig = {
     directory: process.env.BACKUP_DIRECTORY,
     key: process.env.BACKUP_KEY,
@@ -96,6 +99,10 @@ export function createApp({
   const mailer = new Mailer(store, {
     ...(mailConfig !== undefined ? { config: mailConfig } : {}),
     ...(mailTransport ? { transport: mailTransport } : {}),
+  });
+  const gateway = new Gateway(store, {
+    ...(gatewayConfig !== undefined ? { config: gatewayConfig } : {}),
+    ...(gatewayFetch ? { fetcher: gatewayFetch } : {}),
   });
   const assistant = new Assistant(store, {
     ...(assistantConfig !== undefined ? { config: assistantConfig } : {}),
@@ -148,7 +155,11 @@ export function createApp({
         const url = new URL(req.url, "http://localhost");
         const path = url.pathname;
         const method = req.method;
-        if (method !== "GET" && !path.startsWith("/api/integrations/"))
+        if (
+          method !== "GET" &&
+          !path.startsWith("/api/integrations/") &&
+          path !== "/api/payments/billplz/callback"
+        )
           check(
             req.headers.origin === allowedOrigin,
             "Request origin is not allowed.",
@@ -216,6 +227,36 @@ export function createApp({
             );
           throw new AppError("Integration endpoint not found.", 404);
         }
+        if (path === "/api/payments/billplz/callback" && method === "POST") {
+          // Server-to-server notification from Billplz, authenticated by its X Signature.
+          allow("gateway:" + req.socket.remoteAddress, 120, 60000);
+          requestContext.getStore().actor = "gateway:billplz";
+          check(
+            (req.headers["content-type"] || "").startsWith(
+              "application/x-www-form-urlencoded",
+            ),
+            "Form request required.",
+            415,
+          );
+          const chunks = [];
+          let size = 0;
+          for await (const chunk of req) {
+            size += chunk.length;
+            check(size <= 16000, "Request too large.", 413);
+            chunks.push(chunk);
+          }
+          const params = Object.fromEntries(
+            new URLSearchParams(Buffer.concat(chunks).toString("utf8")),
+          );
+          const notice = gateway.verify(params);
+          try {
+            await gateway.settle(notice.id, notice.paidAt);
+          } catch (e) {
+            // A validly signed notice for a bill this app did not create needs no retries.
+            if (e.status !== 404) throw e;
+          }
+          return send(200, "OK", { "Content-Type": "text/plain; charset=utf-8" });
+        }
         if (path === "/api/health" && method === "GET")
           return send(200, { ok: true });
         if (path === "/api/login" && method === "POST") {
@@ -249,14 +290,47 @@ export function createApp({
         }
         if (path.startsWith("/api/public/")) {
           const match = path.match(
-            /^\/api\/public\/([\w-]+)(?:\/(pdf|accept|payment-reference))?$/,
+            /^\/api\/public\/([\w-]+)(?:\/(pdf|accept|payment-reference|checkout|payment-return))?$/,
           );
           check(match, "Not found.", 404);
           const [, token, action] = match;
           requestContext.getStore().actor = "client-link";
           allow("public:" + req.socket.remoteAddress, 120, 60000);
-          if (method === "GET" && !action)
-            return send(200, safeDoc(store.publicDocument(token, true)));
+          if (method === "GET" && !action) {
+            const d = store.publicDocument(token, true);
+            return send(200, {
+              ...safeDoc(d),
+              online_payment:
+                gateway.status().configured &&
+                !!(d.client.email || d.client.phone || store.settings().email),
+            });
+          }
+          if (method === "POST" && action === "checkout") {
+            allow("checkout:" + req.socket.remoteAddress, 10, 60000);
+            return send(200, await gateway.checkout(token, allowedOrigin));
+          }
+          if (method === "POST" && action === "payment-return") {
+            // The browser comes back with signed billplz[...] query values; the
+            // payment is confirmed with the provider before anything is recorded.
+            allow("submit:" + req.socket.remoteAddress, 12, 60000);
+            const d = store.publicDocument(token);
+            const b = await body();
+            const params = Object.fromEntries(
+              Object.entries(b.params || {})
+                .filter(([k, v]) => /^billplz\[[a-z_]+\]$/.test(k) && typeof v === "string")
+                .slice(0, 10),
+            );
+            const { id: billId, paidAt } = gateway.verify(params);
+            check(
+              store.db
+                .prepare("SELECT 1 FROM online_payments WHERE bill_id=? AND invoice_id=?")
+                .get(billId, d.id),
+              "Payment not found.",
+              404,
+            );
+            const r = await gateway.settle(billId, paidAt);
+            return send(200, { state: r.state });
+          }
           if (method === "GET" && action === "pdf") {
             const d = store.publicDocument(token);
             return send(200, await renderPdf(d), {
@@ -455,6 +529,8 @@ export function createApp({
               connectors: store.connectorTokens(),
               assistant: assistant.status(),
               mail: mailer.status(),
+              gateway: gateway.status(),
+              onlinePayments: gateway.list(),
               emailLog: store.emailLog(),
               assistantRuns: store.db
                 .prepare(
@@ -468,12 +544,13 @@ export function createApp({
             return send(
               200,
               {
-                schemaVersion: 6,
+                schemaVersion: 7,
                 exported: new Date().toISOString(),
                 ...store.workspace(),
                 finance: store.finance(),
                 sales: store.sales(),
                 automation: store.automationState(),
+                onlinePayments: gateway.list(100000),
                 audit: store.db
                   .prepare("SELECT * FROM audit ORDER BY id")
                   .all(),
@@ -717,6 +794,14 @@ export function createApp({
               201,
               await mailer.sendStatement(statement[1], await body()),
             );
+          }
+          const online = path.match(/^\/api\/online-payments\/([\w-]+)\/check$/);
+          if (online && method === "POST") {
+            const row = store.db
+              .prepare("SELECT bill_id FROM online_payments WHERE id=?")
+              .get(online[1]);
+            check(row, "Payment not found.", 404);
+            return send(200, await gateway.settle(row.bill_id));
           }
           if (path === "/api/reminders/run" && method === "POST")
             return send(200, await mailer.runReminders());

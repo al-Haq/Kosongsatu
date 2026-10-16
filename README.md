@@ -52,6 +52,7 @@ See [AI, MCP and sales setup](docs/AUTOMATION.md) for configuration, tool scopes
 - Numbered credit/debit notes and refunds, with branded PDFs and adjusted invoice balances. Credits on paid invoices release existing funds for reuse or refund.
 - Normalized bank CSV preview/import, duplicate skipping, manual receipt/refund matching and exclusion reasons. Import alone never creates income.
 - Document-only client links with random tokens, hashed token storage, configurable 1–90 day expiry, revocation and rotation.
+- Optional Billplz online payment (FPX, card, DuitNow) from the client link. Signed callbacks are confirmed with Billplz before a receipt is recorded and the invoice is settled automatically.
 - Responsive client invoice pages, PDF downloads and transaction-reference submission. Client references remain **pending** until an owner verifies actual receipt of money.
 - Client quotation acceptance with signer name and audit entry. A quotation converts to one linked draft invoice, even if conversion is repeated.
 - Monthly recurring schedules with preserved anchor day or month end, pause/resume, and owner-triggered draft generation once per period. Future periods cannot run early.
@@ -66,7 +67,7 @@ See [AI, MCP and sales setup](docs/AUTOMATION.md) for configuration, tool scopes
 
 - LHDN MyInvois e-Invoice submission, validation, cancellation or validated tax notes.
 - SST-02 submission, exemptions and tax on credit/debit notes. The SST summary is a working aid; check it with your accountant before filing. The app must not be represented as tax-compliant software without a separate review.
-- Payment gateways, automatic bank feeds or direct debit. Email needs your own SMTP account; none is connected by default.
+- Automatic bank feeds or direct debit. Email and online payment need your own SMTP and Billplz accounts; none is connected by default.
 - Payment-slip file uploads (clients submit a transaction reference and message), multiple staff roles, multi-company tenancy or self-registration.
 - Fully automatic recurring scheduling. An owner deliberately generates due drafts; no job sends/charges automatically.
 - Business JSON import. Export is portable business data; use the encrypted database backup/restore procedure for recovery.

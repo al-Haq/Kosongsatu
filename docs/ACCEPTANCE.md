@@ -59,3 +59,10 @@ No live bank payment, email delivery, MyInvois submission, production TLS deploy
 - Add the SST number and TIN in Settings. Create an invoice with one 8% line, one 10% line, one exempt line and a discount; confirm the preview, saved document and PDF show the same SST per rate.
 - Add a client's registration number and TIN; confirm they appear on the PDF.
 - Download the SST summary CSV for the period; confirm the issued invoice is listed and drafts are not.
+
+## v0.7 online payment
+
+- With Billplz sandbox keys set, open a client invoice link and confirm "Pay online" appears. Pay with a sandbox bank; confirm you return to the invoice, it shows paid, and a receipt referencing the bill exists.
+- Click "Pay online" twice before paying; confirm the same Billplz bill is reused.
+- Send a callback with a wrong signature; confirm it is refused and nothing changes.
+- In Settings > Online payments, use "Check status" on a pending bill; confirm it stays pending until paid.
