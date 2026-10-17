@@ -3,13 +3,18 @@ import { check } from "./domain.mjs";
 // QR codes for payment payloads, e-Invoice validation links and authenticator setup.
 // Returns the module matrix so callers can draw vectors (PDF) or SVG (browser).
 export function qrMatrix(value, level = "M") {
-  check(
-    typeof value === "string" && value.length > 0 && value.length <= 1200,
-    "QR content must be 1 to 1200 characters.",
-  );
+  check(typeof value === "string" && value.length > 0, "QR content is required.");
+  // The generator keeps only the low byte of each character, so hand it the
+  // UTF-8 bytes as a binary string. Capacity is measured in those bytes.
+  const bytes = Buffer.from(value, "utf8");
+  check(bytes.length <= 1200, "QR content must be 1200 bytes or fewer.");
   const q = qrcode(0, level);
-  q.addData(value, "Byte");
-  q.make();
+  q.addData(bytes.toString("latin1"), "Byte");
+  try {
+    q.make();
+  } catch {
+    check(false, "QR content is too long for a QR code.");
+  }
   const size = q.getModuleCount();
   const rows = [];
   for (let r = 0; r < size; r++) {

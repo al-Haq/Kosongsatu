@@ -6,7 +6,7 @@ function walk(path) {
     e.isDirectory() ? walk(join(path, e.name)) : [join(path, e.name)],
   );
 }
-for (const file of ["server", "public", "scripts", "test"]
+for (const file of ["server", "public", "scripts", "test", "e2e"]
   .flatMap(walk)
   .filter((f) => f.endsWith(".mjs"))) {
   const r = spawnSync(process.execPath, ["--check", file], {

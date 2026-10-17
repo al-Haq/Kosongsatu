@@ -174,3 +174,28 @@ test("modules can register proposal types that apply on approval", async () => {
   assert.throws(() => s.propose("test_note", { text: "bad" }, "owner:test", "request-key-000002"), /bad text/);
   assert.throws(() => s.propose("test_note", { extra: 1 }, "owner:test", "request-key-000003"), /Invalid tool input/);
 });
+
+test("QR codes carry UTF-8 text and reject oversized content cleanly", () => {
+  assert.ok(qrMatrix("Bayaran untuk 发票 INV-1 ✓").length >= 21);
+  assert.throws(() => qrMatrix("😀".repeat(400)), /1200 bytes/);
+  assert.ok(qrMatrix("x".repeat(1200), "H").length <= 177, "the byte limit fits every error level");
+});
+
+test("deleting a record deletes its attached files", () => {
+  const s = openDatabase(":memory:");
+  const c = s.saveClient({ name: "Files client" });
+  const d = s.saveDocument({
+    kind: "invoice",
+    client_id: c.id,
+    issue_date: "2026-10-01",
+    due_date: "2026-10-15",
+    items: [{ description: "Work", quantity: 1, rate: "10.00" }],
+  });
+  s.saveFile({ entity_type: "document", entity_id: d.id, purpose: "attachment", name: "a.png", data: PNG_1PX });
+  s.saveFile({ entity_type: "client", entity_id: c.id, purpose: "logo", name: "b.png", data: PNG_1PX });
+  s.deleteDraft(d.id);
+  assert.equal(s.files("document", d.id).length, 0);
+  assert.equal(s.files("client", c.id).length, 1, "other records keep their files");
+  s.deleteClient(c.id);
+  assert.equal(s.db.prepare("SELECT count(*) n FROM files").get().n, 0);
+});
