@@ -1,1 +1,137 @@
 /* Team and security: users and roles, accountant access, password reset, MFA QR, off-site backups and a verifiable audit chain. */
+.team-forgot {
+  margin-top: 14px;
+  font-size: 12px;
+}
+.team-mfa {
+  display: flex;
+  gap: 20px;
+  align-items: center;
+  margin-bottom: 14px;
+}
+.team-mfa > div {
+  flex: 1;
+  min-width: 0;
+}
+.team-qr {
+  width: 176px;
+  height: 176px;
+  flex: none;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+  image-rendering: pixelated;
+}
+.team-hash {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px;
+  word-break: break-all;
+}
+.team-result {
+  margin-bottom: 0;
+}
+.team-result svg {
+  flex: none;
+}
+.team-broken {
+  border-color: #f3b4ad;
+  background: #fff4f2;
+}
+.team-roles {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+.team-role {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 14px 16px;
+}
+.team-role p {
+  margin: 6px 0;
+  font-size: 12px;
+}
+.team-role small,
+.team-users td small {
+  display: block;
+  color: var(--muted);
+}
+.team-role-help {
+  margin-top: 12px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.team-role-help p {
+  margin: 4px 0;
+}
+.team-users .actions {
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+.team-audit .team-what {
+  white-space: normal;
+  min-width: 240px;
+  overflow-wrap: anywhere;
+}
+.team-audit .team-hash {
+  white-space: nowrap;
+}
+.team-list {
+  padding-left: 18px;
+}
+.team-list li {
+  margin: 6px 0;
+}
+@media (max-width: 850px) {
+  .team-roles {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 640px) {
+  /* The user list becomes stacked cards so every action stays visible. */
+  .team-users thead {
+    display: none;
+  }
+  .team-users,
+  .team-users tbody,
+  .team-users tr,
+  .team-users td {
+    display: block;
+    width: 100%;
+  }
+  .team-users {
+    white-space: normal;
+  }
+  .team-users tr {
+    padding: 12px 0;
+    border-bottom: 1px solid var(--line);
+  }
+  .team-users tbody tr:last-child {
+    border-bottom: 0;
+  }
+  .team-users td {
+    border: 0;
+    padding: 3px 0;
+  }
+  .team-users td small {
+    display: inline;
+    margin-left: 6px;
+  }
+  .team-users td:first-child small {
+    display: block;
+    margin-left: 0;
+  }
+  .team-users .actions {
+    justify-content: flex-start;
+    margin-top: 8px;
+  }
+}
+@media (max-width: 560px) {
+  .team-mfa {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .team-qr {
+    align-self: center;
+  }
+}

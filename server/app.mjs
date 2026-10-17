@@ -364,6 +364,8 @@ export function createApp({
             owner?.password || fallback,
           );
           check(owner && valid, "Email or password is incorrect.", 401);
+          // Team members can be disabled by the owner (see server/ext/team.mjs).
+          check(!owner.disabled, "This account is disabled. Ask the workspace owner.", 403);
           check(
             verifySecondFactor(store, owner.id, b.code),
             "Authenticator or recovery code is required/invalid.",
@@ -762,8 +764,11 @@ export function createApp({
           }
           if (path === "/api/recovery/status" && method === "GET")
             return send(200, backups.status());
-          if (path === "/api/recovery/backup" && method === "POST")
+          if (path === "/api/recovery/backup" && method === "POST") {
+            // A run may also upload the backup off-site, which can take minutes.
+            res.setTimeout(11 * 60000);
             return send(201, await backups.run());
+          }
           const mfa = path.match(/^\/api\/mfa\/(status|begin|enable|disable)$/);
           if (mfa) {
             const action = mfa[1];

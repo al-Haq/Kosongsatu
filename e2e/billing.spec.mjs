@@ -49,10 +49,17 @@ test("invoice: draft, issue, client link, payment and receipt", async ({ page, c
   await page.click('[data-action="record-payment"]');
   const pay = page.locator('form[data-form="payment"]');
   await pay.locator("input[name=reference]").fill("FPX123456");
+  // Link the payment to the client's submitted reference so it is confirmed.
+  await pay.locator("select[name=proof_id]").selectOption({ label: "FPX123456" });
   await pay.locator("input[name=confirmed]").check();
   await pay.locator("button[type=submit]").click();
   await expect(page.locator("#toast")).toContainText("Payment confirmed");
   await expect(page.locator(".panel .badge", { hasText: "Paid" }).first()).toBeVisible();
+  await expect(page.locator(".panel h2", { hasText: "Awaiting review" })).toHaveCount(0);
+  const confirmed = await context.browser().newPage();
+  await confirmed.goto(link);
+  await expect(confirmed.locator(".payment", { hasText: "FPX123456" }).locator(".badge")).toHaveText("Confirmed");
+  await confirmed.close();
 
   const pdf = await page.request.get(page.url().replace(/#\/document\/([\w-]+)$/, "api/documents/$1/pdf"));
   expect(pdf.headers()["content-type"]).toBe("application/pdf");

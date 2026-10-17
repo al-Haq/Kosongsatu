@@ -7,6 +7,7 @@ import {
 } from "node:crypto";
 import { readFileSync, writeFileSync, existsSync, chmodSync } from "node:fs";
 import { check, hash, now } from "./domain.mjs";
+import { qrDataUri } from "./qr.mjs";
 const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
 export function base32(bytes) {
   let bits = 0,
@@ -138,10 +139,9 @@ export function beginMfa(store, ownerId) {
   store.db
     .prepare("UPDATE owners SET mfa_pending=?,mfa_pending_expires=? WHERE id=?")
     .run(seal(secret, store.mfaKey), Date.now() + 600000, ownerId);
-  return {
-    secret,
-    uri: `otpauth://totp/${encodeURIComponent("Nawlogic:" + owner.email)}?secret=${secret}&issuer=Nawlogic&algorithm=SHA1&digits=6&period=30`,
-  };
+  const uri = `otpauth://totp/${encodeURIComponent("Nawlogic:" + owner.email)}?secret=${secret}&issuer=Nawlogic&algorithm=SHA1&digits=6&period=30`;
+  // The QR code lets an authenticator app scan the setup instead of typing the key.
+  return { secret, uri, qr: qrDataUri(uri) };
 }
 export function enableMfa(store, ownerId, code, keepSession) {
   return store.tx(() => {
