@@ -80,9 +80,10 @@ Do not treat a client-submitted reference as bank verification. This is a single
 ```sh
 npm run check
 npm test
+npm run test:e2e   # browser tests (Playwright, Chromium)
 npm audit --omit=dev
 ```
 
-Domain and HTTP integration tests cover exact amounts, immutable snapshots, financial allocations/notes/refunds, recurring anchors, idempotency, CSV reconciliation, migration, TOTP vectors and recovery codes, encrypted backup/restore, authorization and PDF pagination. Browser flows (billing, finance/security, sales) are covered by the manual checklist in [ACCEPTANCE.md](docs/ACCEPTANCE.md); there is no automated browser test suite yet. GitHub Actions runs `check`, `test` and `audit` on every push and pull request.
+Domain and HTTP integration tests cover exact amounts, immutable snapshots, financial allocations/notes/refunds, recurring anchors, idempotency, CSV reconciliation, migration, TOTP vectors and recovery codes, encrypted backup/restore, authorization and PDF pagination. Browser tests in `e2e/` sign in to a disposable demo workspace and cover page navigation, the invoice flow (draft, issue, client link, payment reference, payment, PDF), online quotation acceptance and the phone layout. The manual checklist in [ACCEPTANCE.md](docs/ACCEPTANCE.md) covers the remaining flows. GitHub Actions runs `check`, `test`, `audit` and the browser tests on every push and pull request.
 
 See the [phase 1 release matrix](docs/RELEASE-0.2.md), [deployment and backup](docs/DEPLOYMENT.md), [design decisions](docs/DESIGN.md) and [manual browser checks](docs/ACCEPTANCE.md). Production hosting is **not** configured by this repository commit.
