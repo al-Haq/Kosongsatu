@@ -1,1 +1,176 @@
-/* Payments: gateway keys in Settings, ToyyibPay, Stripe and iPay88, DuitNow QR, payment slip uploads, bank statement formats and smart bank matching. */
+/* Payments: online payment providers, DuitNow QR, payment slips, bank import and matching. */
+.slip-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 0;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--action);
+}
+.slip-link img {
+  width: 56px;
+  height: 56px;
+  object-fit: cover;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: var(--bg);
+}
+.slip-link svg {
+  width: 18px;
+  height: 18px;
+}
+.duitnow-preview {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  margin-bottom: 18px;
+}
+.duitnow-preview img {
+  width: 120px;
+  height: 120px;
+  object-fit: contain;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  flex: none;
+}
+.duitnow-preview p {
+  font-size: 11px;
+  margin-top: 4px;
+}
+.duitnow-panel .duitnow-qr {
+  display: block;
+  width: 100%;
+  max-width: 220px;
+  height: auto;
+  margin: 16px auto 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+}
+.bank-metrics {
+  grid-template-columns: repeat(3, 1fr);
+}
+.bank-table td {
+  vertical-align: top;
+}
+.bank-ref {
+  min-width: 160px;
+  max-width: 260px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.bank-suggest {
+  min-width: 220px;
+  max-width: 300px;
+  white-space: normal;
+}
+.bank-suggest .actions {
+  margin-top: 8px;
+  gap: 6px;
+}
+.bank-suggest .btn {
+  font-size: 11px;
+  padding: 7px 10px;
+}
+.match-top strong {
+  font-size: 12px;
+  margin-right: 4px;
+}
+.match-top small,
+.match-ai small {
+  display: block;
+  margin-top: 4px;
+  font-size: 10px;
+}
+.match-ai {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--line);
+}
+.match-reasons {
+  margin: 6px 0 10px 18px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.match-reasons li {
+  margin: 3px 0;
+}
+.bank-mapping {
+  margin-top: 18px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px 14px;
+}
+.bank-mapping summary {
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 12px;
+}
+.col-checks {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px 12px;
+  min-width: 0;
+}
+.col-checks legend {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 0 4px;
+}
+.col-checks .check-row {
+  margin: 6px 0;
+  overflow-wrap: anywhere;
+}
+.layout-save {
+  align-items: end;
+}
+@media (max-width: 640px) {
+  /* The bank table becomes one card per transaction on phones. */
+  .bank-table thead {
+    display: none;
+  }
+  .bank-table,
+  .bank-table tbody,
+  .bank-table tr,
+  .bank-table td {
+    display: block;
+    width: 100%;
+  }
+  .bank-table tr {
+    border-bottom: 1px solid var(--line);
+    padding: 12px 0;
+  }
+  .bank-table td {
+    padding: 4px 0;
+    border: 0;
+    max-width: none;
+    min-width: 0;
+    white-space: normal;
+    text-align: left;
+  }
+  .bank-table td[data-label]::before {
+    content: attr(data-label);
+    display: block;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 2px;
+  }
+  .bank-table .bank-actions {
+    padding-top: 8px;
+  }
+  .bank-metrics {
+    grid-template-columns: 1fr;
+  }
+  .duitnow-preview {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .bank-mapping .grid-equal {
+    grid-template-columns: 1fr;
+  }
+}

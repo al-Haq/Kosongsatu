@@ -1,5 +1,7 @@
 # Local acceptance checklist
 
+Automated browser tests (`npm run test:e2e`) cover sign-in, every navigation entry, the invoice and quotation flows and the phone layout. Each feature module's owner guide in [features](features) lists what to check for that module.
+
 Run `npm run check`, `npm test` and `npm audit --omit=dev` first. Use a disposable demo database for browser checks; never insert demo transactions into the real workspace.
 
 - Log in using the temporary demo owner credentials; verify invalid login has a useful error.

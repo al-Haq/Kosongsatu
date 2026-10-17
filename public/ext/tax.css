@@ -1,1 +1,174 @@
 /* Tax and compliance: SST-02 worksheet, SST on notes, exemptions, LHDN MyInvois e-Invoice, readiness checks and tax threshold monitor. */
+.tax-meter {
+  margin-top: 14px;
+}
+.tax-meter:first-of-type {
+  margin-top: 4px;
+}
+.tax-meter-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+.tax-progress {
+  display: block;
+  width: 100%;
+  height: 10px;
+  border: 0;
+  border-radius: 6px;
+  background: var(--line);
+  overflow: hidden;
+  appearance: none;
+}
+.tax-progress::-webkit-progress-bar {
+  background: var(--line);
+  border-radius: 6px;
+}
+.tax-progress::-webkit-progress-value {
+  background: var(--teal);
+  border-radius: 6px;
+}
+.tax-progress::-moz-progress-bar {
+  background: var(--teal);
+  border-radius: 6px;
+}
+.tax-progress.near::-webkit-progress-value {
+  background: var(--orange);
+}
+.tax-progress.near::-moz-progress-bar {
+  background: var(--orange);
+}
+.tax-progress.over::-webkit-progress-value {
+  background: var(--red);
+}
+.tax-progress.over::-moz-progress-bar {
+  background: var(--red);
+}
+.tax-watch-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 22px;
+  margin-bottom: 12px;
+}
+.tax-note {
+  margin-top: 12px;
+  margin-bottom: 0;
+}
+.tax-missing {
+  margin: 6px 0 10px;
+  padding-left: 18px;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.tax-panel .detail,
+.tax-detail {
+  margin-top: 12px;
+}
+.tax-code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px;
+  word-break: break-all;
+  white-space: normal;
+}
+.tax-qr-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 12px;
+}
+.tax-qr {
+  width: 112px;
+  height: 112px;
+  flex: none;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: white;
+}
+.tax-inline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+}
+.tax-inline label {
+  margin: 0;
+  min-width: 220px;
+  flex: 1;
+  max-width: 420px;
+}
+.tax-metrics {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin: 4px 0 16px;
+}
+.tax-fieldset {
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+  margin-top: 6px;
+}
+.tax-fieldset h3 {
+  margin: 0 0 2px;
+  font-size: 13px;
+}
+.tax-doc-fields {
+  margin-bottom: 4px;
+}
+.tax-exempt-note {
+  align-self: end;
+}
+.tax-ok {
+  color: var(--action);
+}
+.tax-lines {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px 14px 12px;
+  margin: 12px 0;
+}
+.tax-lines legend {
+  font-size: 12px;
+  font-weight: 700;
+  padding: 0 4px;
+}
+.tax-lines .check-row {
+  margin: 6px 0;
+}
+.tax-sb-line {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) 70px 110px 92px minmax(0, 2fr);
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.tax-cell {
+  margin: 0;
+  min-width: 220px;
+}
+.tax-class-line label {
+  margin-bottom: 8px;
+}
+.tax-panel details summary,
+.panel details summary {
+  cursor: pointer;
+}
+@media (max-width: 760px) {
+  .tax-watch-grid {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+  .tax-sb-line {
+    grid-template-columns: 1fr 1fr;
+  }
+  .tax-sb-line input[name="l_description"],
+  .tax-sb-line select[name="l_class"] {
+    grid-column: 1 / -1;
+  }
+  .tax-metrics {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .tax-inline label {
+    min-width: 0;
+    max-width: none;
+    flex-basis: 100%;
+  }
+}

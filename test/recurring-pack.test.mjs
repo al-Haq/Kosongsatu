@@ -74,13 +74,16 @@ test("the pack lists the month's invoices, notes, cash, SST and aging at month e
     );
     assert.equal(p.totals.invoices, 2);
     assert.equal(p.totals.invoiced, 108000 + 20000);
-    assert.equal(p.totals.sst, 8000);
+    // The RM 100 credit note carries its share of the 8% SST (741 sen), so the
+    // month's SST is 8000 - 741, the same figure as the SST-02 worksheet.
+    assert.equal(p.totals.sst, 8000 - 741);
     assert.deepEqual(p.notes.map((n) => [n.kind, n.amount, n.invoice]), [["credit", 10000, inv.a.number]]);
     assert.equal(p.totals.net_invoiced, 128000 - 10000);
     assert.equal(p.totals.received, 50000 + 5000);
     assert.equal(p.totals.refunded, 2000);
     assert.equal(p.totals.net_cash, 53000);
-    assert.deepEqual(p.sst.rates.map((r) => [r.rate, r.taxable, r.tax]), [[0, 20000, 0], [8, 100000, 8000]]);
+    // The credit note's taxable share (9259) and SST (741) come off the 8% line.
+    assert.deepEqual(p.sst.rates.map((r) => [r.rate, r.taxable, r.tax]), [[0, 20000, 0], [8, 100000 - 9259, 8000 - 741]]);
     // 30th/31st: A is 11+ days late, B is not yet due, the older invoice is 31-60 days late.
     assert.equal(p.aging.d30, 108000 - 10000 - 50000);
     assert.equal(p.aging.current, 20000);

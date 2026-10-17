@@ -2,7 +2,7 @@
 
 An owner-operated invoicing web app for **NAWLOGIC SYSTEMS SOLUTION**, using the supplied Nawlogic logo and teal / orange / ink brand palette.
 
-Release **0.3.0** is a working owner billing application: the browser talks to an authenticated Node.js API and a persistent SQLite database. It is not a localStorage-only mockup. No customer data, credentials, business registration attachments or payment account numbers are committed.
+Release **0.9.0** is a working owner billing application: the browser talks to an authenticated Node.js API and a persistent SQLite database. It is not a localStorage-only mockup. No customer data, credentials, business registration attachments or payment account numbers are committed.
 
 ## Run locally
 
@@ -36,44 +36,41 @@ See [AI, MCP and sales setup](docs/AUTOMATION.md) for configuration, tool scopes
 
 ## Included
 
-- Owner login, hashed passwords, expiring server-side sessions, CSRF and origin checks, login throttling, password changes and sign-out.
-- Dashboard with issued invoice value, confirmed collections, outstanding balances and overdue invoices. Monthly and all-date metrics are explicitly distinguished.
-- Client and service catalogs, including editable payment terms and default rates. Clients with history can be archived and restored; unused clients, services, schedules, opportunities and drafts can be deleted, with the deletion kept in the audit history.
-- Duplicate any document into a new draft.
-- Email issued invoices and quotations with the PDF attached and an optional private link, through your own SMTP server. Every message is logged on the document.
-- Opt-in automatic payment reminders before and after the due date (default 3 days before; 1, 7 and 14 days after). Each invoice gets each reminder once, and a missed reminder is skipped instead of sent late.
-- Statement of account per client for any period, with opening/closing balance and aging (current, 1–30, 31–60, 61–90, 90+ days), as a PDF or by email.
-- SST per line (0, 5, 6, 8 or 10%) once your SST registration number is set, charged after each line's share of the discount. Services carry a default rate. PDFs show your SST number and TIN, and the buyer's registration number, TIN and SST number.
-- SST summary by rate for any period as CSV, to help prepare the SST-02 return.
-- Draft quotations and invoices with live preview, quantities to 2 decimals, line rounding in integer sen, discounts and MYR totals.
-- Issue-time numbering and immutable snapshots of client/business details. Issued documents cannot be silently rewritten.
-- Unicode-capable, branded downloadable PDF invoices, quotations and payment receipts. Long documents paginate.
-- Cash receipts recorded once, allocations across multiple invoices, partial payments and available customer funds. Allocation reversals and erroneous receipt voids preserve history.
-- Numbered credit/debit notes and refunds, with branded PDFs and adjusted invoice balances. Credits on paid invoices release existing funds for reuse or refund.
-- Normalized bank CSV preview/import, duplicate skipping, manual receipt/refund matching and exclusion reasons. Import alone never creates income.
-- Document-only client links with random tokens, hashed token storage, configurable 1–90 day expiry, revocation and rotation.
-- Optional Billplz online payment (FPX, card, DuitNow) from the client link. Signed callbacks are confirmed with Billplz before a receipt is recorded and the invoice is settled automatically.
-- Responsive client invoice pages, PDF downloads and transaction-reference submission. Client references remain **pending** until an owner verifies actual receipt of money.
-- Client quotation acceptance with signer name and audit entry. A quotation converts to one linked draft invoice, even if conversion is repeated.
-- Monthly recurring schedules with preserved anchor day or month end, pause/resume, and owner-triggered draft generation once per period. Future periods cannot run early.
-- CSV export with formula-cell neutralization, business JSON export and actor/before-after audit history.
-- Optional authenticator MFA, one-use recovery codes and local operator recovery.
-- AES-256-GCM online backups, daily scheduling when configured and integrity-checked restore to a new database.
-- Lists page 50 rows at a time with search across all records; `GET /api/documents` offers paged, searchable results for integrations. Set `TRUST_PROXY` behind a reverse proxy so rate limits see real client addresses.
-- Responsive desktop/mobile layout and semantic forms, keyboard-focus styling, explicit labels and native dialogs.
+The core workspace:
 
-**Issued** means published/locked inside this app, not emailed. Sharing opens a link or WhatsApp composer; the app does not send a message itself. A viewed status means the link was opened and is not proof of delivery or identity.
+- Owner login, hashed passwords, expiring server-side sessions, CSRF and origin checks, login throttling, password changes and sign-out. Optional authenticator MFA (with a QR code) and one-use recovery codes.
+- Dashboard with issued invoice value, confirmed collections, outstanding balances, overdue invoices, cash health, tax thresholds and expiring contracts.
+- Clients and services with editable payment terms, default rates, SKUs, default SST rates and classification codes. Archive, guarded deletes, duplication.
+- Draft quotations and invoices with live preview, per-line and document discounts, SST per line, custom fields, attachments, deposits and instalment plans. Proforma invoices, sales orders and delivery orders.
+- Issue-time numbering and immutable snapshots. Branded PDFs with three layouts, your own logo, English / Bahasa Melayu / 中文 and multiple currencies at a fixed rate.
+- Cash receipts, allocations, partial payments, credit/debit notes (with their SST share), refunds, bank CSV import in Malaysian bank layouts, smart matching suggestions and an audit history chained with SHA-256.
+- Client links and a client portal: documents, statements, online payment, payment references with slip upload, drawn or typed e-signatures on quotations, feedback after payment.
+- Recurring plans from weekly to yearly with draft, auto-issue or auto-send modes, automatic late fees, contracts and retainers, and a monthly accountant pack.
+- Books: expenses and vendors, receipt scanning, supplier POs and bills, sales reports, profit and loss, cash flow forecast, Form B/P working summary, late-payment prediction, exports for Xero, QuickBooks, Bukku, SQL Account and AutoCount.
+- Operations: partial and amended customer POs, timesheets with a timer, projects and milestone billing, optional inventory, proof of work on documents.
+- Tax: SST-02 worksheet, SST exemptions per customer, LHDN MyInvois e-Invoices (submission, validation QR, cancellation, credit/debit/refund notes, consolidated and self-billed), a "MyInvois ready" checker and a tax threshold monitor.
+- Communication: SMTP settings in the app, editable email templates (EN/BM), open and bounce tracking, WhatsApp Business messages and reminders, owner notifications, AI-assisted collection follow-ups that wait for approval, link previews.
+- Team: owner, staff and read-only accountant roles, invitations, password reset by email, off-site encrypted backups to S3-compatible storage.
+- Platform: outgoing webhooks with signatures, CSV import of clients, services and historical invoices, an installable app, invoices typed in plain language, a Docker/Caddy hosting kit with install and update scripts.
+- Sales opportunities, customer POs, an MCP server and scoped REST tools for agents and n8n, with owner approval of every proposal.
 
-## Not connected in this release
+Each module is described for owners in [docs/features](docs/features): [documents](docs/features/documents.md), [recurring](docs/features/recurring.md), [tax](docs/features/tax.md), [payments](docs/features/payments.md), [comms](docs/features/comms.md), [portal](docs/features/portal.md), [books](docs/features/books.md), [ops](docs/features/ops.md), [team](docs/features/team.md), [platform](docs/features/platform.md). The roadmap and status of all 100 features is in [docs/100-CIRI.md](docs/100-CIRI.md).
 
-- LHDN MyInvois e-Invoice submission, validation, cancellation or validated tax notes.
-- SST-02 submission, exemptions and tax on credit/debit notes. The SST summary is a working aid; check it with your accountant before filing. The app must not be represented as tax-compliant software without a separate review.
-- Automatic bank feeds or direct debit. Email and online payment need your own SMTP and Billplz accounts; none is connected by default.
-- Payment-slip file uploads (clients submit a transaction reference and message), multiple staff roles, multi-company tenancy or self-registration.
-- Fully automatic recurring scheduling. An owner deliberately generates due drafts; no job sends/charges automatically.
-- Business JSON import. Export is portable business data; use the encrypted database backup/restore procedure for recovery.
+**Issued** means published/locked inside this app. Sharing opens a link or WhatsApp composer unless email or WhatsApp Business is set up. A viewed status means the link was opened and is not proof of delivery or identity.
 
-Do not treat a client-submitted reference as bank verification. This is a single-business billing tool, not a general ledger or bank account.
+## Needs your own accounts
+
+These are built and tested with simulated providers, and switch on when you add the keys under **Settings > Integration keys** (or on the server):
+
+- Email (SMTP): sending documents, statements, reminders, invitations, password resets and the accountant pack.
+- Online payment: Billplz, ToyyibPay, Stripe or iPay88 keys. ToyyibPay and iPay88 have not been exercised against a live account; run a small live test first.
+- WhatsApp Business (Meta Cloud API): access token, phone number ID, app secret, approved templates.
+- LHDN MyInvois: client ID and secret (sandbox or production) and, for signed documents, your certificate. Not yet exercised against the live sandbox; see [docs/features/tax.md](docs/features/tax.md).
+- An OpenAI-compatible model: receipt scanning, AI wording for follow-ups and plain-language invoices. Everything has a non-AI path.
+- S3-compatible storage for off-site backups.
+- A server and domain for production hosting ([docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)).
+
+Still outside this release: automatic bank feeds or direct debit, multi-company tenancy, self-registration, partial deliveries, and fetched exchange rates (rates are typed by the owner). The SST-02 worksheet, Form B/P summary and accounting exports are working aids: check them with your accountant, and test the exports against a real import before relying on them. Do not treat a client-submitted reference as bank verification.
 
 ## Verify
 
@@ -84,6 +81,6 @@ npm run test:e2e   # browser tests (Playwright, Chromium)
 npm audit --omit=dev
 ```
 
-Domain and HTTP integration tests cover exact amounts, immutable snapshots, financial allocations/notes/refunds, recurring anchors, idempotency, CSV reconciliation, migration, TOTP vectors and recovery codes, encrypted backup/restore, authorization and PDF pagination. Browser tests in `e2e/` sign in to a disposable demo workspace and cover page navigation, the invoice flow (draft, issue, client link, payment reference, payment, PDF), online quotation acceptance and the phone layout. The manual checklist in [ACCEPTANCE.md](docs/ACCEPTANCE.md) covers the remaining flows. GitHub Actions runs `check`, `test`, `audit` and the browser tests on every push and pull request.
+More than 440 domain and HTTP tests cover exact amounts, immutable snapshots, allocations/notes/refunds, recurring cadences, idempotency, CSV reconciliation, migrations on populated databases, TOTP and recovery codes, encrypted backup/restore, role permissions, webhook signatures, e-Invoice signing, portal sessions and PDF rendering, with every external provider simulated. Browser tests in `e2e/` sign in to a disposable demo workspace and cover page navigation, the invoice flow (draft, issue, client link, payment reference, payment, PDF), online quotation acceptance and the phone layout. The manual checklist in [ACCEPTANCE.md](docs/ACCEPTANCE.md) covers the remaining flows. GitHub Actions runs `check`, `test`, `audit` and the browser tests on every push and pull request.
 
 See the [phase 1 release matrix](docs/RELEASE-0.2.md), [deployment and backup](docs/DEPLOYMENT.md), [design decisions](docs/DESIGN.md) and [manual browser checks](docs/ACCEPTANCE.md). Production hosting is **not** configured by this repository commit.
