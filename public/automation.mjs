@@ -74,6 +74,8 @@ export function automationUI(h) {
       content = `<p><strong>Customer PO ${E(b.reference)}</strong></p><p>${E(quote(b.quote_id)?.number)} / ${money(Math.round(Number(b.amount) * 100))} / ${dateLabel(b.po_date)}</p><p>${E(b.notes || "")}</p>`;
     if (p.kind === "invoice_from_quote")
       content = `<p>Create/open one <strong>draft invoice</strong> from ${E(quote(b.quote_id)?.number)} / ${E(quote(b.quote_id)?.client.name)} / ${money(quote(b.quote_id)?.total || 0)}</p><p>${b.po_id ? "Customer PO: " + E(get().sales.purchaseOrders.find((po) => po.id === b.po_id)?.reference || b.po_id) : "Any registered customer PO will be linked automatically."}</p>`;
+    // Module proposal types describe themselves with a plain-text summary.
+    if (!content) content = `<p>${E(p.summary || p.kind.replaceAll("_", " "))}</p>`;
     return content;
   }
   function automation() {

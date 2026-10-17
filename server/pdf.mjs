@@ -1,6 +1,7 @@
 import PDFDocument from "pdfkit";
 import { fileURLToPath } from "node:url";
 import { currency, taxSummary } from "./domain.mjs";
+import { drawQr } from "./qr.mjs";
 const regular = fileURLToPath(
   new URL("../public/assets/fonts/DejaVuSans.ttf", import.meta.url),
 );
@@ -10,7 +11,7 @@ const bold = fileURLToPath(
 const logo = fileURLToPath(
   new URL("../public/assets/nawlogic-logo.png", import.meta.url),
 );
-export function renderPdf(invoice, payment = null) {
+export function renderPdf(invoice, payment = null, blocks = []) {
   return new Promise((resolve, reject) => {
     const documentLabel =
       {
@@ -327,6 +328,37 @@ export function renderPdf(invoice, payment = null) {
         y += 16;
       }
       y += 8;
+    }
+    // Extra blocks from feature modules: QR codes, signatures, photos, notes.
+    // Each block keeps its visual and its text together on one page.
+    for (const block of blocks || []) {
+      const visual = block.qr ? block.qrSize || 96 : block.image ? block.imageWidth || 140 : 0;
+      const textX = visual ? 42 + visual + 16 : 42,
+        textWidth = 553 - textX;
+      pdf.font("Body").fontSize(9);
+      const textHeight = block.text
+        ? pdf.heightOfString(String(block.text), { width: textWidth, lineGap: 3 })
+        : 0;
+      let visualHeight = block.qr ? visual : 0;
+      if (block.image) {
+        try {
+          const img = pdf.openImage(block.image);
+          visualHeight = Math.min(block.imageHeight || 220, (img.height / img.width) * visual);
+          block._img = img;
+        } catch {
+          block._img = null;
+        }
+      }
+      room(Math.max(visualHeight, textHeight) + 40);
+      y += 13;
+      if (block.heading) {
+        line(block.heading, 42, y, 10, "Bold");
+        y += 19;
+      }
+      if (block.qr) drawQr(pdf, block.qr, 42, y, visual);
+      if (block._img) pdf.image(block._img, 42, y, { fit: [visual, visualHeight] });
+      if (block.text) line(block.text, textX, y, 9, "Body", muted, textWidth);
+      y += Math.max(visualHeight, textHeight) + 12;
     }
     const pages = pdf.bufferedPageRange();
     for (let i = 0; i < pages.count; i++) {

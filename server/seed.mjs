@@ -1,3 +1,4 @@
+import { PLUGINS } from "./plugins.mjs";
 import { today, addDays } from "./domain.mjs";
 export function seedDemo(store) {
   if (store.db.prepare("SELECT id FROM clients LIMIT 1").get()) return;
@@ -85,4 +86,6 @@ export function seedDemo(store) {
     next_date: today(),
     terms: 14,
   });
+  // Feature modules may add their own example records.
+  for (const p of PLUGINS) p.seedDemo?.(store);
 }

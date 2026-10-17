@@ -3,6 +3,7 @@ import { migrateRecords, attachRecords } from "./records.mjs";
 import { migrateMail, attachMail } from "./mailer.mjs";
 import { migrateTax, attachTax } from "./tax.mjs";
 import { migrateGateway } from "./gateway.mjs";
+import { migratePlugins, attachPlugins } from "./plugins.mjs";
 import { attachSales } from "./sales.mjs";
 import { attachAutomation } from "./automation.mjs";
 import { migrate } from "./migrations.mjs";
@@ -59,6 +60,7 @@ export function openDatabase(path) {
   migrateMail(db, path);
   migrateTax(db, path);
   migrateGateway(db, path);
+  migratePlugins(db, path);
   const store = new Store(db);
   store.path = path;
   try {
@@ -66,7 +68,7 @@ export function openDatabase(path) {
       path,
       !!db
         .prepare("SELECT id FROM owners WHERE mfa_secret IS NOT NULL LIMIT 1")
-        .get(),
+        .get() || !!db.prepare("SELECT 1 FROM secrets LIMIT 1").get(),
     );
     return store;
   } catch (e) {
@@ -615,3 +617,4 @@ attachAutomation(Store);
 attachRecords(Store);
 attachMail(Store);
 attachTax(Store);
+attachPlugins(Store);

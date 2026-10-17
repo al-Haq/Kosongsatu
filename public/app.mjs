@@ -1,10 +1,15 @@
 import { automationUI } from "./automation.mjs";
 import { financeUI } from "./finance.mjs";
+import { UI_PLUGINS } from "./plugins.mjs";
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
 const app = $("#app"),
   modal = $("#modal");
 let advanced, workflow;
+// Feature modules loaded from public/ext (see docs/PLUGINS.md).
+let plugins = [];
+const slot = (name, ...args) =>
+  plugins.map((p) => p.slots?.[name]?.(...args) || "").join("");
 const requestKeys = new Map();
 let S = null,
   session = null,
@@ -161,22 +166,37 @@ const confirmModal = (title, message, action, id, label) =>
 function renderLogin() {
   app.innerHTML = `<div class="login-screen"><section class="login-brand"><span class="eyebrow">NAWLOGIC / BILLING WORKSPACE</span><h1>Good work deserves<br><span class="accent">a clear invoice.</span></h1><p>From the first quotation to the final receipt. A quieter way to keep your business moving.</p><div class="login-points"><span>${icon("doc")}Create with confidence</span><span>${icon("wallet")}Track every payment</span><span>${icon("shield")}Your private workspace</span></div></section><section class="login-form"><div class="login-inner">${logo()}<h2>Welcome back.</h2><p>Sign in to your Nawlogic workspace.</p><form data-form="login">${input("Email address", "email", "", "email", true, 'autocomplete="username" maxlength="160"')}${input("Password", "password", "", "password", true, 'autocomplete="current-password" maxlength="256"')}${input("Authenticator or recovery code (if enabled)", "code", "", "text", false, 'autocomplete="one-time-code" maxlength="40"')}${errorBlock()}<button class="btn primary" type="submit">Sign in ${icon("arrow")}</button></form><div class="login-footer">${icon("shield")} Owner access only. Customer invoices use a separate private link.</div></div></section></div>`;
 }
+const NAV_GROUPS = ["Sell", "Get paid", "Records", "Books", "Operations", "Workspace"];
 const navItems = [
-  ["overview", "Overview", "grid"],
-  ["sales", "Sales & POs", "trend"],
-  ["automation", "AI & automation", "shield"],
-  ["invoices", "Invoices", "doc"],
-  ["quotes", "Quotations", "doc"],
-  ["clients", "Clients", "users"],
-  ["services", "Services", "box"],
-  ["recurring", "Recurring", "clock"],
-  ["payments", "Payments", "wallet"],
-  ["ledger", "Cash & credits", "wallet"],
-  ["bank", "Bank matching", "trend"],
-  ["settings", "Settings", "settings"],
+  ["overview", "Overview", "grid", "Sell"],
+  ["sales", "Sales & POs", "trend", "Sell"],
+  ["quotes", "Quotations", "doc", "Sell"],
+  ["invoices", "Invoices", "doc", "Sell"],
+  ["recurring", "Recurring", "clock", "Sell"],
+  ["payments", "Payments", "wallet", "Get paid"],
+  ["ledger", "Cash & credits", "wallet", "Get paid"],
+  ["bank", "Bank matching", "trend", "Get paid"],
+  ["clients", "Clients", "users", "Records"],
+  ["services", "Services", "box", "Records"],
+  ["automation", "AI & automation", "shield", "Workspace"],
+  ["settings", "Settings", "settings", "Workspace"],
 ];
+// Modules add entries as { key, label, icon, group, hidden?() }.
+function allNav() {
+  const extra = plugins.flatMap((p) => p.nav || []).filter((n) => !n.hidden?.());
+  const list = [...navItems.map(([key, label, ic, group]) => ({ key, label, icon: ic, group })), ...extra];
+  const groups = [...NAV_GROUPS, ...new Set(extra.map((n) => n.group).filter((g) => !NAV_GROUPS.includes(g)))];
+  return groups
+    .map((g) => [g, list.filter((n) => (n.group || "Workspace") === g)])
+    .filter(([, items]) => items.length);
+}
 function renderShell(html, active) {
-  app.innerHTML = `<div class="shell"><aside class="sidebar">${logo()}<div class="eyebrow">Billing workspace</div><nav aria-label="Main navigation">${navItems.map(([key, name, ic]) => `<a href="#/${key}" class="${key === active ? "active" : ""}" ${key === active ? 'aria-current="page"' : ""}>${icon(ic)}${name}</a>`).join("")}</nav><div class="owner-box"><strong>NAWLOGIC</strong><small>${E(session.email)}</small></div></aside><div class="workspace"><header class="topbar"><div class="top-left"><button class="btn ghost mobile-toggle" data-action="toggle-nav" aria-label="Toggle navigation">${icon("menu")}</button><span class="muted top-label">Nawlogic workspace</span></div><div class="right">${S.settings.demo ? '<span class="badge orange">DEMO DATA</span>' : '<span class="badge green">Owner workspace</span>'}<div class="avatar" aria-label="Owner account">WA</div><button class="btn ghost icon-only" data-action="logout" aria-label="Sign out">${icon("logout")}</button></div></header><main class="content">${S.settings.demo ? '<div class="notice"><p>Demo workspace. All clients, documents and payments are examples.</p></div>' : ""}${html}<p class="footer-note">Nawlogic Invoice · MYR · Kuala Lumpur time · MyInvois is not connected${S.gateway?.configured ? "" : " · Online payment is not connected"}.</p></main></div></div>`;
+  app.innerHTML = `<div class="shell"><aside class="sidebar">${logo()}<div class="eyebrow">Billing workspace</div><nav aria-label="Main navigation">${allNav()
+    .map(
+      ([group, items]) =>
+        `<span class="nav-group">${E(group)}</span>${items.map((n) => `<a href="#/${n.key}" class="${n.key === active ? "active" : ""}" ${n.key === active ? 'aria-current="page"' : ""}>${icon(n.icon)}${E(n.label)}</a>`).join("")}`,
+    )
+    .join("")}</nav><div class="owner-box"><strong>NAWLOGIC</strong><small>${E(session.email)}</small></div></aside><div class="workspace"><header class="topbar"><div class="top-left"><button class="btn ghost mobile-toggle" data-action="toggle-nav" aria-label="Toggle navigation">${icon("menu")}</button><span class="muted top-label">Nawlogic workspace</span></div><div class="right">${slot("topbar")}${S.settings.demo ? '<span class="badge orange">DEMO DATA</span>' : '<span class="badge green">Owner workspace</span>'}<div class="avatar" aria-label="Owner account">WA</div><button class="btn ghost icon-only" data-action="logout" aria-label="Sign out">${icon("logout")}</button></div></header><main class="content">${S.settings.demo ? '<div class="notice"><p>Demo workspace. All clients, documents and payments are examples.</p></div>' : ""}${html}<p class="footer-note">Nawlogic Invoice · MYR · Kuala Lumpur time · MyInvois is not connected${S.gateway?.configured ? "" : " · Online payment is not connected"}.</p></main></div></div>`;
 }
 const heading = (title, sub, actions = "") =>
   `<div class="heading"><div><h1>${E(title)}</h1><p>${E(sub)}</p></div><div class="actions">${actions}</div></div>`;
@@ -267,7 +287,7 @@ function overview() {
             `<div class="attention"><div><strong>${E(d.number)}</strong><small>${E(d.client.name)} / ${money(d.balance)}</small><button class="link-button" data-action="open-document" data-id="${d.id}">Review invoice →</button></div>${badge(d.status)}</div>`,
         )
         .join("") || empty("All caught up", "No outstanding issued invoices.")
-    }</section></div><section class="panel mt22"><div class="panel-head"><h2>Recent documents</h2><a href="#/invoices">View invoices →</a></div>${invoiceTable(S.documents.slice(0, 5))}</section>`
+    }</section></div>${slot("overview")}<section class="panel mt22"><div class="panel-head"><h2>Recent documents</h2><a href="#/invoices">View invoices →</a></div>${invoiceTable(S.documents.slice(0, 5))}</section>`
   );
 }
 function documentList(kind) {
@@ -333,11 +353,12 @@ function clientProfile(id) {
           : button("Archive client", "archive-client", c.id)) +
         button("Delete client", "delete-client", c.id) +
         button("Statement", "client-statement", c.id) +
+        slot("clientActions", c) +
         (c.archived
           ? ""
           : button("New invoice", "client-invoice", c.id, true, "plus")),
     ) +
-    `<div class="profile-grid"><section class="panel"><div class="client-avatar">${E(c.name.slice(0, 2).toUpperCase())}</div><h2>${E(c.name)}</h2><dl class="detail"><dt>Billing contact</dt><dd>${E(c.contact || "Not provided")}</dd><dt>Email</dt><dd>${E(c.email || "Not provided")}</dd><dt>Phone</dt><dd>${E(c.phone || "Not provided")}</dd><dt>Billing address</dt><dd>${E(c.address || "Not provided")}</dd><dt>Payment terms</dt><dd>${c.terms} days</dd><dt>Registration / TIN</dt><dd>${E([c.brn, c.tin].filter(Boolean).join(" / ") || "Not provided")}</dd></dl></section><section class="panel"><div class="panel-head"><h2>Documents</h2>${badge("MYR")}</div>${invoiceTable(S.documents.filter((d) => d.client_id === c.id))}</section></div>`
+    `<div class="profile-grid"><section class="panel"><div class="client-avatar">${E(c.name.slice(0, 2).toUpperCase())}</div><h2>${E(c.name)}</h2><dl class="detail"><dt>Billing contact</dt><dd>${E(c.contact || "Not provided")}</dd><dt>Email</dt><dd>${E(c.email || "Not provided")}</dd><dt>Phone</dt><dd>${E(c.phone || "Not provided")}</dd><dt>Billing address</dt><dd>${E(c.address || "Not provided")}</dd><dt>Payment terms</dt><dd>${c.terms} days</dd><dt>Registration / TIN</dt><dd>${E([c.brn, c.tin].filter(Boolean).join(" / ") || "Not provided")}</dd>${slot("clientDetails", c)}</dl></section><section class="panel"><div class="panel-head"><h2>Documents</h2>${badge("MYR")}</div>${invoiceTable(S.documents.filter((d) => d.client_id === c.id))}</section></div>${slot("clientPanels", c)}`
   );
 }
 function services() {
@@ -429,7 +450,7 @@ function settings() {
 function paper(d, publicView = false) {
   const b = d.business,
     c = d.client;
-  return `<section class="panel invoice-paper"><div class="paper-head"><div>${logo()}<div class="paper-company"><strong>${E(b.company)}</strong><p>${E([b.registration ? `Reg: ${b.registration}` : "", b.address, b.email, b.phone].filter(Boolean).join("\n"))}</p></div></div><div><h2>${d.kind === "quote" ? "QUOTATION" : "INVOICE"}</h2><p>${E(d.number || "Draft — not issued")}</p></div></div>${b.demo ? '<div class="notice">Demo document. No real transaction.</div>' : ""}<div class="billing-grid"><div><div class="eyebrow">Bill to</div><strong>${E(c.name)}</strong><p>${E([c.contact, c.address].filter(Boolean).join("\n"))}</p></div><div><div class="eyebrow">Document details</div><p>Issue date: ${dateLabel(d.issue_date)}<br>${d.kind === "quote" ? "Valid until" : "Due date"}: ${dateLabel(d.due_date)}<br>Currency: MYR</p></div></div><div class="table-wrap"><table><thead><tr><th>Description</th><th class="num line-qty">Qty</th><th class="num line-rate">Rate</th><th class="num">Amount</th></tr></thead><tbody>${d.items.map((i) => `<tr><td class="quote-scope">${E(i.description)}<small class="mobile-line-meta">${i.quantity} × ${money(i.rate)}</small></td><td class="num line-qty">${i.quantity}</td><td class="num line-rate">${money(i.rate)}</td><td class="num">${money(i.amount)}</td></tr>`).join("")}</tbody></table></div><div class="totals"><div class="total-row"><span>Subtotal</span><strong>${money(d.subtotal)}</strong></div>${d.discount ? `<div class="total-row"><span>Discount</span><strong>−${money(d.discount)}</strong></div>` : ""}${taxRows(d.items)}<div class="total-row emphasis"><span>Original total</span><span>${money(d.total)}</span></div>${d.credit ? `<div class="total-row"><span>Credit notes</span><strong>−${money(d.credit)}</strong></div>` : ""}${d.debit ? `<div class="total-row"><span>Debit notes</span><strong>+${money(d.debit)}</strong></div>` : ""}${d.credit || d.debit ? `<div class="total-row emphasis"><span>Adjusted total</span><span>${money(d.adjusted_total)}</span></div>` : ""}${d.kind === "invoice" ? `<div class="total-row"><span>Paid</span><strong>${money(d.paid)}</strong></div><div class="total-row emphasis"><span>Balance due</span><span>${money(d.balance)}</span></div>` : ""}</div>${d.kind === "invoice" && d.state !== "void" ? `<div class="paper-notes"><h3>Payment information</h3>${b.bankAccount ? `<p>${E([b.bankName, b.bankHolder, b.bankAccount].filter(Boolean).join("\n"))}</p><p>Reference: ${E(d.number || "Not yet issued")}</p>` : "<p>Bank details are not configured. Contact Nawlogic before paying.</p>"}</div>` : ""}${d.terms ? `<div class="paper-notes"><h3>Terms</h3><p>${E(d.terms)}</p></div>` : ""}${d.notes ? `<div class="paper-notes"><h3>Notes</h3><p>${E(d.notes)}</p></div>` : ""}${publicView ? '<p class="field-hint">Business document. Not a validated MyInvois e-Invoice.</p>' : ""}</section>`;
+  return `<section class="panel invoice-paper"><div class="paper-head"><div>${logo()}<div class="paper-company"><strong>${E(b.company)}</strong><p>${E([b.registration ? `Reg: ${b.registration}` : "", b.address, b.email, b.phone].filter(Boolean).join("\n"))}</p></div></div><div><h2>${d.kind === "quote" ? "QUOTATION" : "INVOICE"}</h2><p>${E(d.number || "Draft — not issued")}</p></div></div>${b.demo ? '<div class="notice">Demo document. No real transaction.</div>' : ""}<div class="billing-grid"><div><div class="eyebrow">Bill to</div><strong>${E(c.name)}</strong><p>${E([c.contact, c.address].filter(Boolean).join("\n"))}</p></div><div><div class="eyebrow">Document details</div><p>Issue date: ${dateLabel(d.issue_date)}<br>${d.kind === "quote" ? "Valid until" : "Due date"}: ${dateLabel(d.due_date)}<br>Currency: MYR</p></div></div><div class="table-wrap"><table><thead><tr><th>Description</th><th class="num line-qty">Qty</th><th class="num line-rate">Rate</th><th class="num">Amount</th></tr></thead><tbody>${d.items.map((i) => `<tr><td class="quote-scope">${E(i.description)}<small class="mobile-line-meta">${i.quantity} × ${money(i.rate)}</small></td><td class="num line-qty">${i.quantity}</td><td class="num line-rate">${money(i.rate)}</td><td class="num">${money(i.amount)}</td></tr>`).join("")}</tbody></table></div><div class="totals"><div class="total-row"><span>Subtotal</span><strong>${money(d.subtotal)}</strong></div>${d.discount ? `<div class="total-row"><span>Discount</span><strong>−${money(d.discount)}</strong></div>` : ""}${taxRows(d.items)}<div class="total-row emphasis"><span>Original total</span><span>${money(d.total)}</span></div>${d.credit ? `<div class="total-row"><span>Credit notes</span><strong>−${money(d.credit)}</strong></div>` : ""}${d.debit ? `<div class="total-row"><span>Debit notes</span><strong>+${money(d.debit)}</strong></div>` : ""}${d.credit || d.debit ? `<div class="total-row emphasis"><span>Adjusted total</span><span>${money(d.adjusted_total)}</span></div>` : ""}${d.kind === "invoice" ? `<div class="total-row"><span>Paid</span><strong>${money(d.paid)}</strong></div><div class="total-row emphasis"><span>Balance due</span><span>${money(d.balance)}</span></div>` : ""}</div>${d.kind === "invoice" && d.state !== "void" ? `<div class="paper-notes"><h3>Payment information</h3>${b.bankAccount ? `<p>${E([b.bankName, b.bankHolder, b.bankAccount].filter(Boolean).join("\n"))}</p><p>Reference: ${E(d.number || "Not yet issued")}</p>` : "<p>Bank details are not configured. Contact Nawlogic before paying.</p>"}</div>` : ""}${d.terms ? `<div class="paper-notes"><h3>Terms</h3><p>${E(d.terms)}</p></div>` : ""}${d.notes ? `<div class="paper-notes"><h3>Notes</h3><p>${E(d.notes)}</p></div>` : ""}${slot("paper", d, publicView)}${publicView ? '<p class="field-hint">Business document. Not a validated MyInvois e-Invoice.</p>' : ""}</section>`;
 }
 function taxRows(items) {
   const by = new Map();
@@ -468,6 +489,31 @@ function remindersPanel() {
   const b = S.settings;
   return `<section class="panel mt22"><div class="panel-head"><div><h2>Email & payment reminders</h2><p>${S.mail.configured ? "Sending from " + E(S.mail.from) : "Email is not configured. Set SMTP_HOST, SMTP_USER, SMTP_PASS and MAIL_FROM on the server."}</p></div>${badge(S.mail.configured ? "Connected" : "Not connected")}</div><form data-form="reminders"><label class="check-row"><input type="checkbox" name="remindersEnabled" ${b.remindersEnabled ? "checked" : ""} ${S.mail.configured ? "" : "disabled"}> Send automatic reminders for unpaid invoices to the client's email.</label><div class="form-grid">${input("Days before due date (0 = none)", "reminderBeforeDays", b.reminderBeforeDays ?? 3, "number", true, 'min="0" max="30" step="1"')}${input("Days after due date (comma separated)", "reminderAfterDays", b.reminderAfterDays ?? "1,7,14", "text", true, 'pattern="\\s*\\d{1,3}(\\s*,\\s*\\d{1,3}){0,4}\\s*" maxlength="40"')}</div><p class="field-hint">Each invoice gets each reminder once. A missed reminder is skipped after 2 days instead of being sent late. Reminders attach the invoice PDF and your bank details.</p>${errorBlock()}<div class="form-actions">${S.mail.configured ? button("Send due reminders now", "run-reminders") : ""}<button class="btn primary" type="submit">Save reminders</button></div></form>${emailHistory(S.emailLog.filter((m) => m.kind === "reminder")).replace("<h2>Emails</h2>", "<h2>Recent reminders</h2>")}</section>`;
 }
+// Integration keys declared by feature modules. Values are write-only.
+function integrationKeysPanel() {
+  const list = S.secrets || [];
+  if (!list.length) return "";
+  const groups = [...new Set(list.map((x) => x.plugin))];
+  return `<section class="panel mt22"><div class="panel-head"><div><h2>Integration keys</h2><p>Saved encrypted on this server and never shown again. A value set on the server environment takes precedence.</p></div>${badge(list.some((x) => x.source) ? "Connected" : "Not connected")}</div>${groups
+    .map(
+      (g) =>
+        `<h3 class="mt22">${E(g[0].toUpperCase() + g.slice(1))}</h3>${list
+          .filter((x) => x.plugin === g)
+          .map(
+            (x) =>
+              `<div class="setting-line"><div><h3>${E(x.label)}</h3><p>${E(x.help || x.name)}${x.source === "server" ? " · set on the server" : x.updated ? " · saved " + timeLabel(x.updated) : ""}</p></div><div class="actions">${badge(x.source ? "Connected" : "Not connected")}${x.source === "server" ? "" : button(x.source ? "Replace" : "Set", "secret-edit", x.name)}${x.source === "settings" ? button("Clear", "secret-clear", x.name) : ""}</div></div>`,
+          )
+          .join("")}`,
+    )
+    .join("")}</section>`;
+}
+function secretForm(name, clear = false) {
+  const x = (S.secrets || []).find((s) => s.name === name);
+  showModal(
+    clear ? "Clear " + x.label : x.label,
+    `<form data-form="secret-save" data-id="${E(name)}" data-clear="${clear ? 1 : ""}">${clear ? `<p>${E(x.label)} will be removed from this server.</p>` : x.secret ? input(x.label, "value", "", "password", true, 'autocomplete="off" maxlength="8000"') : area(x.label, "value", "", 8000)}${x.help ? `<p class="field-hint">${E(x.help)}</p>` : ""}${input("Current password", "password", "", "password", true, 'autocomplete="current-password"')}${S.security.enabled ? input("Authenticator or recovery code", "code", "", "text", true, 'autocomplete="one-time-code"') : ""}${formEnd(clear ? "Clear" : "Save")}</form>`,
+  );
+}
 function emailForm(id) {
   const d = S.documents.find((d) => d.id === id);
   if (!S.mail.configured) {
@@ -499,6 +545,7 @@ function documentView(id) {
         : button("Client link", "share-document", id, true, "copy") +
           button("Email", "email-document", id)) +
     button("Duplicate", "duplicate-document", id) +
+    slot("documentActions", d) +
     `<a class="btn" href="/api/documents/${id}/pdf">${icon("download")} PDF</a>`;
   const events = S.audit.filter((a) => a.entity_id === id).slice(0, 8);
   return (
@@ -507,7 +554,7 @@ function documentView(id) {
       d.client.name,
       actions,
     ) +
-    `<div class="doc-grid">${paper(d)}<div class="stack">${advanced.documentExtras(d)}<section class="panel"><div class="panel-head"><h2>Document status</h2>${badge(d.status)}</div><div class="total-row"><span>Document total</span><strong>${money(d.total)}</strong></div>${d.kind === "invoice" ? `<div class="total-row"><span>Confirmed payments</span><strong>${money(d.paid)}</strong></div><div class="total-row emphasis"><span>Balance</span><span>${money(d.balance)}</span></div>` : ""}${d.state === "draft" ? '<p class="field-hint">Review the client, dates, amounts and terms before issuing. Issuing locks the document.</p>' : ""}${d.kind === "invoice" && d.state === "issued" && d.balance > 0 ? `<div class="actions mt22">${button("Record payment", "record-payment", id, true, "plus")}</div>` : ""}${d.kind === "quote" && d.state === "accepted" ? `<p class="field-hint">Accepted by ${E(d.accepted_name)}</p><div class="mt22">${button("Create / open invoice", "convert-quote", id, true)}</div>` : ""}${d.token_hash ? `<div class="mt22">${button("Revoke client link", "revoke-link", id)}</div>` : ""}${d.state !== "void" ? `<div class="mt22">${button("Void document", "void-document", id)}</div>` : ""}</section>${
+    `<div class="doc-grid">${paper(d)}<div class="stack">${advanced.documentExtras(d)}${slot("documentPanels", d)}<section class="panel"><div class="panel-head"><h2>Document status</h2>${badge(d.status)}</div><div class="total-row"><span>Document total</span><strong>${money(d.total)}</strong></div>${d.kind === "invoice" ? `<div class="total-row"><span>Confirmed payments</span><strong>${money(d.paid)}</strong></div><div class="total-row emphasis"><span>Balance</span><span>${money(d.balance)}</span></div>` : ""}${d.state === "draft" ? '<p class="field-hint">Review the client, dates, amounts and terms before issuing. Issuing locks the document.</p>' : ""}${d.kind === "invoice" && d.state === "issued" && d.balance > 0 ? `<div class="actions mt22">${button("Record payment", "record-payment", id, true, "plus")}</div>` : ""}${d.kind === "quote" && d.state === "accepted" ? `<p class="field-hint">Accepted by ${E(d.accepted_name)}</p><div class="mt22">${button("Create / open invoice", "convert-quote", id, true)}</div>` : ""}${d.token_hash ? `<div class="mt22">${button("Revoke client link", "revoke-link", id)}</div>` : ""}${d.state !== "void" ? `<div class="mt22">${button("Void document", "void-document", id)}</div>` : ""}</section>${
       d.proofs.filter((p) => p.status === "pending").length
         ? `<section class="panel"><div class="panel-head"><h2>Awaiting review</h2>${badge("Pending review")}</div>${d.proofs
             .filter((p) => p.status === "pending")
@@ -565,7 +612,14 @@ function renderRoute() {
       html = payments();
       break;
     case "settings":
-      html = settings() + sstPanel() + remindersPanel() + gatewayPanel() + advanced.security();
+      html =
+        settings() +
+        sstPanel() +
+        remindersPanel() +
+        gatewayPanel() +
+        slot("settings") +
+        integrationKeysPanel() +
+        advanced.security();
       break;
     case "document":
       html = documentView(id);
@@ -574,11 +628,17 @@ function renderRoute() {
           ? "quotes"
           : "invoices";
       break;
-    default:
-      html = empty(
-        "Page not found",
-        "Use the navigation to return to your workspace.",
-      );
+    default: {
+      const owner = plugins.find((p) => p.pages?.[page]);
+      if (owner) {
+        html = owner.pages[page](id);
+        active = owner.activeFor?.[page] || page;
+      } else
+        html = empty(
+          "Page not found",
+          "Use the navigation to return to your workspace.",
+        );
+    }
   }
   renderShell(html, active);
   $$("[data-height]").forEach((el) => {
@@ -593,7 +653,7 @@ function clientForm(id) {
   const c = S.clients.find((c) => c.id === id) || { terms: 14 };
   showModal(
     id ? "Edit client" : "Add client",
-    `<form data-form="client" data-id="${E(id || "")}"><div class="form-grid">${input("Billing name", "name", c.name, "text", true, 'maxlength="160"')}${input("Contact person", "contact", c.contact, "text", false, 'maxlength="120"')}${input("Email", "email", c.email, "email", false, 'maxlength="160"')}${input("Phone", "phone", c.phone, "text", false, 'maxlength="60"')}${input("Registration / IC number", "brn", c.brn || "", "text", false, 'maxlength="40"')}${input("Tax identification number (TIN)", "tin", c.tin || "", "text", false, 'maxlength="20"')}${input("SST registration (if any)", "sst_number", c.sst_number || "", "text", false, 'maxlength="40"')}<div class="span-2">${area("Billing address", "address", c.address, 600)}</div>${input("Payment terms (days)", "terms", c.terms, "number", true, 'min="0" max="365" step="1"')}</div>${formEnd("Save client")}</form>`,
+    `<form data-form="client" data-id="${E(id || "")}"><div class="form-grid">${input("Billing name", "name", c.name, "text", true, 'maxlength="160"')}${input("Contact person", "contact", c.contact, "text", false, 'maxlength="120"')}${input("Email", "email", c.email, "email", false, 'maxlength="160"')}${input("Phone", "phone", c.phone, "text", false, 'maxlength="60"')}${input("Registration / IC number", "brn", c.brn || "", "text", false, 'maxlength="40"')}${input("Tax identification number (TIN)", "tin", c.tin || "", "text", false, 'maxlength="20"')}${input("SST registration (if any)", "sst_number", c.sst_number || "", "text", false, 'maxlength="40"')}<div class="span-2">${area("Billing address", "address", c.address, 600)}</div>${input("Payment terms (days)", "terms", c.terms, "number", true, 'min="0" max="365" step="1"')}${slot("clientFields", c)}</div>${formEnd("Save client")}</form>`,
   );
 }
 function serviceForm(id) {
@@ -659,7 +719,7 @@ function documentForm(kind = "invoice", id = "", clientId = "") {
       )
       .join(
         "",
-      )}</select></label></div><div class="mt22">${input("Discount (MYR)", "discount", dec(value.discount), "number", true, 'min="0" max="99999999.99" step="0.01"')}${area("Payment / project terms", "terms", value.terms)}${area("Notes", "notes", value.notes, 2000)}</div></div><aside class="preview"><div class="eyebrow mb22">Live preview / draft</div><div id="live-preview"></div><p class="field-hint">${sstEnabled() ? "MYR. SST is calculated per line after discount. The saved document is authoritative." : "MYR. Add your SST registration number in Settings to charge SST."} This preview is not a validated e-Invoice.</p></aside></div>${formEnd("Save draft & review")}</form>`,
+      )}</select></label></div><div class="mt22">${slot("documentFields", value, kind)}${input("Discount (MYR)", "discount", dec(value.discount), "number", true, 'min="0" max="99999999.99" step="0.01"')}${area("Payment / project terms", "terms", value.terms)}${area("Notes", "notes", value.notes, 2000)}</div></div><aside class="preview"><div class="eyebrow mb22">Live preview / draft</div><div id="live-preview"></div><p class="field-hint">${sstEnabled() ? "MYR. SST is calculated per line after discount. The saved document is authoritative." : "MYR. Add your SST registration number in Settings to charge SST."} This preview is not a validated e-Invoice.</p></aside></div>${formEnd("Save draft & review")}</form>`,
     true,
   );
   updatePreview();
@@ -769,11 +829,18 @@ function shareModal(id) {
   );
 }
 async function runAction(action, id, el) {
+  for (const p of plugins) if (await p.action?.(action, id, el)) return;
   if (await workflow.action(action, id)) return;
   if (await advanced.action(action, id)) return;
   switch (action) {
     case "close-modal":
       modal.close();
+      break;
+    case "secret-edit":
+      secretForm(id);
+      break;
+    case "secret-clear":
+      secretForm(id, true);
       break;
     case "toggle-nav":
       $(".sidebar").classList.toggle("open");
@@ -1096,7 +1163,7 @@ async function renderPublic() {
   try {
     const d = await api(`/public/${token}`);
     document.title = `${d.number} | Nawlogic`;
-    app.innerHTML = `<main class="public-wrap"><header class="public-header">${logo()}<span class="badge">Private client document</span></header><div class="public-top"><div><h1>${d.kind === "quote" ? "Quotation" : "Invoice"} ${E(d.number)}</h1><p>${E(d.client.name)} / ${badge(d.status)}</p></div><div class="actions"><a class="btn" href="/api/public/${token}/pdf">${icon("download")} Download PDF</a></div></div><div class="doc-grid">${paper(d, true)}<aside class="stack"><section class="balance-card"><p>${d.kind === "quote" ? "Quotation total" : "Balance due"}</p><div class="value">${money(d.kind === "quote" ? d.total : d.balance)}</div><p>${d.kind === "quote" ? "Valid until" : "Due"} ${dateLabel(d.due_date)}</p><p>Total ${money(d.adjusted_total ?? d.total)}${d.kind === "invoice" ? " / Paid " + money(d.paid) : ""}</p></section><section class="panel"><h2>${d.kind === "quote" ? "Your quotation" : "Payment information"}</h2>${d.kind === "quote" ? (d.state === "accepted" ? `<div class="notice info mt22"><p>Accepted by ${E(d.accepted_name)}. Nawlogic will follow up with the next step.</p></div>` : d.status === "Expired" ? '<p class="mt22">This quotation has expired. Contact Nawlogic for an updated quotation.</p>' : `<p class="mt22">Review the scope and terms. Accept when you are ready to proceed.</p><button class="btn primary full" data-action="public-accept">Accept quotation</button>`) : d.balance <= 0 ? `<div class="notice info mt22"><p>${d.status === "Credited" ? "This invoice is fully credited. No payment is due." : "Thank you. No further payment is due."}</p></div>` : `${d.online_payment ? `<p class="mt22">Pay ${money(d.balance)} now with online banking (FPX), card or DuitNow. The invoice is marked paid as soon as the payment is confirmed.</p><button class="btn primary full" data-action="public-pay">Pay online</button><h3 class="mt22">Or pay by bank transfer</h3>` : ""}<p class="mt22">${d.business.bankAccount ? E(d.business.bankName) + "<br>" + E(d.business.bankHolder) + "<br><strong>" + E(d.business.bankAccount) + "</strong>" : "Bank details are not configured. Contact Nawlogic before paying."}</p><p class="field-hint">Use ${E(d.number)} as the bank transfer reference.</p><button class="btn ${d.online_payment ? "" : "primary "}full" data-action="public-reference">Submit payment reference</button>`}${d.proofs.length ? `<div class="mt22">${d.proofs.map((p) => `<div class="payment"><strong>${E(p.reference)}</strong><p>${badge(p.status === "pending" ? "Pending review" : p.status === "confirmed" ? "Confirmed" : "Rejected")}</p></div>`).join("")}</div>` : ""}</section></aside></div><footer class="public-footer">Powered by Nawlogic · Keep your document link private.<br>Questions? Contact Nawlogic using the contact details on your document.</footer></main>`;
+    app.innerHTML = `<main class="public-wrap"><header class="public-header">${logo()}<span class="badge">Private client document</span></header><div class="public-top"><div><h1>${d.kind === "quote" ? "Quotation" : "Invoice"} ${E(d.number)}</h1><p>${E(d.client.name)} / ${badge(d.status)}</p></div><div class="actions"><a class="btn" href="/api/public/${token}/pdf">${icon("download")} Download PDF</a></div></div><div class="doc-grid">${paper(d, true)}<aside class="stack"><section class="balance-card"><p>${d.kind === "quote" ? "Quotation total" : "Balance due"}</p><div class="value">${money(d.kind === "quote" ? d.total : d.balance)}</div><p>${d.kind === "quote" ? "Valid until" : "Due"} ${dateLabel(d.due_date)}</p><p>Total ${money(d.adjusted_total ?? d.total)}${d.kind === "invoice" ? " / Paid " + money(d.paid) : ""}</p></section><section class="panel"><h2>${d.kind === "quote" ? "Your quotation" : "Payment information"}</h2>${d.kind === "quote" ? (d.state === "accepted" ? `<div class="notice info mt22"><p>Accepted by ${E(d.accepted_name)}. Nawlogic will follow up with the next step.</p></div>` : d.status === "Expired" ? '<p class="mt22">This quotation has expired. Contact Nawlogic for an updated quotation.</p>' : `<p class="mt22">Review the scope and terms. Accept when you are ready to proceed.</p><button class="btn primary full" data-action="public-accept">Accept quotation</button>`) : d.balance <= 0 ? `<div class="notice info mt22"><p>${d.status === "Credited" ? "This invoice is fully credited. No payment is due." : "Thank you. No further payment is due."}</p></div>` : `${d.online_payment ? `<p class="mt22">Pay ${money(d.balance)} now with online banking (FPX), card or DuitNow. The invoice is marked paid as soon as the payment is confirmed.</p><button class="btn primary full" data-action="public-pay">Pay online</button><h3 class="mt22">Or pay by bank transfer</h3>` : ""}<p class="mt22">${d.business.bankAccount ? E(d.business.bankName) + "<br>" + E(d.business.bankHolder) + "<br><strong>" + E(d.business.bankAccount) + "</strong>" : "Bank details are not configured. Contact Nawlogic before paying."}</p><p class="field-hint">Use ${E(d.number)} as the bank transfer reference.</p><button class="btn ${d.online_payment ? "" : "primary "}full" data-action="public-reference">Submit payment reference</button>`}${d.proofs.length ? `<div class="mt22">${d.proofs.map((p) => `<div class="payment"><strong>${E(p.reference)}</strong><p>${badge(p.status === "pending" ? "Pending review" : p.status === "confirmed" ? "Confirmed" : "Rejected")}</p></div>`).join("")}</div>` : ""}</section>${slot("publicPanels", d, token)}</aside></div><footer class="public-footer">Powered by Nawlogic · Keep your document link private.<br>Questions? Contact Nawlogic using the contact details on your document.</footer></main>`;
     if (returned === "paid") toast("Payment received. Thank you.");
     else if (returned) toast("Payment was not completed. You can try again or pay by bank transfer.", returned === "error");
   } catch (e) {
@@ -1107,8 +1174,21 @@ async function submitForm(form) {
   const type = form.dataset.form,
     b = Object.fromEntries(new FormData(form)),
     id = form.dataset.id;
+  for (const p of plugins) if (await p.submit?.(form, b)) return;
   if (await workflow.submit(form, b)) return;
   if (await advanced.submit(form, b)) return;
+  if (type === "secret-save") {
+    await api(`/secrets/${id}`, "PUT", {
+      value: form.dataset.clear ? null : b.value,
+      password: b.password,
+      code: b.code,
+    });
+    modal.close();
+    await refresh();
+    renderRoute();
+    toast(form.dataset.clear ? "Removed." : "Saved.");
+    return;
+  }
   if (type === "login") {
     session = await api("/login", "POST", b);
     await refresh();
@@ -1338,6 +1418,8 @@ window.addEventListener("hashchange", () => {
   window.scrollTo(0, 0);
 });
 async function boot() {
+  // Guest pages from modules (client portal, password reset, feedback...).
+  for (const p of plugins) if (await p.guestPage?.(location)) return;
   if (publicToken()) return renderPublic();
   try {
     session = await api("/session");
@@ -1353,8 +1435,30 @@ async function boot() {
 document.addEventListener("click", (event) => {
   if (event.target.closest('[data-action="reload"]')) location.reload();
 });
+// Uploads a File/Blob to /api/files and returns the stored file's details.
+async function upload(file, params) {
+  const response = await fetch("/api/files?" + new URLSearchParams({ name: file.name || "upload", ...params }), {
+    method: "POST",
+    headers: { "Content-Type": "application/octet-stream", "X-CSRF-Token": session.csrf },
+    body: file,
+  });
+  const data = await response.json().catch(() => ({ error: "Upload failed." }));
+  if (!response.ok) throw new Error(data.error || "Upload failed.");
+  return data;
+}
 const uiHelpers = {
   get: () => S,
+  session: () => session,
+  upload,
+  slot,
+  icons,
+  errorBlock,
+  confirmModal,
+  clientOptions,
+  addDays,
+  paged,
+  invoiceTable,
+  reasonForm,
   api,
   refresh,
   renderRoute,
@@ -1379,4 +1483,6 @@ const uiHelpers = {
 };
 advanced = financeUI(uiHelpers);
 workflow = automationUI(uiHelpers);
+plugins = UI_PLUGINS.map(([name, make]) => ({ name, ...make(uiHelpers) }));
+for (const p of plugins) Object.assign(icons, p.icons || {});
 boot();

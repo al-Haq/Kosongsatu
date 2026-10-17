@@ -157,6 +157,15 @@ const parsed = (schema, value) => {
   );
   return result.data;
 };
+// Proposal types added by feature modules:
+// registerProposalKind("collection_message", { schema, validate(store, b), apply(store, b), summary(b) }).
+// apply() runs inside the approval transaction and returns { kind, id }.
+export const PROPOSAL_KINDS = {};
+export function registerProposalKind(kind, spec) {
+  check(/^[a-z][a-z_]{2,40}$/.test(kind) && !Object.hasOwn(schemas, kind), "Invalid proposal type.");
+  check(spec?.schema && typeof spec.apply === "function", "Proposal type needs a schema and apply().");
+  PROPOSAL_KINDS[kind] = spec;
+}
 // Key-order independent JSON, so an identical retry always has the same fingerprint.
 const canonical = (value) =>
   JSON.stringify(value, (_, v) =>
@@ -165,6 +174,11 @@ const canonical = (value) =>
       : v,
   );
 function validate(store, kind, payload) {
+  if (typeof kind === "string" && Object.hasOwn(PROPOSAL_KINDS, kind)) {
+    const b = parsed(PROPOSAL_KINDS[kind].schema, payload);
+    PROPOSAL_KINDS[kind].validate?.(store, b);
+    return b;
+  }
   check(
     typeof kind === "string" && Object.hasOwn(schemas, kind),
     "Unknown proposal type.",
@@ -304,6 +318,8 @@ export function attachAutomation(Store) {
               kind: "document",
               id: this.invoiceFromQuote(b.quote_id, b.po_id).id,
             };
+          if (Object.hasOwn(PROPOSAL_KINDS, p.kind))
+            result = PROPOSAL_KINDS[p.kind].apply(this, b) || null;
         } else reason = text(reason, 1000, true);
         this.db
           .prepare(

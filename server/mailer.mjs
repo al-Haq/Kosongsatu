@@ -213,7 +213,7 @@ export class Mailer {
         cc,
         subject,
         body: lines.filter((l) => l !== undefined).join("\n"),
-        attachments: [{ filename: `${d.number}.pdf`, content: await renderPdf(d), contentType: "application/pdf" }],
+        attachments: [{ filename: `${d.number}.pdf`, content: await renderPdf(d, null, await this.store.pdfBlocks(d)), contentType: "application/pdf" }],
       });
     } catch (e) {
       // The new link never reached anyone, so put the previous link back.
@@ -292,7 +292,7 @@ export class Mailer {
             to: [d.client.email],
             subject,
             body,
-            attachments: [{ filename: `${d.number}.pdf`, content: await renderPdf(d), contentType: "application/pdf" }],
+            attachments: [{ filename: `${d.number}.pdf`, content: await renderPdf(d, null, await this.store.pdfBlocks(d)), contentType: "application/pdf" }],
             dedupeKey: `reminder:${d.id}:${stage.key}`,
           });
           if (r) sent++;

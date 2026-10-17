@@ -119,6 +119,9 @@ export async function restoreBackup(input, output, key) {
         "UPDATE integration_tokens SET revoked=1;UPDATE automation_rules SET enabled=0;UPDATE assistant_runs SET state='failed',response='Interrupted by restore' WHERE state='running'",
       );
     }
+    // Feature modules revoke their own links, tokens and outgoing jobs.
+    const { PLUGINS } = await import("./plugins.mjs");
+    for (const p of PLUGINS) p.onRestore?.(db);
     db.close();
     return {
       path: resolve(output),
