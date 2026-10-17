@@ -73,6 +73,7 @@ The request object `r`: `{ req, res, url, path, method, ip, body(), rawBody(limi
 - **PDF blocks**: wrap `Store.prototype.pdfBlocks` (async) and append `{ heading, text, qr, qrSize, image, imageWidth, imageHeight }`. Blocks print after the notes. Keep the original call.
 - **QR codes** (`server/qr.mjs`): `qrSvg(text)`, `qrDataUri(text)`, `drawQr(pdf, text, x, y, size)`.
 - **Proposals**: `store.propose(kind, data, source, request_key)` queues an action for owner approval. Add your own types in `attach()` with `registerProposalKind(kind, { schema (zod), validate(store, b), apply(store, b) → { kind, id }, summary(b) })` from `server/automation.mjs`; `apply` runs inside the approval transaction.
+- **Client documents by ID** (portal module): `store.portalDocument(clientId, docId)`, and `portalRef(clientId, docId)` from `server/portal-access.mjs` can be passed wherever a client-link token is accepted (`publicDocument`, `accept`, `proof`, `gateway.checkout`). `safeDoc(d)` from `server/app.mjs` gives the client-safe document fields. `ctx.services.portal.recipients(clientId)` returns `{ to, cc }` from the client's contacts.
 - **Mail**: `ctx.mailer.deliver({ kind, to, cc, subject, body, attachments, documentId, clientId, dedupeKey })` (`kind` is any short label, e.g. `notification`).
 - **Test fixture** (`test/helpers.mjs`): `fixture()` gives a signed-in server (`auth`, `json`, `request`), `issuedInvoice(store)`, `PNG_1PX`.
 
@@ -90,6 +91,8 @@ export default function exampleUI(h) {
     async submit(form, b) { /* return true when handled */ },
     async guestPage(location) { /* render a page without sign-in; return true */ },
     can(kind, name) { /* "nav" | "page" | "action": return false to hide (e.g. by role) */ },
+    // Start values of the document/statement email form; return the fields to change.
+    emailPrefill(kind, record, values) { return { cc: "copy@example.com" }; },
     slots: {
       login: () => "",                       // under the sign-in form (e.g. "Forgot password?")
       topbar: () => "",                      // small items in the top bar (e.g. a bell)
@@ -104,12 +107,13 @@ export default function exampleUI(h) {
       clientPanels: (c) => "",               // panels under the client profile
       settings: () => "",                    // panels on the Settings page
       publicPanels: (d, token) => "",        // panels on the client document page
+      emailFields: (kind, record) => "",     // fields in the document/statement email form
     },
   };
 }
 ```
 
-`h` provides: `get()` (workspace state `S`, module data in `S.ext.<name>`), `session()`, `api(path, method, body)`, `upload(file, params)`, `refresh()`, `renderRoute()`, `navigate(route)`, `showModal(title, html, wide)`, `modal`, `toast(msg, error)`, `confirmModal`, `reasonForm`, `E` (escape), `money`, `dec`, `dateLabel`, `timeLabel`, `addDays`, `button`, `badge`, `input`, `area`, `select`, `formEnd`, `errorBlock`, `heading`, `empty`, `icon`, `icons`, `paged`, `invoiceTable`, `clientOptions`, `slot`.
+`h` provides: `get()` (workspace state `S`, module data in `S.ext.<name>`), `session()`, `api(path, method, body)`, `upload(file, params)`, `refresh()`, `renderRoute()`, `navigate(route)`, `showModal(title, html, wide)`, `modal`, `toast(msg, error)`, `confirmModal`, `reasonForm`, `E` (escape), `money`, `dec`, `dateLabel`, `timeLabel`, `addDays`, `button`, `badge`, `input`, `area`, `select`, `formEnd`, `errorBlock`, `heading`, `empty`, `icon`, `icons`, `paged`, `invoiceTable`, `clientOptions`, `slot`, `paper(d, publicView)` (the document paper), `logo()`.
 
 Named form fields added through `clientFields` and `documentFields` are sent with the core save request (checkboxes arrive as `"on"`). Plugins see actions and form submits before the core does, so a module can take over a core action by handling its name.
 

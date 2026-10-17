@@ -1,1 +1,379 @@
 /* Books and reports: expenses and vendor bills, receipt scanning, sales reports, profit and loss, accounting exports, cash flow, tax summaries, late-payment prediction and cash health. */
+form[data-form^="books-"] [hidden],
+.books-dup[hidden] {
+  display: none !important;
+}
+.books-tabs a.tab {
+  text-decoration: none;
+}
+.books-tabs a.tab:focus-visible {
+  outline: 2px solid #8ad6d0;
+}
+.books-loading {
+  padding: 20px 0;
+}
+.books-sub {
+  font-size: 13px;
+  margin-bottom: 10px;
+}
+.books-pre {
+  white-space: pre-line;
+}
+.books-wrap {
+  white-space: normal;
+  min-width: 220px;
+}
+
+/* Tiles */
+.books-tiles {
+  display: grid;
+  gap: 14px;
+  margin-bottom: 20px;
+}
+.books-tiles-3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.books-tiles-5 {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+.books-tiles .metric {
+  padding: 16px;
+  min-width: 0;
+}
+.books-tiles .metric .value {
+  font-size: 20px;
+  letter-spacing: -0.4px;
+}
+.books-tiles-5 .metric .value {
+  font-size: 18px;
+}
+.books-row-actions {
+  flex-wrap: nowrap;
+  justify-content: flex-end;
+}
+.books-trend {
+  font-size: 16px !important;
+}
+.books-trend::first-letter {
+  text-transform: uppercase;
+}
+
+/* Filters and period pickers */
+.books-filter {
+  margin-bottom: 22px;
+}
+.books-filter-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 0 12px;
+}
+.books-range-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 220px)) auto;
+  gap: 0 12px;
+  align-items: end;
+}
+.books-range-go {
+  margin-bottom: 15px;
+}
+.books-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.books-inline-cash {
+  margin-top: 4px;
+}
+.books-inline-tabs {
+  margin-bottom: 0;
+}
+
+/* Lists */
+.books-clip svg {
+  width: 16px;
+  height: 16px;
+  color: var(--muted);
+}
+.books-files {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 12px;
+}
+.books-files li {
+  padding: 6px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 12px;
+}
+.books-reasons {
+  margin: 10px 0 0;
+  padding-left: 18px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.books-reasons li {
+  margin-bottom: 4px;
+}
+.books-method p {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 10px;
+}
+details summary {
+  cursor: pointer;
+  font-size: 11px;
+  color: var(--action);
+  font-weight: 700;
+}
+.books-items {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  white-space: normal;
+  min-width: 260px;
+}
+.books-items li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 4px 0;
+  border-bottom: 1px dashed var(--line);
+  font-size: 11px;
+}
+.books-items small {
+  display: inline;
+  color: var(--muted);
+}
+
+/* Report tables and bars */
+.books-total td {
+  font-weight: 700;
+  background: #f9fbfc;
+}
+.books-sub-row td:first-child {
+  padding-left: 28px;
+  color: var(--muted);
+}
+.books-bar-col {
+  width: 34%;
+  min-width: 120px;
+}
+.books-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.books-bar {
+  display: block;
+  height: 7px;
+  min-width: 2px;
+  border-radius: 4px;
+  background: var(--teal);
+}
+.books-bar.col {
+  background: var(--orange);
+}
+.books-bar.out {
+  background: #94a3b8;
+}
+.books-bar.neg {
+  background: var(--red);
+}
+.books-legend {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+.books-key {
+  display: inline-block;
+  width: 12px;
+  height: 7px;
+  border-radius: 3px;
+  background: var(--teal);
+  margin-left: 8px;
+}
+.books-key.col {
+  background: var(--orange);
+}
+.books-key.out {
+  background: #94a3b8;
+}
+.books-compare {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 22px;
+}
+.books-compare h3 {
+  font-size: 13px;
+}
+.books-compare .books-tiles {
+  margin-top: 10px;
+}
+
+/* Cash flow chart: bars above the line for cash, below for an overdraft */
+.books-flow {
+  display: grid;
+  grid-template-columns: repeat(13, minmax(0, 1fr));
+  gap: 6px;
+  margin-top: 18px;
+}
+.books-flow-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.books-flow-up,
+.books-flow-down {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
+.books-flow-up {
+  height: 114px;
+  align-items: flex-end;
+  border-bottom: 1px solid #94a3b8;
+}
+.books-flow-down {
+  height: 64px;
+  align-items: flex-start;
+}
+.books-flow-up span,
+.books-flow-down span {
+  display: block;
+  width: 70%;
+  max-width: 34px;
+  background: var(--teal);
+  border-radius: 4px 4px 0 0;
+}
+.books-flow-down span {
+  background: var(--red);
+  border-radius: 0 0 4px 4px;
+}
+.books-flow-col small {
+  font-size: 9px;
+  color: var(--muted);
+}
+.books-flow-col.neg small {
+  color: var(--red);
+  font-weight: 700;
+}
+.books-neg td {
+  background: #fff5f4;
+}
+
+/* Purchase lines */
+.books-line {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr) minmax(0, 0.8fr) minmax(0, 1.2fr) minmax(0, 0.9fr) auto;
+  gap: 0 10px;
+  align-items: end;
+  border-bottom: 1px solid var(--line);
+  padding-top: 8px;
+}
+.books-line label {
+  margin-bottom: 10px;
+}
+.books-line-remove {
+  margin-bottom: 10px;
+}
+.books-live-total {
+  margin-left: auto;
+  font-weight: 700;
+}
+
+/* Receipt scanning */
+.books-scan-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.4fr);
+  gap: 22px;
+  align-items: start;
+}
+.books-preview img {
+  width: 100%;
+  max-height: 520px;
+  object-fit: contain;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+/* Exports */
+.books-export-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 18px;
+}
+.books-export-grid .panel-head {
+  flex-direction: column;
+  align-items: flex-start;
+  margin-bottom: 12px;
+}
+.books-codes input {
+  min-width: 90px;
+  margin-top: 0;
+  padding: 8px;
+}
+.books-codes td {
+  padding: 8px;
+}
+
+@media (max-width: 1150px) {
+  .books-tiles-5 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .books-filter-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .books-compare {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 850px) {
+  .books-scan-grid {
+    grid-template-columns: 1fr;
+  }
+  .books-line {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  }
+  .books-line .books-line-desc {
+    grid-column: 1 / -1;
+  }
+}
+@media (max-width: 640px) {
+  .books-tiles-3,
+  .books-tiles-5 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+  .books-tiles .metric {
+    padding: 12px;
+  }
+  .books-tiles .metric .value,
+  .books-tiles-5 .metric .value {
+    font-size: 16px;
+    overflow-wrap: break-word;
+  }
+  .books-filter-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .books-range-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .books-range-go {
+    grid-column: 1 / -1;
+  }
+  .books-flow {
+    gap: 2px;
+  }
+  .books-bar-col {
+    min-width: 80px;
+  }
+  .books-line {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+  .books-line-remove {
+    justify-self: end;
+  }
+}

@@ -128,9 +128,9 @@ export const TOOL_DEFINITIONS = [
         quotation:
           "Propose a quotation draft. Rates and discount are MYR decimal amounts, not sen. Use existing client IDs; optionally link an opportunity.",
         customer_po:
-          "Propose registration of a customer-issued PO against an accepted quotation. Full matching MYR value only.",
+          "Propose registration of a customer-issued PO against an accepted quotation. The amount is a MYR decimal amount including SST. Partial POs are allowed; all POs for one quotation together cannot exceed its total.",
         invoice_from_quote:
-          "Propose one invoice draft from an accepted quotation, optionally linked to its customer PO.",
+          "Propose one invoice draft from an accepted quotation, optionally for one of its customer POs (po_id, required when the quotation has several POs). A partial PO is invoiced for its own amount.",
       }[kind] +
       " Owner approval in the app is required. This tool cannot approve, issue, send, pay or refund. Reuse request_key only for an identical retry.",
     scope: "proposals:write",
@@ -217,18 +217,9 @@ function validate(store, kind, payload) {
     if (kind === "customer_po") {
       date(b.po_date);
       check(b.po_date <= today(), "PO cannot be future dated.");
-      check(
-        calculate([{ description: "PO", quantity: 1, rate: b.amount }])
-          .total === q.total,
-        "PO must match the accepted quotation amount.",
-      );
-      check(
-        !store.db
-          .prepare("SELECT id FROM customer_pos WHERE quote_id=?")
-          .get(q.id),
-        "Quotation already has a PO.",
-      );
     }
+    // Partial POs: together they stay within the quotation (server/ops-po.mjs).
+    store.checkPOProposal(kind, q, b);
     if (b.po_id)
       check(
         store.db
@@ -492,13 +483,15 @@ export function attachAutomation(Store) {
         if (b.kind === "opportunities") rows = this.sales().opportunities;
         if (b.kind === "customer_pos")
           rows = this.sales().purchaseOrders.map(
-            ({ id, client_id, quote_id, reference, amount, invoice_id }) => ({
+            ({ id, client_id, quote_id, reference, amount, invoice_id, status, revision }) => ({
               id,
               client_id,
               quote_id,
               reference,
               amount_sen: amount,
               invoice_id,
+              status,
+              revision,
             }),
           );
         if (["quotes", "invoices"].includes(b.kind))
