@@ -100,6 +100,7 @@ export function safeDoc(d) {
       reference: p.reference,
       status: p.status,
       created: p.created,
+      slip: !!p.slip,
     })),
   };
 }
@@ -404,7 +405,7 @@ export function createApp({
         }
         if (path.startsWith("/api/public/")) {
           const match = path.match(
-            /^\/api\/public\/([\w-]+)(?:\/(pdf|accept|payment-reference|checkout|payment-return))?$/,
+            /^\/api\/public\/([\w-]+)(?:\/(pdf|accept|payment-reference))?$/,
           );
           check(match, "Not found.", 404);
           const [, token, action] = match;
@@ -414,10 +415,9 @@ export function createApp({
             const d = store.publicDocument(token, true);
             return send(200, {
               ...safeDoc(d),
-              online_payment:
-                gateway.status().configured &&
-                (d.currency || "MYR") === "MYR" &&
-                !!(d.client.email || d.client.phone || store.settings().email),
+              // Online payment (checkout and returns) is served by the payments module; MYR only.
+              online_payment: (d.currency || "MYR") === "MYR" && gateway.canPay(d),
+              online_methods: (d.currency || "MYR") === "MYR" && gateway.canPay(d) ? gateway.status().methods : null,
               // Client-safe extras from feature modules (never owner-only data).
               ext: Object.fromEntries(
                 await Promise.all(
@@ -428,32 +428,6 @@ export function createApp({
                 ),
               ),
             });
-          }
-          if (method === "POST" && action === "checkout") {
-            allow("checkout:" + ipOf(req), 10, 60000);
-            return send(200, await gateway.checkout(token, allowedOrigin));
-          }
-          if (method === "POST" && action === "payment-return") {
-            // The browser comes back with signed billplz[...] query values; the
-            // payment is confirmed with the provider before anything is recorded.
-            allow("submit:" + ipOf(req), 12, 60000);
-            const d = store.publicDocument(token);
-            const b = await body();
-            const params = Object.fromEntries(
-              Object.entries(b.params || {})
-                .filter(([k, v]) => /^billplz\[[a-z_]+\]$/.test(k) && typeof v === "string")
-                .slice(0, 10),
-            );
-            const { id: billId, paidAt } = gateway.verify(params);
-            check(
-              store.db
-                .prepare("SELECT 1 FROM online_payments WHERE bill_id=? AND invoice_id=?")
-                .get(billId, d.id),
-              "Payment not found.",
-              404,
-            );
-            const r = await gateway.settle(billId, paidAt);
-            return send(200, { state: r.state });
           }
           if (method === "GET" && action === "pdf") {
             const d = store.publicDocument(token);
@@ -896,7 +870,9 @@ export function createApp({
               };
               row.kind = "refund";
             }
-            return send(200, await renderAdjustmentPdf(d, row), {
+            // Modules see the note as { ...invoice, kind, number, note } (e.g. its e-Invoice QR).
+            const blocks = await store.pdfBlocks({ ...d, kind: row.kind, number: row.number, note: row });
+            return send(200, await renderAdjustmentPdf(d, row, blocks), {
               "Content-Type": "application/pdf",
               "Content-Disposition": `attachment; filename="${row.number}.pdf"`,
             });

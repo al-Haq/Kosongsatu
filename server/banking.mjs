@@ -60,19 +60,28 @@ export function parseBankCsv(csv, account = "MAIN") {
       reference = text(data.reference, 120, true),
       description = text(data.description || "", 500),
       source_id = text(data.transaction_id || "", 160);
-    const dedupe_key = hash(
-      JSON.stringify([
-        account,
-        source_id || [txn_date, reference, amount, description],
-      ]),
-    );
+    const dedupe_key = bankRowKey(account, { source_id, txn_date, reference, amount, description });
     return { account, txn_date, reference, description, amount, dedupe_key };
   });
 }
+// Duplicate key for a statement row. The bank's own transaction id wins; else
+// date, reference, amount and description. `n` counts identical rows within one
+// statement (two equal transfers on one day), so re-imports still dedupe.
+export const bankRowKey = (account, r, n = 0) =>
+  hash(
+    JSON.stringify([
+      account,
+      r.source_id || [r.txn_date, r.reference, r.amount, r.description],
+      ...(n ? [n] : []),
+    ]),
+  );
 export function attachBanking(Store) {
   Object.assign(Store.prototype, {
     previewBank(b) {
-      const rows = parseBankCsv(b.csv, b.account || "MAIN");
+      return this.previewBankRows(parseBankCsv(b.csv, b.account || "MAIN"));
+    },
+    // Marks rows already imported (or repeated in this batch) as duplicates.
+    previewBankRows(rows) {
       const seen = new Set();
       return rows.map((r) => {
         const duplicate =
@@ -85,8 +94,12 @@ export function attachBanking(Store) {
       });
     },
     importBank(b) {
+      return this.tx(() => this.importBankRows(this.previewBank(b)));
+    },
+    // The one import path for parsed statement rows; import never records income.
+    importBankRows(parsed, note = "") {
       return this.tx(() => {
-        const rows = this.previewBank(b);
+        const rows = this.previewBankRows(parsed);
         let inserted = 0;
         for (const r of rows) {
           if (r.duplicate) continue;
@@ -109,7 +122,7 @@ export function attachBanking(Store) {
         this.audit(
           "bank.csv.imported",
           null,
-          `${inserted} imported, ${rows.length - inserted} duplicates skipped.`,
+          `${inserted} imported, ${rows.length - inserted} duplicates skipped.${note ? " " + note : ""}`,
         );
         return { inserted, skipped: rows.length - inserted };
       });

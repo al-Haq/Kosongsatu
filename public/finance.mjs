@@ -24,7 +24,6 @@ export function financeUI(h) {
     empty,
     icon,
   } = h;
-  let pendingImport = null;
   // Receipts are in the currency of the invoices they pay; totals are in MYR.
   const myr = (amount, x) => toMYR(amount || 0, x?.fx_rate || "1");
   const currencies = () => get().ext?.documents?.currencies || ["MYR"];
@@ -119,23 +118,6 @@ export function financeUI(h) {
       );
       modal.querySelector("[name=reason]").required = true;
     },
-    import() {
-      showModal(
-        "Import bank statement CSV",
-        `<form data-form="bank-preview">${input("Account label", "account", "MAIN", "text", true, 'maxlength="80"')}<p class="field-hint">Use normalized columns below. Positive amounts are money in; negative amounts are money out. Dates: YYYY-MM-DD. Amounts: MYR without thousands separators.</p><pre class="csv-example">date,reference,amount,description,transaction_id</pre><label>Choose CSV file<input type="file" id="bank-csv-file" accept=".csv,text/csv"></label>${area("CSV content", "csv", "", 110000)}${formEnd("Preview import")}</form>`,
-        true,
-      );
-      modal.querySelector("[name=csv]").required = true;
-      modal
-        .querySelector("#bank-csv-file")
-        .addEventListener("change", async (e) => {
-          const file = e.target.files[0];
-          if (!file) return;
-          if (file.size > 110000)
-            return toast("Import up to 110 KB per batch.", true);
-          modal.querySelector("[name=csv]").value = await file.text();
-        });
-    },
     match(tid) {
       const S = get(),
         t = transaction(tid);
@@ -201,18 +183,6 @@ export function financeUI(h) {
       `${receipts.some((r) => r.legacy_review) ? '<div class="notice"><p>Legacy transactions need review. Cash totals may include duplicate old entries until verified and corrected.</p></div>' : ""}<div class="metrics"><div class="metric"><div class="label">Net cash recorded</div><div class="value">${money(total)}</div><div class="hint">All dates / receipts less refunds</div></div><div class="metric"><div class="label">Available customer funds</div><div class="value teal">${money(available)}</div><div class="hint">Available for allocation or refund</div></div></div><section class="panel">${receipts.length ? `<div class="table-wrap"><table><thead><tr><th>Receipt / client</th><th>Received</th><th class="num">Original</th><th class="num">Allocated</th><th class="num">Available</th><th>Actions</th></tr></thead><tbody>${receipts.map((r) => `<tr><td><strong>${E(r.number)}</strong><small>${E(r.client.name)} / ${E(r.reference)}</small>${r.voided ? badge("Void") : r.legacy_review ? badge("Pending review") : ""}</td><td>${dateLabel(r.paid_date)}</td><td class="num">${money(r.amount, r.currency)}</td><td class="num">${money(r.allocated, r.currency)}</td><td class="num">${money(r.available, r.currency)}${r.refunded ? `<small>Refunded ${money(r.refunded, r.currency)}</small>` : ""}</td><td><div class="actions">${!r.voided ? `<a class="btn small" href="/api/receipts/${r.id}/pdf">PDF</a>` : ""}${!r.voided && r.legacy_review ? button("Review legacy", "cash-review", r.id) : r.available > 0 ? button("Allocate", "cash-allocate", r.id) + button("Refund", "cash-refund", r.id) : ""}${!r.voided && r.allocated === 0 && r.refunded === 0 ? button("Void entry", "cash-void", r.id) : ""}</div></td></tr>`).join("")}</tbody></table></div>` : empty("No cash receipts yet", "Record verified customer payments, then apply them to invoices.")}</section>${receipts.some((r) => r.refunds.length) ? `<section class="panel mt22"><h2>Refund notes</h2>${receipts.flatMap((r) => r.refunds.map((f) => `<div class="attention"><div><strong>${E(f.number)} / ${money(f.amount, r.currency)}</strong><small>${E(r.client.name)} / ${E(f.reference)} / ${E(f.reason)}</small></div><a class="btn small" href="/api/refunds/${f.id}/pdf">PDF</a></div>`)).join("")}</section>` : ""}`
     );
   }
-  function bank() {
-    const S = get(),
-      txns = S.finance.bankTransactions;
-    return (
-      heading(
-        "Bank reconciliation",
-        "Import normalized statement rows and review each match. Importing does not record income.",
-        button("Import CSV", "bank-import", "", true, "plus"),
-      ) +
-      `<section class="panel">${txns.length ? `<div class="table-wrap"><table><thead><tr><th>Bank date / account</th><th>Reference</th><th class="num">Amount</th><th>Status</th><th>Action</th></tr></thead><tbody>${txns.map((t) => `<tr><td>${dateLabel(t.txn_date)}<small>${E(t.account)}</small></td><td>${E(t.reference)}<small>${E(t.description)}</small></td><td class="num">${money(t.amount)}</td><td>${badge(t.receipt_id || t.refund_id ? "Matched" : t.ignored_reason ? "Excluded" : "Unmatched")}</td><td><div class="actions">${t.receipt_id || t.refund_id || t.ignored_reason ? button("Reset match", "bank-reset", t.id) : button("Match existing", "bank-match", t.id) + (t.amount > 0 ? button("Record receipt", "bank-receive", t.id) : "") + button("Exclude", "bank-exclude", t.id)}</div></td></tr>`).join("")}</tbody></table></div>` : empty("No bank transactions", "Preview a normalized CSV before importing. Duplicate rows are skipped.")}</section>`
-    );
-  }
   function documentExtras(d) {
     if (d.kind !== "invoice" || d.state !== "issued") return "";
     const m = (v) => money(v, d.currency);
@@ -255,9 +225,6 @@ export function financeUI(h) {
           id,
           "Confirm from bank evidence that this is a distinct legitimate receipt. This action preserves the original data and is audited.",
         );
-        break;
-      case "bank-import":
-        forms.import();
         break;
       case "bank-match":
         forms.match(id);
@@ -312,30 +279,7 @@ export function financeUI(h) {
     } else if (type === "bank-reset") path = `/bank/${id}/unmatch`;
     else if (type === "bank-exclude") path = `/bank/${id}/exclude`;
     else if (type === "proof-reject") path = `/proofs/${id}/reject`;
-    else if (type === "bank-preview") {
-      const rows = await api("/bank/preview", "POST", {
-        csv: b.csv,
-        account: b.account,
-      });
-      pendingImport = { csv: b.csv, account: b.account };
-      modal.close();
-      showModal(
-        "Review bank import",
-        `<form data-form="bank-confirm"><p>${rows.length} validated rows / ${rows.filter((r) => r.duplicate).length} duplicates will be skipped. No payments are created by import.</p><div class="table-wrap mt22"><table><thead><tr><th>Date</th><th>Reference</th><th class="num">Amount</th><th>Import</th></tr></thead><tbody>${rows.map((r) => `<tr><td>${dateLabel(r.txn_date)}</td><td>${E(r.reference)}</td><td class="num">${money(r.amount)}</td><td>${r.duplicate ? "Skip duplicate" : "New row"}</td></tr>`).join("")}</tbody></table></div>${formEnd("Confirm import")}</form>`,
-        true,
-      );
-      return true;
-    } else if (type === "bank-confirm") {
-      const result = await api("/bank/import", "POST", pendingImport);
-      pendingImport = null;
-      modal.close();
-      await refresh();
-      renderRoute();
-      toast(
-        `${result.inserted} bank rows imported; ${result.skipped} duplicates skipped.`,
-      );
-      return true;
-    } else if (type === "mfa-begin") {
+    else if (type === "mfa-begin") {
       const setup = await api("/mfa/begin", "POST", b);
       modal.close();
       showModal(
@@ -375,5 +319,5 @@ export function financeUI(h) {
     );
     return true;
   }
-  return { ledger, bank, documentExtras, security, action, submit };
+  return { ledger, documentExtras, security, action, submit };
 }

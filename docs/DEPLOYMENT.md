@@ -143,6 +143,12 @@ Without Docker, run Node.js 24 directly behind nginx:
 | `ACME_EMAIL`         | unset                                          | docker-compose only: email for Let's Encrypt certificate notices |
 | `BACKUP_HOST_DIR`    | `./backups`                                    | docker-compose only: host folder mounted as the backup directory |
 | `PLATFORM_OWNER_WHATSAPP` | unset                                     | Owner's own WhatsApp number for quick invoices (also in Settings) |
+| `PAYMENT_PROVIDER`   | unset                                          | Fixes the online payment provider (`billplz`, `toyyibpay`, `stripe`, `ipay88` or `off`); otherwise chosen in Settings |
+| `TOYYIBPAY_SECRET_KEY` / `TOYYIBPAY_CATEGORY_CODE` / `TOYYIBPAY_SANDBOX` | unset | ToyyibPay keys (see [payments](features/payments.md)) |
+| `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET` | unset                 | Stripe Checkout keys; webhook at `/api/hooks/payments/stripe` |
+| `IPAY88_MERCHANT_CODE` / `IPAY88_MERCHANT_KEY` / `IPAY88_SANDBOX` | unset | iPay88 keys |
+
+All payment keys can instead be entered in Settings > Online payments; a server value wins.
 
 Generate each key independently:
 

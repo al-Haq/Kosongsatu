@@ -69,14 +69,14 @@ export function drawLogo(pdf, ctx, x, y, width, height) {
   pdf.image(logo, x, y, { width });
 }
 // The page footer: owner text (or "Nawlogic | Business document"), the e-Invoice notice and page numbers.
-export function drawFooter(pdf, ctx, line, rule, kindText) {
+export function drawFooter(pdf, ctx, line, rule, kindText, disclaimer = null) {
   const pages = pdf.bufferedPageRange();
   for (let i = 0; i < pages.count; i++) {
     pdf.switchToPage(i);
     rule(778);
     if (ctx.template.pdfShowFooter !== false)
       line(
-        `${ctx.template.pdfFooterText || "Nawlogic | " + kindText} | ${ctx.t("notEInvoice")}`,
+        `${ctx.template.pdfFooterText || "Nawlogic | " + kindText} | ${disclaimer || ctx.t("notEInvoice")}`,
         42,
         788,
         7,
@@ -571,7 +571,8 @@ export function renderPdf(invoice, payment = null, blocks = []) {
       if (block.text) line(block.text, textX, y, 9, "Body", muted, textWidth);
       y += Math.max(visualHeight, textHeight) + 12;
     }
-    drawFooter(pdf, ctx, line, rule, payment ? t("footerReceipt") : t("footerDocument"));
+    // A module block may replace the disclaimer, e.g. for a validated e-Invoice.
+    drawFooter(pdf, ctx, line, rule, payment ? t("footerReceipt") : t("footerDocument"), (blocks || []).find((b) => b.footer)?.footer);
     pdf.end();
   });
 }
@@ -604,8 +605,25 @@ export function renderReceiptPdf(receipt) {
     refunded: receipt.refunded,
   });
 }
-export function renderAdjustmentPdf(invoice, note) {
+export function renderAdjustmentPdf(invoice, note, blocks = []) {
   const t = labels(invoice.language || "en");
+  // A note's SST split by rate (tax module), else one tax-inclusive line.
+  let split = null;
+  try {
+    split = note.tax_lines ? JSON.parse(note.tax_lines) : null;
+  } catch {
+    split = null;
+  }
+  const items = split?.some((l) => l.tax)
+    ? split.map((l) => ({
+        description: split.length > 1 ? `${note.reason}\n${t("portionAt", { rate: l.rate })}` : note.reason,
+        quantity: 1,
+        rate: l.taxable,
+        amount: l.taxable,
+        tax_rate: l.rate,
+        tax: l.tax,
+      }))
+    : [{ description: note.reason, quantity: 1, rate: note.amount, amount: note.amount }];
   return renderPdf({
     ...invoice,
     kind: note.kind,
@@ -613,15 +631,8 @@ export function renderAdjustmentPdf(invoice, note) {
     issue_date: note.issue_date || note.paid_date,
     due_date: note.issue_date || note.paid_date,
     status: "Issued",
-    items: [
-      {
-        description: note.reason,
-        quantity: 1,
-        rate: note.amount,
-        amount: note.amount,
-      },
-    ],
-    subtotal: note.amount,
+    items,
+    subtotal: items.reduce((s, i) => s + i.amount, 0),
     discount: 0,
     total: note.amount,
     adjusted_total: note.amount,
@@ -636,5 +647,5 @@ export function renderAdjustmentPdf(invoice, note) {
     balance: 0,
     terms: "",
     notes: `${t("noteReferencing", { note: t("kind_" + note.kind), number: invoice.number })}\n${note.reference ? t("transactionReference") + ": " + note.reference : ""}`,
-  });
+  }, null, blocks);
 }

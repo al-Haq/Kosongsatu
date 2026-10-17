@@ -94,6 +94,7 @@ const en = {
   invoiceTotal: "Invoice total",
   currentBalance: "Current balance",
   noteReferencing: "{note} referencing {number}.",
+  portionAt: "Portion at {rate}% SST",
   transactionReference: "Transaction reference",
   receiptNotes:
     "Allocations are recorded separately from cash received. A payment allocation reversal is not a bank refund.",
@@ -265,6 +266,7 @@ const ms = {
   invoiceTotal: "Jumlah invois",
   currentBalance: "Baki semasa",
   noteReferencing: "{note} merujuk kepada {number}.",
+  portionAt: "Bahagian pada SST {rate}%",
   transactionReference: "Rujukan transaksi",
   receiptNotes:
     "Agihan direkodkan berasingan daripada wang yang diterima. Pembatalan agihan bukan bayaran balik bank.",
@@ -436,6 +438,7 @@ const zh = {
   invoiceTotal: "发票总额",
   currentBalance: "当前余额",
   noteReferencing: "{note}，参考 {number}。",
+  portionAt: "{rate}% 销售与服务税部分",
   transactionReference: "交易参考编号",
   receiptNotes: "款项分配与收款分开记录。撤销分配并不等于银行退款。",
   type: "类型",
