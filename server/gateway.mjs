@@ -7,6 +7,8 @@
 // - the paid amount is always read back from the provider before money is recorded,
 // - exactly one receipt + allocation is recorded through store.receive(), and
 //   money beyond the balance stays as customer funds.
+import { randomBytes } from "node:crypto";
+import { hash as sha256 } from "./domain.mjs";
 import { chmodSync } from "node:fs";
 import { randomUUID } from "node:crypto";
 import { AppError, check, today } from "./domain.mjs";
@@ -196,7 +198,16 @@ export class Gateway {
         "SELECT * FROM online_payments WHERE invoice_id=? AND provider=? AND state='pending' AND amount=? AND created>? ORDER BY created DESC",
       )
       .get(d.id, name, d.balance, recent);
-    if (existing) return { url: p.visit ? p.visit(existing.url, token) : existing.url, provider: name };
+    if (existing) {
+      if (!p.visit) return { url: existing.url, provider: name };
+      // Our own launch page (iPay88): a fresh single-use secret, bound to this
+      // return address, so the client portal can start it without a share token.
+      const launch = randomBytes(24).toString("base64url");
+      this.store.db
+        .prepare("UPDATE online_payments SET return_url=?,launch_hash=? WHERE id=?")
+        .run(returnUrl, sha256(launch), existing.id);
+      return { url: p.visit(existing.url, launch), provider: name };
+    }
     const stale = this.store.db
       .prepare("SELECT id,provider,bill_id,amount FROM online_payments WHERE invoice_id=? AND state='pending'")
       .all(d.id);
@@ -223,12 +234,16 @@ export class Gateway {
       "The payment provider returned an unexpected response.",
       502,
     );
+    const launch = p.visit ? randomBytes(24).toString("base64url") : null;
     this.store.tx(() => {
       this.store.db
         .prepare(
           "INSERT INTO online_payments(id,invoice_id,provider,bill_id,amount,url,created,ref) VALUES(?,?,?,?,?,?,?,?)",
         )
         .run(rowId, d.id, name, created.bill_id, d.balance, created.url, new Date().toISOString(), created.ref || ref);
+      this.store.db
+        .prepare("UPDATE online_payments SET return_url=?,launch_hash=? WHERE id=?")
+        .run(returnUrl, launch ? sha256(launch) : null, rowId);
       this.store.audit("online_payment.started", d.id, `${p.label} ${created.bill_id}: ${d.balance} sen`);
     });
     for (const s of stale) {
@@ -237,7 +252,7 @@ export class Gateway {
       if (sp?.cancel && sc)
         await sp.cancel({ http: (url, init) => this.http(url, init), config: sc, row: s }).catch(() => {});
     }
-    return { url: p.visit ? p.visit(created.url, token) : created.url, provider: name };
+    return { url: p.visit ? p.visit(created.url, launch) : created.url, provider: name };
   }
   // Billplz callback/redirect signature check (kept for the original callback route).
   verify(params) {

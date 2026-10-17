@@ -318,11 +318,13 @@ test("iPay88: signed form page, HMAC-SHA512 backend post, re-query before record
     assert.equal(await (await f.hook("ipay88", post())).text(), "RECEIVEOK", "replay");
     assert.equal(receiptsFor(f, "iPay88").length, 1);
     assert.equal(f.store.document(f.invoice.id).status, "Paid");
-    const back = await f.hook("ipay88/return/" + f.token, post());
+    const rowId = new URL(url).pathname.split("/").pop();
+    const back = await f.hook("ipay88/return/" + rowId, post());
     assert.equal(back.status, 303);
-    assert.equal(back.headers.get("location"), `/client/${f.token}?payment=ipay88&result=paid`);
-    const forgedBack = await f.hook("ipay88/return/" + f.token, post("1", "250.00", "00"));
-    assert.equal(forgedBack.headers.get("location"), `/client/${f.token}?payment=ipay88&result=error`);
+    assert.equal(back.headers.get("location"), `http://localhost/client/${f.token}?payment=ipay88&result=paid`);
+    const forgedBack = await f.hook("ipay88/return/" + rowId, post("1", "250.00", "00"));
+    assert.equal(forgedBack.headers.get("location"), `http://localhost/client/${f.token}?payment=ipay88&result=error`);
+    assert.equal((await f.hook("ipay88/return/" + f.token, post())).status, 404, "a share token is not a payment");
     assert.deepEqual(await (await f.pub("/payment-return", { provider: "ipay88" })).json(), { state: "paid" });
   } finally {
     await f.close();
@@ -369,5 +371,28 @@ test("server environment keys win over Settings and incomplete keys stay off", (
     assert.match(g.providerConfig("stripe").error, /sk_live_/);
   } finally {
     s.db.close();
+  }
+});
+
+test("iPay88 can start from the client portal: the launch page needs no share token", async () => {
+  const f = await setup(IPAY);
+  try {
+    const { portalRef } = await import("../server/portal-access.mjs");
+    const d = f.store.document(f.invoice.id);
+    const { url } = await f.server.ctx.gateway.checkout(portalRef(d.client_id, d.id), "http://localhost", `http://localhost/portal/d/${d.id}`);
+    assert.match(url, /\/api\/guest\/payments\/ipay88\/[\w-]{36}\?t=[\w-]{32}$/);
+    const page = await f.request(new URL(url).pathname + new URL(url).search);
+    assert.equal(page.status, 200);
+    const rowId = new URL(url).pathname.split("/").pop();
+    assert.match(await page.text(), new RegExp(`name="ResponseURL" value="http://localhost/api/hooks/payments/ipay88/return/${rowId}"`));
+    // Starting again rotates the secret and keeps the newest return address.
+    const again = await f.server.ctx.gateway.checkout(portalRef(d.client_id, d.id), "http://localhost", `http://localhost/portal/d/${d.id}`);
+    assert.notEqual(again.url, url);
+    assert.equal((await f.request(new URL(url).pathname + new URL(url).search)).status, 404, "old secret no longer opens the page");
+    const back = await f.hook("ipay88/return/" + rowId, { MerchantCode: "M01234" });
+    assert.equal(back.status, 303);
+    assert.equal(back.headers.get("location"), `http://localhost/portal/d/${d.id}?payment=ipay88&result=error`);
+  } finally {
+    await f.close();
   }
 });

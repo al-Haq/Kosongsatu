@@ -53,7 +53,7 @@ export const ipay88 = {
   },
   visit: (url, token) => `${url}?t=${token}`,
   // The fields the browser posts to entry.asp.
-  fields({ config, row, doc, business, origin, token }) {
+  fields({ config, row, doc, business, origin }) {
     const amount = senToRm(row.amount, true);
     return {
       MerchantCode: config.merchantCode,
@@ -69,7 +69,7 @@ export const ipay88 = {
       Lang: "UTF-8",
       SignatureType: "HMACSHA512",
       Signature: ipay88Signature(config.merchantKey, [config.merchantCode, row.bill_id, digits(amount), "MYR"]),
-      ResponseURL: `${origin}/api/hooks/payments/ipay88/return/${token}`,
+      ResponseURL: `${origin}/api/hooks/payments/ipay88/return/${row.id}`,
       BackendURL: `${origin}/api/hooks/payments/ipay88`,
     };
   },

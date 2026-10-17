@@ -25,6 +25,10 @@ test("B2C invoices of a month become one consolidated e-Invoice for the general 
     const small1 = invoice(f.store, b2c, { issue_date: day, items: [{ description: "Laptop repair", quantity: "1", rate: "250.00", tax_rate: 8 }] });
     const small2 = invoice(f.store, b2c, { issue_date: day, items: [{ description: "Setup", quantity: "1", rate: "100.00" }] });
     const big = invoice(f.store, b2c, { issue_date: day, items: [{ description: "Server", quantity: "1", rate: "12000.00" }] });
+    // A USD invoice is consolidated at its own rate: USD 100 at 4.5 = RM 450.
+    const usd = f.store.issue(
+      f.store.saveDocument({ kind: "invoice", client_id: b2c.id, issue_date: day, due_date: day, currency: "USD", fx_rate: "4.5", items: [{ description: "Remote support", quantity: "1", rate: "100.00" }] }).id,
+    );
     // Consolidated-mode invoices are not submitted one by one.
     const single = await f.auth("/api/tax/einvoices", "POST", { source: "invoice", id: small1.id });
     assert.equal(single.status, 409);
@@ -34,7 +38,7 @@ test("B2C invoices of a month become one consolidated e-Invoice for the general 
     assert.equal(ws.ext.tax.ready[small1.id].ready, true, "no buyer details needed");
     assert.match(ws.ext.tax.ready[big.id].missing.join(";"), /Over RM10,000/);
     const c = await f.json(`/api/tax/consolidated?month=${lastMonth}`);
-    assert.deepEqual(c.ready.map((x) => x.number).sort(), [small1.number, small2.number].sort());
+    assert.deepEqual(c.ready.map((x) => x.number).sort(), [small1.number, small2.number, usd.number].sort());
     assert.deepEqual(c.tooLarge.map((x) => x.number), [big.number]);
     assert.equal(c.closed, true);
     assert.match(c.deadline, /^\d{4}-\d{2}-07$/);
@@ -42,7 +46,7 @@ test("B2C invoices of a month become one consolidated e-Invoice for the general 
     assert.equal(thisMonth.status, 409);
     const con = await f.json("/api/tax/consolidated", "POST", { month: lastMonth });
     assert.equal(con.number, `CON-${lastMonth}-01`);
-    assert.equal(con.count, 2);
+    assert.equal(con.count, 3);
     assert.equal((await f.auth("/api/tax/consolidated", "POST", { month: lastMonth })).status, 409, "nothing left to consolidate");
     const e = await f.json("/api/tax/einvoices", "POST", { source: "consolidated", id: con.id });
     assert.equal(e.state, "valid");
@@ -51,8 +55,12 @@ test("B2C invoices of a month become one consolidated e-Invoice for the general 
     assert.equal(buyer.PartyIdentification[0].ID[0]._, "EI00000000010");
     assert.equal(buyer.PartyLegalEntity[0].RegistrationName[0]._, "General Public");
     assert.ok(doc.InvoiceLine.every((l) => l.Item[0].CommodityClassification[0].ItemClassificationCode[0]._ === "004"));
-    assert.equal(doc.InvoiceLine.length, 2);
-    assert.equal(doc.LegalMonetaryTotal[0].PayableAmount[0]._, (small1.total + small2.total) / 100);
+    assert.equal(doc.InvoiceLine.length, 3);
+    assert.deepEqual(doc.DocumentCurrencyCode, [{ _: "MYR" }]);
+    const usdLine = doc.InvoiceLine.find((l) => l.Item[0].Description[0]._.includes(usd.number));
+    assert.match(usdLine.Item[0].Description[0]._, /USD at 4\.5/);
+    assert.equal(usdLine.LineExtensionAmount[0]._, 450);
+    assert.equal(doc.LegalMonetaryTotal[0].PayableAmount[0]._, (small1.total + small2.total) / 100 + 450);
     // The invoice PDF says where it was reported; a note references the consolidated UUID.
     const blocks = await f.store.pdfBlocks(f.store.document(small1.id));
     assert.match(blocks.at(-1).text, new RegExp(con.number));

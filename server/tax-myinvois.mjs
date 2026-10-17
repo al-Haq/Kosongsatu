@@ -482,23 +482,33 @@ export class EInvoices {
         .all(con.id)
         .map((r) => store.document(r.document_id));
       check(docs.length, "This consolidated e-Invoice has no invoices.", 409);
+      // The consolidated document is in MYR: a foreign-currency invoice is
+      // converted at its own exchange rate, line by line, so the totals add up.
       const lines = [];
-      for (const d of docs)
-        for (const r of rateTotals(d))
+      let total = 0;
+      for (const d of docs) {
+        const rate = d.currency && d.currency !== "MYR" ? d.fx_rate || "1" : "1";
+        const rates = rateTotals(d);
+        for (const r of rates) {
+          const taxable = toMyr(r.taxable, rate);
+          const tax = toMyr(r.tax, rate);
           lines.push({
-            description: `Invoice ${d.number}${rateTotals(d).length > 1 ? ` (SST ${r.rate}%)` : ""}`,
+            description: `Invoice ${d.number}${rates.length > 1 ? ` (SST ${r.rate}%)` : ""}${rate !== "1" ? ` (${d.currency} at ${rate})` : ""}`,
             quantity: 1,
-            unitPrice: r.taxable,
-            subtotal: r.taxable,
+            unitPrice: taxable,
+            subtotal: taxable,
             discount: 0,
-            net: r.taxable,
+            net: taxable,
             classes: ["004"],
-            tax: { category: category(r.rate, false), rate: r.rate, taxable: r.taxable, tax: r.tax },
+            tax: { category: category(r.rate, false), rate: r.rate, taxable, tax },
           });
+          total += taxable + tax;
+        }
+      }
       return {
         typeCode: "01",
         number: con.number,
-        total: docs.reduce((t, d) => t + d.total, 0),
+        total,
         doc: { typeCode: "01", number: con.number, currency: "MYR", supplier, buyer: GENERAL_PUBLIC, lines },
       };
     }

@@ -1,6 +1,8 @@
 // Payments: gateway keys in Settings, ToyyibPay, Stripe and iPay88, DuitNow QR,
 // payment slip uploads, bank statement formats and smart bank matching.
 // Feature module contract: see docs/PLUGINS.md. Owner guide: docs/features/payments.md.
+import { timingSafeEqual } from "node:crypto";
+import { hash as sha256 } from "../domain.mjs";
 import { PROVIDERS, PROVIDER_ORDER } from "../gateway.mjs";
 import { verifyStripeWebhook } from "../payments-stripe.mjs";
 import { IPAY88_SCRIPT_HASH } from "../payments-ipay88.mjs";
@@ -110,6 +112,13 @@ export default {
       // The latest AI ranking the owner asked for, per bank transaction.
       name: "payments-004-bank-hints",
       sql: "CREATE TABLE bank_match_hints(transaction_id TEXT PRIMARY KEY REFERENCES bank_transactions(id) ON DELETE CASCADE, ranking TEXT NOT NULL, model TEXT NOT NULL, created TEXT NOT NULL);",
+    },
+    {
+      // Our own launch pages (iPay88) open with a single-use secret instead of
+      // the share token, so the client portal can start them too; each payment
+      // remembers where to send the client back.
+      name: "payments-005-launch",
+      sql: "ALTER TABLE online_payments ADD COLUMN launch_hash TEXT; ALTER TABLE online_payments ADD COLUMN return_url TEXT;",
     },
   ],
   // Gateway keys, entered in Settings > Integration keys (the server environment wins).
@@ -475,7 +484,11 @@ export default {
         }
         // iPay88: the browser return (ResponseURL) and the server post (BackendURL).
         if (isReturn) {
-          check(TOKEN.test(token), "Not found.", 404);
+          // The row id in the ResponseURL tells us where the client came from.
+          const launched = /^[\w-]{36}$/.test(token)
+            ? store.db.prepare("SELECT return_url FROM online_payments WHERE id=? AND provider='ipay88'").get(token)
+            : null;
+          check(launched?.return_url, "Not found.", 404);
           let result = "error";
           try {
             check(config, "Online payment is not configured.", 404);
@@ -487,7 +500,8 @@ export default {
           } catch (e) {
             if (!(e instanceof AppError)) throw e;
           }
-          r.res.writeHead(303, { Location: `/client/${token}?payment=ipay88&result=${result}`, "Cache-Control": "no-store" });
+          const back = launched.return_url + (launched.return_url.includes("?") ? "&" : "?") + `payment=ipay88&result=${result}`;
+          r.res.writeHead(303, { Location: back, "Cache-Control": "no-store" });
           r.res.end();
           return true;
         }
@@ -545,15 +559,23 @@ export default {
       if (go && method === "GET") {
         actor("client-link");
         r.allow("public:" + r.ip, 120, 60000);
-        const token = r.url.searchParams.get("t") || "";
-        const d = store.publicDocument(token);
-        const row = store.db
-          .prepare("SELECT * FROM online_payments WHERE id=? AND provider='ipay88' AND invoice_id=? AND state='pending'")
-          .get(go[1], d.id);
-        check(row, "This payment link has expired. Go back to the invoice and choose Pay online again.", 404);
+        // The launch secret from checkout (share link or client portal), not a share token.
+        const secret = r.url.searchParams.get("t") || "";
+        const row = /^[\w-]{20,64}$/.test(secret)
+          ? store.db.prepare("SELECT * FROM online_payments WHERE id=? AND provider='ipay88' AND state='pending'").get(go[1])
+          : null;
+        const expected = row?.launch_hash ? Buffer.from(row.launch_hash) : null;
+        const given = Buffer.from(sha256(secret));
+        check(
+          expected && expected.length === given.length && timingSafeEqual(expected, given),
+          "This payment link has expired. Go back to the invoice and choose Pay online again.",
+          404,
+        );
+        const d = store.document(row.invoice_id);
+        check(d.kind === "invoice" && d.state === "issued" && d.balance > 0, "This invoice is not awaiting payment.", 409);
         const { config } = gateway.providerConfig("ipay88");
         check(config, "Online payment is not available for this invoice.", 503);
-        const fields = PROVIDERS.ipay88.fields({ config, row, doc: d, business: store.settings(), origin: appUrl, token });
+        const fields = PROVIDERS.ipay88.fields({ config, row, doc: d, business: store.settings(), origin: appUrl });
         r.send(200, PROVIDERS.ipay88.page(config, fields), {
           "Content-Type": "text/html; charset=utf-8",
           "Content-Security-Policy": `default-src 'none'; style-src 'self'; img-src 'self'; script-src '${IPAY88_SCRIPT_HASH}'; form-action https:; base-uri 'none'; frame-ancestors 'none'`,
