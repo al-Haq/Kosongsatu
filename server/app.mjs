@@ -12,7 +12,7 @@ import { fileURLToPath } from "node:url";
 import { openDatabase } from "./db.mjs";
 import { PLUGINS, SECRETS, JOBS } from "./plugins.mjs";
 import { MAX_FILE_BYTES } from "./files.mjs";
-import { check, AppError, hash, text } from "./domain.mjs";
+import { check, AppError, hash, text, toMYR } from "./domain.mjs";
 import {
   sessionFrom,
   createSession,
@@ -68,12 +68,33 @@ export function safeDoc(d) {
     balance: d.balance,
     notes: d.notes,
     terms: d.terms,
+    currency: d.currency || "MYR",
+    language: d.language || "en",
+    instalments: (d.instalments || []).map((i) => ({
+      seq: i.seq,
+      due_date: i.due_date,
+      amount: i.amount,
+      status: i.status,
+    })),
+    next_due_date: d.next_due_date || null,
+    next_due_amount: d.next_due_amount || 0,
+    deposit: d.deposit
+      ? {
+          type: d.deposit.type,
+          value: d.deposit.value,
+          amount: d.deposit.amount,
+          tax: d.deposit.tax,
+          total: d.deposit.total,
+        }
+      : null,
+    source_number: d.links?.source?.number || null,
     client: {
       name: d.client.name,
       address: d.client.address,
       contact: d.client.contact,
     },
-    business: d.business,
+    // Custom field definitions may name internal-only fields, so they stay out.
+    business: { ...d.business, customFields: undefined },
     accepted_name: d.accepted_name,
     proofs: d.proofs.map((p) => ({
       reference: p.reference,
@@ -395,6 +416,7 @@ export function createApp({
               ...safeDoc(d),
               online_payment:
                 gateway.status().configured &&
+                (d.currency || "MYR") === "MYR" &&
                 !!(d.client.email || d.client.phone || store.settings().email),
               // Client-safe extras from feature modules (never owner-only data).
               ext: Object.fromEntries(
@@ -697,6 +719,10 @@ export function createApp({
                 "Paid MYR",
                 "Balance MYR",
                 "Status",
+                "Currency",
+                "Exchange rate",
+                "Total",
+                "Balance",
               ],
               ...store
                 .documents()
@@ -706,10 +732,15 @@ export function createApp({
                   d.client.name,
                   d.issue_date,
                   d.due_date,
-                  ((d.adjusted_total ?? d.total) / 100).toFixed(2),
-                  (d.paid / 100).toFixed(2),
-                  (d.balance / 100).toFixed(2),
+                  // MYR columns use the invoice's own exchange rate.
+                  (toMYR(d.adjusted_total ?? d.total, d.fx_rate) / 100).toFixed(2),
+                  (toMYR(d.paid, d.fx_rate) / 100).toFixed(2),
+                  (toMYR(d.balance, d.fx_rate) / 100).toFixed(2),
                   d.status,
+                  d.currency || "MYR",
+                  d.fx_rate || "1",
+                  ((d.adjusted_total ?? d.total) / 100).toFixed(2),
+                  (d.balance / 100).toFixed(2),
                 ]),
             ];
             return send(
@@ -856,7 +887,13 @@ export function createApp({
             if (note[1] === "adjustments") d = store.document(row.invoice_id);
             else {
               const r = store.receipt(row.receipt_id);
-              d = { number: r.number, business: r.business, client: r.client };
+              d = {
+                number: r.number,
+                business: r.business,
+                client: r.client,
+                currency: r.currency,
+                language: r.client.language || r.business.documentLanguage,
+              };
               row.kind = "refund";
             }
             return send(200, await renderAdjustmentPdf(d, row), {
@@ -1016,6 +1053,7 @@ export function createApp({
                 due_date: d.due_date,
                 total: d.total,
                 balance: d.balance,
+                currency: d.currency || "MYR",
               })),
             });
           }

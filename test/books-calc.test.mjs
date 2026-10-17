@@ -60,7 +60,9 @@ test("sales report: invoiced net of notes, collected cash, by client, item and m
   pay(s, b1, "40.00");
   // Beta's invoice is in USD at 4.4725; its receipt follows the invoice's rate.
   const docs = s.documents().map((d) => (d.id === b1.id ? { ...d, currency: "USD", fx_rate: "4.4725" } : d));
-  const r = salesReport({ docs, receipts: s.receipts(), services: [], from: T.slice(0, 8) + "01", to: T });
+  // Receipts carry their own currency and rate (a USD invoice takes USD receipts).
+  const receipts = s.receipts().map((x) => (x.client_id === b.id ? { ...x, currency: "USD", fx_rate: "4.4725" } : x));
+  const r = salesReport({ docs, receipts, services: [], from: T.slice(0, 8) + "01", to: T });
   assert.deepEqual(r.totals, { invoiced: 130100 - 10000 + 44725, sst: 0, collected: 50000 + 17890 });
   const alpha = r.clients.find((c) => c.client_id === a.id);
   assert.equal(alpha.invoiced, 120100);
@@ -79,7 +81,7 @@ test("sales report: invoiced net of notes, collected cash, by client, item and m
   assert.equal(month.invoiced, r.totals.invoiced);
   assert.equal(month.collected, r.totals.collected);
   // Outside the period nothing counts.
-  const before = salesReport({ docs, receipts: s.receipts(), from: "2020-01-01", to: "2020-12-31" });
+  const before = salesReport({ docs, receipts, from: "2020-01-01", to: "2020-12-31" });
   assert.deepEqual(before.totals, { invoiced: 0, sst: 0, collected: 0 });
 });
 

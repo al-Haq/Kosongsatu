@@ -10,6 +10,7 @@ import {
   date,
   integer,
   status,
+  prefixFor,
 } from "./domain.mjs";
 function normal(value) {
   return value.trim().toUpperCase().replace(/\s+/g, " ");
@@ -165,7 +166,7 @@ export function attachFinance(Store) {
           !this.db
             .prepare("SELECT 1 FROM documents WHERE number=?")
             .get(
-              `${d.kind === "invoice" ? business.invoicePrefix : business.quotePrefix}-${d.issue_date.slice(0, 4)}-${String((this.db.prepare("SELECT value FROM counters WHERE key=?").get(`${d.kind}-${d.issue_date.slice(0, 4)}`)?.value || 0) + 1).padStart(4, "0")}`,
+              `${prefixFor(d.kind, business)}-${d.issue_date.slice(0, 4)}-${String((this.db.prepare("SELECT value FROM counters WHERE key=?").get(`${d.kind}-${d.issue_date.slice(0, 4)}`)?.value || 0) + 1).padStart(4, "0")}`,
             ),
           "The next document number is already in use. Review numbering settings.",
           409,

@@ -8,7 +8,7 @@ export const LANGUAGES = ["en", "ms"];
 export const LANGUAGE_LABELS = { en: "English", ms: "Bahasa Melayu" };
 const COMMON = ["client_name", "contact_name", "company", "company_email", "company_phone"];
 const DOCUMENT = ["number", "document_type", "document_title", "amount", "issue_date", "due_date", "link"];
-const INVOICE = [...DOCUMENT, "balance", "paid", "bank_details"];
+const INVOICE = [...DOCUMENT, "balance", "amount_due", "paid", "bank_details"];
 export const VAR_HELP = {
   client_name: "Client's billing name",
   contact_name: "Contact person, or the client name when there is none",
@@ -20,6 +20,7 @@ export const VAR_HELP = {
   document_title: "Invoice, Quotation, Proforma invoice…",
   amount: "Document total (or receipt amount)",
   balance: "Amount still due",
+  amount_due: "Amount due now: the next instalment for an instalment plan, otherwise the balance",
   paid: "Amount paid so far (empty when nothing is paid)",
   issue_date: "Issue date",
   due_date: "Due date or valid-until date",
@@ -211,7 +212,7 @@ ${bank("Maklumat pembayaran")}
       subject: "Upcoming payment reminder: {{number}}",
       body: `Dear {{contact_name}},
 
-This is a friendly reminder that invoice {{number}} is due on {{due_date}}. The balance is {{balance}}.
+This is a friendly reminder that invoice {{number}} is due on {{due_date}}. The amount due is {{amount_due}}.
 
 If you have already paid, please ignore this message or reply with your transaction reference.
 ${bank("Payment details")}
@@ -223,7 +224,7 @@ ${linkLine("View and pay online")}
       subject: "Peringatan bayaran akan datang: {{number}}",
       body: `Salam sejahtera {{contact_name}},
 
-Ini adalah peringatan mesra bahawa invois {{number}} perlu dibayar pada {{due_date}}. Baki ialah {{balance}}.
+Ini adalah peringatan mesra bahawa invois {{number}} perlu dibayar pada {{due_date}}. Jumlah perlu dibayar ialah {{amount_due}}.
 
 Jika Tuan/Puan telah membuat bayaran, sila abaikan mesej ini atau balas dengan rujukan transaksi.
 ${bank("Maklumat pembayaran")}
@@ -237,7 +238,7 @@ ${linkLine("Lihat dan bayar dalam talian")}
       subject: "Overdue payment reminder: {{number}}",
       body: `Dear {{contact_name}},
 
-Our records show that invoice {{number}} was due on {{due_date}} and has an outstanding balance of {{balance}}.
+Our records show that invoice {{number}} was due on {{due_date}} and has {{amount_due}} outstanding.
 
 If you have already paid, please ignore this message or reply with your transaction reference.
 ${bank("Payment details")}
@@ -249,7 +250,7 @@ ${linkLine("View and pay online")}
       subject: "Peringatan bayaran tertunggak: {{number}}",
       body: `Salam sejahtera {{contact_name}},
 
-Menurut rekod kami, invois {{number}} telah tamat tempoh bayaran pada {{due_date}} dengan baki tertunggak sebanyak {{balance}}.
+Menurut rekod kami, invois {{number}} telah tamat tempoh bayaran pada {{due_date}} dengan jumlah tertunggak sebanyak {{amount_due}}.
 
 Jika Tuan/Puan telah membuat bayaran, sila abaikan mesej ini atau balas dengan rujukan transaksi.
 ${bank("Maklumat pembayaran")}
@@ -423,6 +424,10 @@ export function documentVars(d, { lang = "en", link = "", asOf = today() } = {})
     document_title: capital(type),
     amount: formatMoney(d.adjusted_total ?? d.total, currency, lang),
     balance: financial ? formatMoney(d.balance, currency, lang) : "",
+    // Instalment plans: what is due by the next instalment date.
+    amount_due: financial
+      ? formatMoney(d.instalments?.length && d.next_due_date ? d.next_due_amount : d.balance, currency, lang)
+      : "",
     paid: financial && d.paid > 0 ? formatMoney(d.paid, currency, lang) : "",
     issue_date: formatDate(d.issue_date, lang),
     due_date: formatDate(due, lang),
@@ -441,8 +446,13 @@ export function statementVars(statement, lang = "en") {
     ...businessVars(b, statement.client || {}),
     period_from: formatDate(statement.from, lang),
     period_to: formatDate(statement.to, lang),
-    balance: formatMoney(statement.closing, "MYR", lang),
-    amount: formatMoney(statement.outstanding, "MYR", lang),
+    // Statements list one balance per currency when a client is billed in several.
+    balance: statement.groups?.length
+      ? statement.groups.map((g) => formatMoney(g.closing, g.currency || "MYR", lang)).join(" + ")
+      : formatMoney(statement.closing, "MYR", lang),
+    amount: statement.groups?.length
+      ? statement.groups.map((g) => formatMoney(g.outstanding ?? g.closing, g.currency || "MYR", lang)).join(" + ")
+      : formatMoney(statement.outstanding, "MYR", lang),
     bank_details: b.bankAccount ? [b.bankName, b.bankHolder, b.bankAccount].filter(Boolean).join("\n") : "",
   };
 }

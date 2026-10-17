@@ -1,5 +1,5 @@
 import { chmodSync } from "node:fs";
-import { today, check, date, integer, addDays } from "./domain.mjs";
+import { today, check, date, integer, addDays, itemInput, regularItems } from "./domain.mjs";
 export function migrateRecords(db, path) {
   const version = db.prepare("PRAGMA user_version").get().user_version;
   if (version >= 4) return;
@@ -151,20 +151,21 @@ export function attachRecords(Store) {
         const d = this.document(did);
         const c = this.client(d.client_id);
         const issue = today();
+        // Codes, units and line discounts are copied; deposit deductions are not.
         const copy = this.saveDocument({
           kind: d.kind,
           client_id: d.client_id,
           issue_date: issue,
-          due_date: addDays(issue, d.kind === "quote" ? 14 : c.terms),
-          items: d.items.map((i) => ({
-            description: i.description,
-            quantity: String(i.quantity),
-            rate: (i.rate / 100).toFixed(2),
-            tax_rate: i.tax_rate ?? 0,
-          })),
+          due_date: addDays(issue, d.kind === "invoice" ? c.terms : 14),
+          items: regularItems(d.items).map(itemInput),
           discount: (d.discount / 100).toFixed(2),
           notes: d.notes,
           terms: d.terms,
+          currency: d.currency,
+          fx_rate: d.fx_rate,
+          language: d.language,
+          custom: d.meta?.custom || {},
+          ...(d.meta?.deposit ? { deposit: d.meta.deposit } : {}),
         });
         this.audit("document.duplicated", copy.id, d.number || d.id);
         return copy;

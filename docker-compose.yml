@@ -1,0 +1,83 @@
+# Production stack for one server: the app behind Caddy, which gets and renews
+# the HTTPS certificate for your domain automatically.
+#
+#   sudo ./scripts/install.sh     first install (writes .env, creates the owner)
+#   sudo ./scripts/update.sh      later updates (backup first)
+#
+# .env must set DOMAIN and ACME_EMAIL, plus BACKUP_KEY and MFA_ENCRYPTION_KEY.
+# See docs/DEPLOYMENT.md. The server, domain and DNS are yours to choose; this
+# file does not create them.
+name: nawlogic
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
+services:
+  app:
+    build: .
+    image: nawlogic-invoice:local
+    restart: unless-stopped
+    init: true
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: "3000"
+      APP_URL: https://${DOMAIN:?Set DOMAIN in .env}
+      DATABASE_PATH: /app/data/nawlogic.sqlite
+      BACKUP_DIRECTORY: /app/backups
+      # Caddy is the one proxy in front; it replaces X-Forwarded-For with the real client address.
+      TRUST_PROXY: "1"
+    volumes:
+      - app-data:/app/data
+      - ${BACKUP_HOST_DIR:-./backups}:/app/backups
+    # Not published on the host: only Caddy can reach the app.
+    expose:
+      - "3000"
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:'+(process.env.PORT||3000)+'/api/health').then((r)=>process.exit(r.ok?0:1),()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    logging: *logging
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    depends_on:
+      app:
+        condition: service_healthy
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      DOMAIN: ${DOMAIN:?Set DOMAIN in .env}
+      ACME_EMAIL: ${ACME_EMAIL:?Set ACME_EMAIL in .env}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:2019/config/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    logging: *logging
+
+volumes:
+  app-data:
+  caddy-data:
+  caddy-config:

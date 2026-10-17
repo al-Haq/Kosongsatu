@@ -283,6 +283,11 @@ test("module routes follow each module's role rules", async () => {
     ["staff", "PUT", "/api/comms/templates/invoice/en", false],
     ["accountant", "GET", "/api/comms/notifications", true],
     ["accountant", "POST", "/api/comms/receipts/abc/email", false],
+    ["staff", "POST", "/api/ext/documents/abc/deposit-invoice", true],
+    ["staff", "POST", "/api/ext/documents/logo", false],
+    ["staff", "POST", "/api/platform/quick/draft", true],
+    ["staff", "POST", "/api/platform/webhooks", false],
+    ["accountant", "POST", "/api/platform/quick/draft", false],
   ];
   for (const [role, method, path, expected] of cases)
     assert.equal(allowed(rules, role, method, path), expected, `${role} ${method} ${path}`);

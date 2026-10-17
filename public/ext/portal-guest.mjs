@@ -248,7 +248,7 @@ export function portalGuest(h) {
         ? `<div class="table-wrap"><table><thead><tr><th>Receipt</th><th>Date</th><th class="num">Amount</th><th><span class="sr-only">PDF</span></th></tr></thead><tbody>${o.receipts
             .map(
               (r) =>
-                `<tr><td>${E(r.number)}<small>${E(r.invoices.map((i) => i.number).join(", ") || r.method)}</small></td><td>${dateLabel(r.paid_date)}</td><td class="num">${fmt(r.amount)}</td><td><a class="btn small" href="${BASE}/receipts/${E(r.id)}/pdf">${icon("download")}PDF</a></td></tr>`,
+                `<tr><td>${E(r.number)}<small>${E(r.invoices.map((i) => i.number).join(", ") || r.method)}</small></td><td>${dateLabel(r.paid_date)}</td><td class="num">${fmt(r.amount, r.currency)}</td><td><a class="btn small" href="${BASE}/receipts/${E(r.id)}/pdf">${icon("download")}PDF</a></td></tr>`,
             )
             .join("")}</tbody></table></div>`
         : "<p>No receipts yet.</p>"

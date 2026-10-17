@@ -127,8 +127,9 @@ test("edited templates are validated, previewed with a real document, used and r
     await f.json("/api/comms/templates/invoice/en", "DELETE");
     await f.json(`/api/documents/${invoice.id}/email`, "POST", { to: "client@example.com" });
     assert.match(f.transport.sent.at(-1).subject, /^Invoice INV-/);
-    // A Malay business default switches every message to Malay.
+    // A Malay document (and, for statements, a Malay business default) switches messages to Malay.
     await f.json("/api/comms/settings", "PUT", { language: "ms" });
+    f.store.db.prepare("UPDATE documents SET language='ms' WHERE id=?").run(invoice.id);
     await f.json(`/api/documents/${invoice.id}/email`, "POST", { to: "client@example.com" });
     assert.match(f.transport.sent.at(-1).subject, /^Invois INV-/);
     assert.match(f.transport.sent.at(-1).text, /Salam sejahtera/);

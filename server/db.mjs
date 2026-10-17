@@ -29,6 +29,16 @@ import {
   status,
   addDays,
   nextMonth,
+  KINDS,
+  CURRENCIES,
+  LANGUAGES,
+  DEDUCTIONS,
+  LINK,
+  META,
+  prefixFor,
+  itemInput,
+  regularItems,
+  fxRate,
 } from "./domain.mjs";
 const defaults = {
   company: "NAWLOGIC SYSTEMS SOLUTION",
@@ -211,6 +221,10 @@ export class Store {
       .reduce((s, p) => s + p.amount, 0);
     return {
       ...row,
+      currency: row.currency || "MYR",
+      fx_rate: row.fx_rate || "1",
+      language: row.language || "en",
+      meta: row.meta ? JSON.parse(row.meta) : {},
       items: JSON.parse(row.items),
       client: row.client_snapshot
         ? JSON.parse(row.client_snapshot)
@@ -245,16 +259,25 @@ export class Store {
       409,
     );
     const kind = existing?.kind || b.kind;
-    check(["invoice", "quote"].includes(kind), "Invalid document type.");
+    check(KINDS.includes(kind), "Invalid document type.");
     this.client(b.client_id);
     const issued = date(b.issue_date),
       due = date(b.due_date);
     check(due >= issued, "Due date must be on or after issue date.");
-    const amounts = calculate(b.items, b.discount ?? "0");
+    const amounts = calculate(b.items, b.discount ?? "0", {
+      kind,
+      deductions: b[DEDUCTIONS] || [],
+    });
     check(
-      !amounts.tax || this.settings().sstNumber,
+      !amounts.items.some((i) => i.tax > 0) || this.settings().sstNumber,
       "Add your SST registration number in Settings before charging SST.",
     );
+    // Amounts are minor units of the document currency; fx_rate converts them to MYR.
+    const currency = b.currency ?? existing?.currency ?? "MYR";
+    check(CURRENCIES.includes(currency), "Choose a supported currency.");
+    const language = b.language ?? existing?.language ?? "en";
+    check(LANGUAGES.includes(language), "Choose English, Bahasa Melayu or Chinese.");
+    const link = existing ? {} : b[LINK] || {};
     const d = {
       id: idv,
       kind,
@@ -268,12 +291,20 @@ export class Store {
       total: amounts.total,
       notes: text(b.notes || "", 2000),
       terms: text(b.terms ?? this.settings().paymentTerms, 1000),
+      currency,
+      fx_rate:
+        currency === "MYR" ? "1" : fxRate(b.fx_rate ?? existing?.fx_rate),
+      language,
+      meta: JSON.stringify(b[META] ?? (existing ? JSON.parse(existing.meta || "{}") : {})),
+      source_quote: link.source_quote ?? null,
+      source_id: link.source_id ?? null,
+      source_role: link.source_role ?? null,
       created: now(),
       updated: now(),
     };
     this.db
       .prepare(
-        "INSERT INTO documents(id,kind,client_id,issue_date,due_date,items,subtotal,discount,tax,total,notes,terms,created,updated) VALUES(:id,:kind,:client_id,:issue_date,:due_date,:items,:subtotal,:discount,:tax,:total,:notes,:terms,:created,:updated) ON CONFLICT(id) DO UPDATE SET client_id=excluded.client_id,issue_date=excluded.issue_date,due_date=excluded.due_date,items=excluded.items,subtotal=excluded.subtotal,discount=excluded.discount,tax=excluded.tax,total=excluded.total,notes=excluded.notes,terms=excluded.terms,updated=excluded.updated",
+        "INSERT INTO documents(id,kind,client_id,issue_date,due_date,items,subtotal,discount,tax,total,notes,terms,currency,fx_rate,language,meta,source_quote,source_id,source_role,created,updated) VALUES(:id,:kind,:client_id,:issue_date,:due_date,:items,:subtotal,:discount,:tax,:total,:notes,:terms,:currency,:fx_rate,:language,:meta,:source_quote,:source_id,:source_role,:created,:updated) ON CONFLICT(id) DO UPDATE SET client_id=excluded.client_id,issue_date=excluded.issue_date,due_date=excluded.due_date,items=excluded.items,subtotal=excluded.subtotal,discount=excluded.discount,tax=excluded.tax,total=excluded.total,notes=excluded.notes,terms=excluded.terms,currency=excluded.currency,fx_rate=excluded.fx_rate,language=excluded.language,meta=excluded.meta,updated=excluded.updated",
       )
       .run(d);
     this.audit("document.draft.saved", idv);
@@ -293,7 +324,7 @@ export class Store {
       const n = this.db
         .prepare("SELECT value FROM counters WHERE key=?")
         .get(key).value;
-      const number = `${d.kind === "invoice" ? business.invoicePrefix : business.quotePrefix}-${d.issue_date.slice(0, 4)}-${String(n).padStart(4, "0")}`;
+      const number = `${prefixFor(d.kind, business)}-${d.issue_date.slice(0, 4)}-${String(n).padStart(4, "0")}`;
       this.db
         .prepare(
           "UPDATE documents SET state='issued',number=?,client_snapshot=?,business_snapshot=?,updated=? WHERE id=?",
@@ -386,19 +417,23 @@ export class Store {
         .prepare("SELECT id FROM documents WHERE source_quote=?")
         .get(idv);
       if (old) return this.document(old.id);
+      // The invoice keeps the quotation's currency, rate, language, codes and
+      // line discounts. Deposit deductions are added by the documents module.
       const d = this.saveDocument({
         kind: "invoice",
         client_id: q.client_id,
         issue_date: today(),
         due_date: addDays(today(), q.client.terms),
-        items: q.items.map((i) => ({ ...i, rate: (i.rate / 100).toFixed(2) })),
+        items: regularItems(q.items).map(itemInput),
         discount: (q.discount / 100).toFixed(2),
         notes: q.notes,
         terms: q.terms,
+        currency: q.currency,
+        fx_rate: q.fx_rate,
+        language: q.language,
+        custom: q.meta.custom || {},
+        [LINK]: { source_quote: idv },
       });
-      this.db
-        .prepare("UPDATE documents SET source_quote=? WHERE id=?")
-        .run(idv, d.id);
       this.audit("quotation.converted", idv, d.id);
       return this.document(d.id);
     });

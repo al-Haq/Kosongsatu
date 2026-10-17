@@ -173,7 +173,8 @@ test("inbound owner messages reach onInbound handlers once, and handlers can rep
     assert.equal(seen.length, 1, "owner handlers see owner messages once");
     assert.deepEqual([seen[0].fromOwner, seen[0].text, seen[0].name], [true, "invois ABC RM1500", "Owner"]);
     assert.equal(clientSeen.length, 2, "handlers that ask for clients see every message");
-    const reply = f.meta.calls.find((c) => c.body.type === "text");
+    // Other modules' handlers (e.g. quick invoices) may reply as well.
+    const reply = f.meta.calls.find((c) => c.body.type === "text" && c.body.text.body === "Got it");
     assert.deepEqual([reply.body.to, reply.body.text.body], ["60129998888", "Got it"]);
     assert.equal(f.service.windowOpen("60111111111"), true);
     off();

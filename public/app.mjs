@@ -1,6 +1,8 @@
 import { automationUI } from "./automation.mjs";
 import { financeUI } from "./finance.mjs";
 import { UI_PLUGINS } from "./plugins.mjs";
+import { totals, toMYR, basisPoints, percentOf } from "./ext/documents-calc.mjs";
+import { labels, titleFor, statusLabel, LOCALES } from "./ext/documents-i18n.mjs";
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
 const app = $("#app"),
@@ -16,6 +18,7 @@ const allowed = (kind, name) =>
   plugins.every((p) => p.can?.(kind, name) !== false);
 const requestKeys = new Map();
 let S = null,
+  publicDoc = null,
   session = null,
   filter = "All",
   search = "",
@@ -30,10 +33,12 @@ const E = (value) =>
         c
       ],
   );
-const money = (c) =>
-  new Intl.NumberFormat("en-MY", { style: "currency", currency: "MYR" }).format(
+const money = (c, currency = "MYR") =>
+  new Intl.NumberFormat("en-MY", { style: "currency", currency: currency || "MYR" }).format(
     (c || 0) / 100,
   );
+// MYR value of a document or receipt amount at its own exchange rate.
+const myr = (amount, x) => toMYR(amount || 0, x?.fx_rate || "1");
 const dec = (c) => (c / 100).toFixed(2);
 const dateLabel = (s) =>
   s
@@ -83,8 +88,8 @@ const icon = (n) =>
   `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${icons[n] || icons.doc}</svg>`;
 const logo = () =>
   '<img class="logo" src="/assets/nawlogic-logo.png" alt="Nawlogic">';
-const badge = (s) =>
-  `<span class="badge ${{ Paid: "green", Accepted: "green", Active: "green", "Part-paid": "orange", "Pending review": "orange", Overdue: "red", Void: "red", Declined: "red", Viewed: "blue", Issued: "blue", Expired: "orange", Archived: "orange", Sent: "green", Failed: "red", Sending: "blue", Connected: "green", Opened: "green", Delivered: "green", Read: "green", Bounced: "red", "Spam complaint": "red", "Soft bounce": "orange", "Partly sent": "orange", Pending: "orange", Edited: "blue", Received: "blue" }[s] || ""}"><span class="dot"></span>${E(s)}</span>`;
+const badge = (s, label = s) =>
+  `<span class="badge ${{ Paid: "green", Accepted: "green", Active: "green", "Part-paid": "orange", "Pending review": "orange", Overdue: "red", Void: "red", Declined: "red", Viewed: "blue", Issued: "blue", Expired: "orange", Archived: "orange", Sent: "green", Failed: "red", Sending: "blue", Connected: "green", Opened: "green", Delivered: "green", Read: "green", Bounced: "red", "Spam complaint": "red", "Soft bounce": "orange", "Partly sent": "orange", Pending: "orange", Edited: "blue", Received: "blue", Converted: "green", Invoiced: "green", Delivered: "green", Completed: "green" }[s] || ""}"><span class="dot"></span>${E(label)}</span>`;
 const button = (label, action, id = "", primary = false, iconName = "") =>
   !allowed("action", action)
     ? ""
@@ -178,6 +183,9 @@ const navItems = [
   ["sales", "Sales & POs", "trend", "Sell"],
   ["quotes", "Quotations", "doc", "Sell"],
   ["invoices", "Invoices", "doc", "Sell"],
+  ["proformas", "Proforma", "doc", "Sell"],
+  ["sales-orders", "Sales orders", "box", "Sell"],
+  ["delivery-orders", "Delivery orders", "box", "Sell"],
   ["payments", "Payments", "wallet", "Get paid"],
   ["ledger", "Cash & credits", "wallet", "Get paid"],
   ["bank", "Bank matching", "trend", "Get paid"],
@@ -229,7 +237,7 @@ function invoiceTable(docs) {
       "No matching documents",
       "Create your first invoice or change the filters.",
     );
-  return `<div class="table-wrap"><table><caption class="sr-only">Billing documents</caption><thead><tr><th>Document</th><th>Client</th><th>Due / valid until</th><th class="num">Total</th><th class="num">Balance</th><th>Status</th><th><span class="sr-only">Action</span></th></tr></thead><tbody>${docs.map((d) => `<tr><td><button class="link-button" data-action="open-document" data-id="${d.id}">${E(d.number || "Draft")} ${!d.number ? "<small>" + d.id.slice(0, 8) + "</small>" : ""}</button></td><td>${E(d.client.name)}</td><td>${dateLabel(d.due_date)}</td><td class="num">${money(d.adjusted_total ?? d.total)}</td><td class="num">${d.kind === "quote" || d.state === "void" ? "—" : money(d.balance)}</td><td>${badge(d.status)}</td><td><button class="btn ghost small" data-action="open-document" data-id="${d.id}" aria-label="Open ${E(d.number || "draft")}">${icon("arrow")}</button></td></tr>`).join("")}</tbody></table></div>`;
+  return `<div class="table-wrap"><table><caption class="sr-only">Billing documents</caption><thead><tr><th>Document</th><th>Client</th><th>Due / valid until</th><th class="num">Total</th><th class="num">Balance</th><th>Status</th><th><span class="sr-only">Action</span></th></tr></thead><tbody>${docs.map((d) => `<tr><td><button class="link-button" data-action="open-document" data-id="${d.id}">${E(d.number || "Draft")} ${!d.number ? "<small>" + d.id.slice(0, 8) + "</small>" : ""}</button>${d.kind !== "invoice" ? `<small>${E(kindLabel(d.kind))}</small>` : ""}</td><td>${E(d.client.name)}</td><td>${dateLabel(d.due_date)}</td><td class="num">${d.kind === "delivery_order" ? "—" : money(d.adjusted_total ?? d.total, d.currency)}</td><td class="num">${d.kind !== "invoice" || d.state === "void" ? "—" : money(d.balance, d.currency)}</td><td>${badge(d.status)}</td><td><button class="btn ghost small" data-action="open-document" data-id="${d.id}" aria-label="Open ${E(d.number || "draft")}">${icon("arrow")}</button></td></tr>`).join("")}</tbody></table></div>`;
 }
 function overview() {
   const invoices = S.documents.filter(
@@ -242,28 +250,28 @@ function overview() {
       r.voided
         ? []
         : [
-            { paid_date: r.paid_date, amount: r.amount },
+            { paid_date: r.paid_date, amount: myr(r.amount, r) },
             ...r.refunds.map((f) => ({
               paid_date: f.paid_date,
-              amount: -f.amount,
+              amount: -myr(f.amount, r),
             })),
           ],
     );
   const sums = [
     invoices
       .filter((d) => d.issue_date.startsWith(month))
-      .reduce((s, d) => s + d.total, 0) +
+      .reduce((s, d) => s + myr(d.total, d), 0) +
       S.finance.adjustments
         .filter((a) => a.issue_date.startsWith(month))
-        .reduce(
-          (sum, a) => sum + (a.kind === "credit" ? -a.amount : a.amount),
-          0,
-        ),
+        .reduce((sum, a) => {
+          const value = myr(a.amount, S.documents.find((d) => d.id === a.invoice_id));
+          return sum + (a.kind === "credit" ? -value : value);
+        }, 0),
     payments
       .filter((p) => p.paid_date.startsWith(month))
       .reduce((s, p) => s + p.amount, 0),
-    outstanding.reduce((s, d) => s + d.balance, 0),
-    overdue.reduce((s, d) => s + d.balance, 0),
+    outstanding.reduce((s, d) => s + myr(d.balance, d), 0),
+    overdue.reduce((s, d) => s + myr(d.balance, d), 0),
   ];
   const weeks = [3, 2, 1, 0].map((n) => {
     const start = addDays(S.today, -n * 7 - 6),
@@ -291,30 +299,67 @@ function overview() {
         .slice(0, 4)
         .map(
           (d) =>
-            `<div class="attention"><div><strong>${E(d.number)}</strong><small>${E(d.client.name)} / ${money(d.balance)}</small><button class="link-button" data-action="open-document" data-id="${d.id}">Review invoice →</button></div>${badge(d.status)}</div>`,
+            `<div class="attention"><div><strong>${E(d.number)}</strong><small>${E(d.client.name)} / ${money(d.balance, d.currency)}</small><button class="link-button" data-action="open-document" data-id="${d.id}">Review invoice →</button></div>${badge(d.status)}</div>`,
         )
         .join("") || empty("All caught up", "No outstanding issued invoices.")
     }</section></div>${slot("overview")}<section class="panel mt22"><div class="panel-head"><h2>Recent documents</h2><a href="#/invoices">View invoices →</a></div>${invoiceTable(S.documents.slice(0, 5))}</section>`
   );
 }
+// Screens per document kind. Only invoices carry money owed.
+const KIND_UI = {
+  invoice: {
+    list: "invoices",
+    title: "Invoices",
+    one: "invoice",
+    sub: "Create, issue and keep track of every invoice.",
+    action: "new-invoice",
+    tabs: ["All", "Unpaid", "Overdue", "Paid", "Draft"],
+  },
+  quote: {
+    list: "quotes",
+    title: "Quotations",
+    one: "quotation",
+    sub: "Agree on scope, price and terms before starting work.",
+    action: "new-quote",
+    tabs: ["All", "Draft", "Issued", "Accepted", "Expired"],
+  },
+  proforma: {
+    list: "proformas",
+    title: "Proforma invoices",
+    one: "proforma invoice",
+    sub: "Ask for payment before the final invoice. Proformas never change balances.",
+    action: "new-proforma",
+    tabs: ["All", "Draft", "Issued", "Converted"],
+  },
+  sales_order: {
+    list: "sales-orders",
+    title: "Sales orders",
+    one: "sales order",
+    sub: "Confirm what was ordered, then invoice and deliver it.",
+    action: "new-sales-order",
+    tabs: ["All", "Draft", "Issued", "Invoiced", "Delivered", "Completed"],
+  },
+  delivery_order: {
+    list: "delivery-orders",
+    title: "Delivery orders",
+    one: "delivery order",
+    sub: "Items and quantities delivered, with signature lines. No prices.",
+    action: "new-delivery-order",
+    tabs: ["All", "Draft", "Issued"],
+  },
+};
+const kindUI = (kind) => KIND_UI[kind] || KIND_UI.invoice;
+const kindLabel = (kind) => {
+  const one = kindUI(kind).one;
+  return one[0].toUpperCase() + one.slice(1);
+};
 function documentList(kind) {
-  const quotes = kind === "quote";
+  const k = kindUI(kind);
   const data = S.documents.filter((d) => d.kind === kind);
+  const currencies = [...new Set(data.map((d) => d.currency || "MYR"))];
   return (
-    heading(
-      quotes ? "Quotations" : "Invoices",
-      quotes
-        ? "Agree on scope, price and terms before starting work."
-        : "Create, issue and keep track of every invoice.",
-      button(
-        quotes ? "New quotation" : "New invoice",
-        quotes ? "new-quote" : "new-invoice",
-        "",
-        true,
-        "plus",
-      ),
-    ) +
-    `<div class="tabs" role="group" aria-label="Filter by status">${(quotes ? ["All", "Draft", "Issued", "Accepted", "Expired"] : ["All", "Unpaid", "Overdue", "Paid", "Draft"]).map((t) => `<button class="tab ${t === filter ? "active" : ""}" data-action="filter" data-id="${t}">${t} <span>${t === "All" ? data.length : data.filter((d) => matches(d, t)).length}</span></button>`).join("")}</div><section class="panel"><div class="toolbar"><label class="search"><span class="sr-only">Search documents</span>${icon("search")}<input id="document-search" placeholder="Search invoice number or client" value="${E(search)}"></label>${!quotes ? '<a class="btn" href="/api/invoices.csv">' + icon("download") + " Export CSV</a>" : ""}</div><div id="document-table">${documentTable(filteredDocs(kind))}</div><div class="table-foot"><span>${data.length} ${quotes ? "quotations" : "invoices"} in workspace</span><span>All dates / MYR</span></div></section>`
+    heading(k.title, k.sub, button("New " + k.one, k.action, "", true, "plus")) +
+    `<div class="tabs" role="group" aria-label="Filter by status">${k.tabs.map((t) => `<button class="tab ${t === filter ? "active" : ""}" data-action="filter" data-id="${t}">${t} <span>${t === "All" ? data.length : data.filter((d) => matches(d, t)).length}</span></button>`).join("")}</div><section class="panel"><div class="toolbar"><label class="search"><span class="sr-only">Search documents</span>${icon("search")}<input id="document-search" data-kind="${kind}" placeholder="Search ${kind === "invoice" ? "invoice" : "document"} number or client" value="${E(search)}"></label>${kind === "invoice" ? '<a class="btn" href="/api/invoices.csv">' + icon("download") + " Export CSV</a>" : ""}</div><div id="document-table">${documentTable(filteredDocs(kind))}</div><div class="table-foot"><span>${data.length} ${k.title.toLowerCase()} in workspace</span><span>All dates / ${E(currencies.length > 1 ? currencies.join(", ") : currencies[0] || "MYR")}</span></div></section>`
   );
 }
 function matches(d, f) {
@@ -344,7 +389,7 @@ function clients() {
       "One place for every contact, quotation and billing history.",
       button("Add client", "new-client", "", true, "plus"),
     ) +
-    `<section class="panel">${S.clients.length ? `<div class="table-wrap"><table><thead><tr><th>Client</th><th>Contact</th><th>Payment terms</th><th class="num">Outstanding</th><th>Action</th></tr></thead><tbody>${paged(S.clients).rows.map((c) => `<tr><td><button class="link-button" data-action="open-client" data-id="${c.id}">${E(c.name)}</button><small>${E(c.email)}</small></td><td>${E(c.contact || "—")}</td><td>${c.terms} days${c.archived ? " " + badge("Archived") : ""}</td><td class="num">${money(S.documents.filter((d) => d.client_id === c.id && d.kind === "invoice" && d.state === "issued").reduce((s, d) => s + d.balance, 0))}</td><td>${button("Edit", "edit-client", c.id)}</td></tr>`).join("")}</tbody></table></div>${paged(S.clients).nav}` : empty("Your first client starts here", "Add their billing name and contact details.", button("Add client", "new-client", "", true))}</section>`
+    `<section class="panel">${S.clients.length ? `<div class="table-wrap"><table><thead><tr><th>Client</th><th>Contact</th><th>Payment terms</th><th class="num">Outstanding</th><th>Action</th></tr></thead><tbody>${paged(S.clients).rows.map((c) => `<tr><td><button class="link-button" data-action="open-client" data-id="${c.id}">${E(c.name)}</button><small>${E(c.email)}</small></td><td>${E(c.contact || "—")}</td><td>${c.terms} days${c.archived ? " " + badge("Archived") : ""}</td><td class="num">${money(S.documents.filter((d) => d.client_id === c.id && d.kind === "invoice" && d.state === "issued").reduce((s, d) => s + myr(d.balance, d), 0))}</td><td>${button("Edit", "edit-client", c.id)}</td></tr>`).join("")}</tbody></table></div>${paged(S.clients).nav}` : empty("Your first client starts here", "Add their billing name and contact details.", button("Add client", "new-client", "", true))}</section>`
   );
 }
 function clientProfile(id) {
@@ -375,7 +420,7 @@ function services() {
       "Reusable line items. Tailor the final scope and price for each project.",
       button("Add service", "new-service", "", true, "plus"),
     ) +
-    `<section class="panel">${S.services.length ? `<div class="table-wrap"><table><thead><tr><th>Service</th><th>Unit</th><th class="num">Default rate</th><th>Status</th><th>Action</th></tr></thead><tbody>${S.services.map((s) => `<tr><td><strong>${E(s.name)}</strong><small>${E(s.description)}</small></td><td>${E(s.unit)}</td><td class="num">${money(s.rate)}</td><td>${badge(s.active ? "Active" : "Inactive")}</td><td><div class="actions">${button("Edit", "edit-service", s.id)}${button("Delete", "delete-service", s.id)}</div></td></tr>`).join("")}</tbody></table></div>` : empty("Build your service catalog", "Add a service or use custom items directly on an invoice.", button("Add service", "new-service", "", true))}</section>`
+    `<section class="panel">${S.services.length ? `<div class="table-wrap"><table><thead><tr><th>Service</th><th>Code</th><th>Unit</th><th class="num">Default rate</th><th>Status</th><th>Action</th></tr></thead><tbody>${S.services.map((s) => `<tr><td><strong>${E(s.name)}</strong><small>${E(s.description)}</small></td><td>${E(s.sku || "—")}</td><td>${E(s.unit)}</td><td class="num">${money(s.rate)}</td><td>${badge(s.active ? "Active" : "Inactive")}</td><td><div class="actions">${button("Edit", "edit-service", s.id)}${button("Delete", "delete-service", s.id)}</div></td></tr>`).join("")}</tbody></table></div>` : empty("Build your service catalog", "Add a service or use custom items directly on an invoice.", button("Add service", "new-service", "", true))}</section>`
   );
 }
 function payments() {
@@ -397,7 +442,7 @@ function payments() {
     (proofs.length
       ? `<section class="panel mb22"><div class="panel-head"><h2>Awaiting review</h2>${badge("Pending review")}</div>${proofs.map((p) => `<div class="attention"><div><strong>${E(p.document.number)} / ${E(p.document.client.name)}</strong><small>Reference: ${E(p.reference)}${p.note ? " / " + E(p.note) : ""}</small></div>${button("Review invoice", "open-document", p.document.id)}</div>`).join("")}</section>`
       : "") +
-    `<section class="panel">${all.length ? `<div class="table-wrap"><table><thead><tr><th>Payment / invoice</th><th>Received</th><th>Method</th><th>Reference</th><th class="num">Amount</th><th>Status</th><th>Receipt</th></tr></thead><tbody>${all.map((p) => `<tr><td><button class="link-button" data-action="open-document" data-id="${p.document.id}">${E(p.document.number)}</button><small>${E(p.document.client.name)}</small></td><td>${dateLabel(p.paid_date)}</td><td>${E(p.method)}</td><td>${E(p.reference)}</td><td class="num">${money(p.applied ?? p.amount)}${p.released ? `<small>Released ${money(p.released)}</small>` : ""}</td><td>${badge(p.reversed ? "Reversed" : "Confirmed")}</td><td>${p.reversed ? "—" : `<a class="btn small" href="/api/payments/${p.id}/receipt">${icon("download")} PDF</a>`}</td></tr>`).join("")}</tbody></table></div>` : empty("No payments recorded", "Record a payment only after checking it was received.")}</section>`
+    `<section class="panel">${all.length ? `<div class="table-wrap"><table><thead><tr><th>Payment / invoice</th><th>Received</th><th>Method</th><th>Reference</th><th class="num">Amount</th><th>Status</th><th>Receipt</th></tr></thead><tbody>${all.map((p) => `<tr><td><button class="link-button" data-action="open-document" data-id="${p.document.id}">${E(p.document.number)}</button><small>${E(p.document.client.name)}</small></td><td>${dateLabel(p.paid_date)}</td><td>${E(p.method)}</td><td>${E(p.reference)}</td><td class="num">${money(p.applied ?? p.amount, p.document.currency)}${p.released ? `<small>Released ${money(p.released, p.document.currency)}</small>` : ""}</td><td>${badge(p.reversed ? "Reversed" : "Confirmed")}</td><td>${p.reversed ? "—" : `<a class="btn small" href="/api/payments/${p.id}/receipt">${icon("download")} PDF</a>`}</td></tr>`).join("")}</tbody></table></div>` : empty("No payments recorded", "Record a payment only after checking it was received.")}</section>`
   );
 }
 function settings() {
@@ -410,18 +455,115 @@ function settings() {
     `<div class="grid-equal"><section class="panel"><div class="panel-head"><h2>Brand & company</h2></div>${logo()}<div class="palette"><div class="swatch teal-bg"><span></span>Teal<br>#0EA5A4</div><div class="swatch orange-bg"><span></span>Orange<br>#F97316</div><div class="swatch ink-bg"><span></span>Ink<br>#0F172A</div></div><form data-form="settings"><div class="form-grid">${input("Registered business name", "company", b.company, "text", true, 'maxlength="180"')}${input("Registration number", "registration", b.registration, "text", false, 'maxlength="80"')}${input("Tax identification number (TIN)", "tin", b.tin || "", "text", false, 'maxlength="20"')}${input("SST registration number", "sstNumber", b.sstNumber || "", "text", false, 'maxlength="40"')}${input("Billing email", "email", b.email, "email", false, 'maxlength="160"')}${input("Phone", "phone", b.phone, "text", false, 'maxlength="60"')}<div class="span-2">${area("Business address", "address", b.address, 600)}</div>${input("Invoice prefix", "invoicePrefix", b.invoicePrefix, "text", true, 'pattern="[A-Z][A-Z0-9-]{0,11}" maxlength="12"')}${input("Quotation prefix", "quotePrefix", b.quotePrefix, "text", true, 'pattern="[A-Z][A-Z0-9-]{0,11}" maxlength="12"')}<div class="span-2">${area("Default terms", "paymentTerms", b.paymentTerms)}</div>${input("Bank name", "bankName", b.bankName, "text", false, 'maxlength="100"')}${input("Account number", "bankAccount", b.bankAccount, "text", false, 'maxlength="60"')}<div class="span-2">${input("Account holder", "bankHolder", b.bankHolder, "text", false, 'maxlength="180"')}</div></div>${errorBlock()}<p class="field-hint">Issued documents keep a snapshot of the company and client details. SST is charged only after you add your SST registration number.</p><div class="form-actions"><button class="btn primary" type="submit">Save settings</button></div></form></section><div class="stack"><section class="panel"><div class="panel-head"><h2>Access & integrations</h2></div><div class="setting-line"><div><h3>Owner access</h3><p>${E(session.email)}</p></div>${badge("Password protected")}</div><div class="setting-line"><div><h3>Client invoice links</h3><p>Document only / 1–90 days / revocable</p></div>${icon("shield")}</div><div class="setting-line"><div><h3>LHDN MyInvois</h3><p>Requires separate integration and validation</p></div>${badge("Not connected")}</div><div class="setting-line"><div><h3>Online payment (Billplz)</h3><p>${S.gateway?.configured ? (S.gateway.sandbox ? "Sandbox mode" : "Live") : "Set Billplz keys on the server"}</p></div>${badge(S.gateway?.configured ? "Connected" : "Not connected")}</div><div class="setting-line"><div><h3>Email & scheduled reminders</h3><p>${S.mail?.configured ? "Sending from " + E(S.mail.from) : "Add SMTP settings under Integration keys"}</p></div>${badge(S.mail?.configured ? "Connected" : "Not connected")}</div></section><section class="panel"><div class="panel-head"><h2>Account password</h2></div><form data-form="password">${input("Current password", "current", "", "password", true, 'autocomplete="current-password"')}${input("New password (at least 12 characters)", "password", "", "password", true, 'minlength="12" maxlength="256" autocomplete="new-password"')}${S.security.enabled ? input("Authenticator or recovery code", "code", "", "text", true, 'autocomplete="one-time-code"') : ""}${errorBlock()}<button type="submit" class="btn">Change password & sign out</button></form></section><section class="panel"><div class="panel-head"><h2>Your business data</h2></div><p>Download a business data export, including documents, payments and audit history. Store it privately.</p><div class="actions mt22"><a class="btn" href="/api/backup">${icon("download")} Export JSON</a><a class="btn" href="/api/invoices.csv">Export CSV</a></div><p class="field-hint">For full disaster recovery, use the encrypted backup and restore procedure in the deployment guide.</p></section></div></div>`
   );
 }
+// Labels, columns and money on the paper follow the document's language and currency.
+const dateIn = (lang, s) =>
+  s
+    ? new Intl.DateTimeFormat(LOCALES[lang] || "en-MY", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+        timeZone: "UTC",
+      }).format(new Date(s + "T00:00:00Z"))
+    : "-";
+const fieldApplies = (f, kind) =>
+  f.applies === "all" || f.applies === kind || (f.applies === "invoice" && kind === "proforma");
+function dueLabelFor(t, kind) {
+  return kind === "invoice"
+    ? t("dueDate")
+    : kind === "sales_order"
+      ? t("requiredBy")
+      : kind === "delivery_order"
+        ? t("deliveryDate")
+        : t("validUntil");
+}
 function paper(d, publicView = false) {
   const b = d.business,
-    c = d.client;
-  return `<section class="panel invoice-paper"><div class="paper-head"><div>${logo()}<div class="paper-company"><strong>${E(b.company)}</strong><p>${E([b.registration ? `Reg: ${b.registration}` : "", b.address, b.email, b.phone].filter(Boolean).join("\n"))}</p></div></div><div><h2>${d.kind === "quote" ? "QUOTATION" : "INVOICE"}</h2><p>${E(d.number || "Draft — not issued")}</p></div></div>${b.demo ? '<div class="notice">Demo document. No real transaction.</div>' : ""}<div class="billing-grid"><div><div class="eyebrow">Bill to</div><strong>${E(c.name)}</strong><p>${E([c.contact, c.address].filter(Boolean).join("\n"))}</p></div><div><div class="eyebrow">Document details</div><p>Issue date: ${dateLabel(d.issue_date)}<br>${d.kind === "quote" ? "Valid until" : "Due date"}: ${dateLabel(d.due_date)}<br>Currency: MYR</p></div></div><div class="table-wrap"><table><thead><tr><th>Description</th><th class="num line-qty">Qty</th><th class="num line-rate">Rate</th><th class="num">Amount</th></tr></thead><tbody>${d.items.map((i) => `<tr><td class="quote-scope">${E(i.description)}<small class="mobile-line-meta">${i.quantity} × ${money(i.rate)}</small></td><td class="num line-qty">${i.quantity}</td><td class="num line-rate">${money(i.rate)}</td><td class="num">${money(i.amount)}</td></tr>`).join("")}</tbody></table></div><div class="totals"><div class="total-row"><span>Subtotal</span><strong>${money(d.subtotal)}</strong></div>${d.discount ? `<div class="total-row"><span>Discount</span><strong>−${money(d.discount)}</strong></div>` : ""}${taxRows(d.items)}<div class="total-row emphasis"><span>Original total</span><span>${money(d.total)}</span></div>${d.credit ? `<div class="total-row"><span>Credit notes</span><strong>−${money(d.credit)}</strong></div>` : ""}${d.debit ? `<div class="total-row"><span>Debit notes</span><strong>+${money(d.debit)}</strong></div>` : ""}${d.credit || d.debit ? `<div class="total-row emphasis"><span>Adjusted total</span><span>${money(d.adjusted_total)}</span></div>` : ""}${d.kind === "invoice" ? `<div class="total-row"><span>Paid</span><strong>${money(d.paid)}</strong></div><div class="total-row emphasis"><span>Balance due</span><span>${money(d.balance)}</span></div>` : ""}</div>${d.kind === "invoice" && d.state !== "void" ? `<div class="paper-notes"><h3>Payment information</h3>${b.bankAccount ? `<p>${E([b.bankName, b.bankHolder, b.bankAccount].filter(Boolean).join("\n"))}</p><p>Reference: ${E(d.number || "Not yet issued")}</p>` : "<p>Bank details are not configured. Contact Nawlogic before paying.</p>"}</div>` : ""}${d.terms ? `<div class="paper-notes"><h3>Terms</h3><p>${E(d.terms)}</p></div>` : ""}${d.notes ? `<div class="paper-notes"><h3>Notes</h3><p>${E(d.notes)}</p></div>` : ""}${slot("paper", d, publicView)}${publicView ? '<p class="field-hint">Business document. Not a validated MyInvois e-Invoice.</p>' : ""}</section>`;
+    c = d.client,
+    ext = d.ext?.documents || {};
+  const lang = d.language || "en",
+    t = labels(lang),
+    cur = d.currency || "MYR",
+    m = (v) => money(v, cur),
+    dl = (s) => dateIn(lang, s);
+  const priced = d.kind !== "delivery_order";
+  const items = d.items.filter((i) => !i.deposit_id);
+  const deducted = d.items.filter((i) => i.deposit_id).reduce((s, i) => s + i.amount, 0);
+  const deposits = [...new Set(d.items.filter((i) => i.deposit_id).map((i) => i.deposit_number))];
+  const showCode = items.some((i) => i.sku),
+    showUnit = items.some((i) => i.unit),
+    showDiscount = priced && items.some((i) => i.discount);
+  const wide = showCode || showUnit || showDiscount || !priced;
+  const custom = publicView
+    ? ext.custom || []
+    : (b.customFields || [])
+        .filter((f) => fieldApplies(f, d.kind) && d.meta?.custom?.[f.id])
+        .map((f) => ({ label: f.label, value: d.meta.custom[f.id], internal: f.show !== "pdf" }));
+  const logoId = b.logoFileId || (!publicView && S?.settings?.logoFileId);
+  const logoHtml = publicView
+    ? ext.logo
+      ? `<img class="logo" src="/api/guest/documents/${E(publicToken())}/logo" alt="${E(b.company)}">`
+      : logo()
+    : logoId
+      ? `<img class="logo" src="/api/files/${E(logoId)}" alt="${E(b.company)}">`
+      : logo();
+  const files = publicView
+    ? ext.list_attachments
+      ? ext.attachments || []
+      : []
+    : d.meta?.list_attachments
+      ? (d.attachments || []).filter((f) => f.visibility === "client")
+      : [];
+  const buyerTax =
+    b.pdfShowBuyerTax === false
+      ? ""
+      : [c.brn ? `${t("regIc")}: ${c.brn}` : "", c.tin ? `${t("tin")}: ${c.tin}` : ""].filter(Boolean).join("  |  ");
+  const cell = (i) => {
+    const meta = [i.quantity + (i.unit ? " " + i.unit : ""), priced ? "× " + m(i.rate) : "", i.discount ? "− " + m(i.discount) : ""]
+      .filter(Boolean)
+      .join(" ");
+    return `<tr>${showCode ? `<td class="line-code">${E(i.sku || "")}</td>` : ""}<td class="quote-scope">${E(i.description)}<small class="mobile-line-meta">${E(meta)}</small></td><td class="num line-qty">${i.quantity}</td>${showUnit ? `<td class="line-unit">${E(i.unit || "")}</td>` : ""}${priced ? `<td class="num line-rate">${m(i.rate)}</td>${showDiscount ? `<td class="num line-disc">${i.discount ? m(i.discount) + (i.discount_percent ? `<small>${E(i.discount_percent)}%</small>` : "") : ""}</td>` : ""}<td class="num">${m(i.amount)}</td>` : ""}</tr>`;
+  };
+  const details = [
+    `${t("issueDate")}: ${dl(d.issue_date)}`,
+    `${dueLabelFor(t, d.kind)}: ${dl(d.due_date)}`,
+    `${t("currency")}: ${cur}`,
+    cur !== "MYR" && d.fx_rate ? `${t("exchangeRate")}: 1 ${cur} = ${d.fx_rate} MYR` : "",
+    d.links?.source?.number || d.source_number ? `${t("basedOn")}: ${d.links?.source?.number || d.source_number}` : "",
+    ...deposits.map((n) => `${t("deposit")}: ${n}`),
+  ]
+    .filter(Boolean)
+    .map(E)
+    .join("<br>");
+  const customHtml = custom
+    .map((f) => `<br>${E(f.label)}: ${E(f.value)}${f.internal ? ' <span class="badge">Internal</span>' : ""}`)
+    .join("");
+  const totals = priced
+    ? `<div class="totals"><div class="total-row"><span>${t("subtotal")}</span><strong>${m(d.subtotal)}</strong></div>${d.discount ? `<div class="total-row"><span>${t("discount")}</span><strong>−${m(d.discount)}</strong></div>` : ""}${deducted ? `<div class="total-row"><span>${t("lessDepositShort")}</span><strong>${m(deducted)}</strong></div>` : ""}${taxRows(d.items, cur, t)}<div class="total-row emphasis"><span>${d.kind === "invoice" || d.kind === "quote" ? t("originalTotal") : t("total")}</span><span>${m(d.total)}</span></div>${d.credit ? `<div class="total-row"><span>${t("creditNotes")}</span><strong>−${m(d.credit)}</strong></div>` : ""}${d.debit ? `<div class="total-row"><span>${t("debitNotes")}</span><strong>+${m(d.debit)}</strong></div>` : ""}${d.credit || d.debit ? `<div class="total-row emphasis"><span>${t("adjustedTotal")}</span><span>${m(d.adjusted_total)}</span></div>` : ""}${d.kind === "invoice" ? `<div class="total-row"><span>${t("paid")}</span><strong>${m(d.paid)}</strong></div><div class="total-row emphasis"><span>${t("balanceDue")}</span><span>${m(d.balance)}</span></div>` : ""}</div>`
+    : "";
+  const deposit =
+    d.kind === "quote" && d.deposit?.total
+      ? `<div class="paper-notes"><h3>${t("depositRequired")}</h3><p>${E(t("depositOf", { value: d.deposit.type === "percent" ? d.deposit.value + "%" : "", amount: m(d.deposit.total) + (d.deposit.tax ? ` (${t("inclSst")})` : "") }).replace("  ", " "))}</p></div>`
+      : "";
+  const plan = (d.instalments || []).length
+    ? `<div class="paper-notes"><h3>${t("instalmentPlan")}</h3><div class="instalment-list">${d.instalments.map((i) => `<div class="instalment-row"><span>${i.seq}. ${dl(i.due_date)}</span><strong>${m(i.amount)}</strong><span>${E(t("ins_" + i.status))}</span></div>`).join("")}</div>${d.next_due_date ? `<p>${E(t("nextPaymentDue", { amount: m(d.next_due_amount), date: dl(d.next_due_date) }))}</p>` : ""}</div>`
+    : "";
+  const signatures =
+    d.kind === "delivery_order"
+      ? `<div class="paper-notes signature-grid">${[t("deliveredBy"), t("receivedBy")].map((h, n) => `<div><h3>${E(h)}</h3>${n ? `<p>${E(t("goodsReceived"))}</p>` : ""}<div class="signature-line">${E(t("signature"))}</div><div class="signature-line">${E(t("name"))}</div><div class="signature-line">${E(t("date"))}</div></div>`).join("")}</div>`
+      : "";
+  const bank =
+    (d.kind === "invoice" || d.kind === "proforma") && d.state !== "void" && b.pdfShowBank !== false
+      ? `<div class="paper-notes"><h3>${t("paymentInformation")}</h3>${b.bankAccount ? `<p>${E([b.bankName, b.bankHolder, b.bankAccount].filter(Boolean).join("\n"))}</p><p>${t("reference")}: ${E(d.number || t("notYetIssued"))}</p>` : `<p>${t("bankMissing")}</p>`}</div>`
+      : "";
+  return `<section class="panel invoice-paper" lang="${lang === "zh" ? "zh-Hans" : lang}"><div class="paper-head"><div>${logoHtml}<div class="paper-company"><strong>${E(b.company)}</strong><p>${E([b.registration ? `${t("regShort")}: ${b.registration}` : "", b.address, b.email, b.phone].filter(Boolean).join("\n"))}</p></div></div><div><h2>${E(titleFor(lang, d.kind))}</h2><p>${E(d.number || t("draft"))}</p></div></div>${b.demo ? `<div class="notice">${t("demoShort")}</div>` : ""}<div class="billing-grid"><div><div class="eyebrow">${d.kind === "delivery_order" ? t("deliverTo") : t("billTo")}</div><strong>${E(c.name)}</strong><p>${E([c.contact, c.address, buyerTax].filter(Boolean).join("\n"))}</p></div><div><div class="eyebrow">${t("documentDetails")}</div><p>${details}${customHtml}</p></div></div><div class="table-wrap"><table class="${wide ? "wide-lines" : ""}${priced ? "" : " no-price-lines"}"><thead><tr>${showCode ? `<th class="line-code">${t("code")}</th>` : ""}<th>${t("description")}</th><th class="num line-qty">${t("qty")}</th>${showUnit ? `<th class="line-unit">${t("unit")}</th>` : ""}${priced ? `<th class="num line-rate">${t("rate")}</th>${showDiscount ? `<th class="num line-disc">${t("discount")}</th>` : ""}<th class="num">${t("amount")}</th>` : ""}</tr></thead><tbody>${items.map(cell).join("")}</tbody></table></div>${totals}${deposit}${plan}${bank}${d.terms && b.pdfShowTerms !== false ? `<div class="paper-notes"><h3>${t("terms")}</h3><p>${E(d.terms)}</p></div>` : ""}${d.notes && b.pdfShowNotes !== false ? `<div class="paper-notes"><h3>${t("notes")}</h3><p>${E(d.notes)}</p></div>` : ""}${files.length ? `<div class="paper-notes"><h3>${t("attachments")}</h3><p>${files.map((f) => E(f.name)).join("\n")}</p></div>` : ""}${signatures}${slot("paper", d, publicView)}${publicView ? `<p class="field-hint">${t("businessDocument")}</p>` : ""}</section>`;
 }
-function taxRows(items) {
+function taxRows(items, cur = "MYR", t = labels("en")) {
   const by = new Map();
   for (const i of items)
     if (i.tax_rate) by.set(i.tax_rate, (by.get(i.tax_rate) || 0) + (i.tax || 0));
   return [...by]
     .sort((a, b) => a[0] - b[0])
-    .map(([r, v]) => `<div class="total-row"><span>SST ${r}%</span><strong>${money(v)}</strong></div>`)
+    .map(([r, v]) => `<div class="total-row"><span>${t("sst")} ${r}%</span><strong>${money(v, cur)}</strong></div>`)
     .join("");
 }
 function sstPanel() {
@@ -487,6 +629,7 @@ function emailPrefill(kind, record, values) {
 function documentView(id) {
   const d = S.documents.find((d) => d.id === id);
   if (!d) return empty("Document not found");
+  const cur = d.currency || "MYR";
   const actions =
     (d.state === "draft"
       ? button("Edit draft", "edit-document", id) +
@@ -501,12 +644,8 @@ function documentView(id) {
     `<a class="btn" href="/api/documents/${id}/pdf">${icon("download")} PDF</a>`;
   const events = S.audit.filter((a) => a.entity_id === id).slice(0, 8);
   return (
-    heading(
-      d.number || `Draft ${d.kind === "quote" ? "quotation" : "invoice"}`,
-      d.client.name,
-      actions,
-    ) +
-    `<div class="doc-grid">${paper(d)}<div class="stack">${advanced.documentExtras(d)}${slot("documentPanels", d)}<section class="panel"><div class="panel-head"><h2>Document status</h2>${badge(d.status)}</div><div class="total-row"><span>Document total</span><strong>${money(d.total)}</strong></div>${d.kind === "invoice" ? `<div class="total-row"><span>Confirmed payments</span><strong>${money(d.paid)}</strong></div><div class="total-row emphasis"><span>Balance</span><span>${money(d.balance)}</span></div>` : ""}${d.state === "draft" ? '<p class="field-hint">Review the client, dates, amounts and terms before issuing. Issuing locks the document.</p>' : ""}${d.kind === "invoice" && d.state === "issued" && d.balance > 0 ? `<div class="actions mt22">${button("Record payment", "record-payment", id, true, "plus")}</div>` : ""}${d.kind === "quote" && d.state === "accepted" ? `<p class="field-hint">Accepted by ${E(d.accepted_name)}</p><div class="mt22">${button("Create / open invoice", "convert-quote", id, true)}</div>` : ""}${d.token_hash ? `<div class="mt22">${button("Revoke client link", "revoke-link", id)}</div>` : ""}${d.state !== "void" ? `<div class="mt22">${button("Void document", "void-document", id)}</div>` : ""}</section>${
+    heading(d.number || `Draft ${kindUI(d.kind).one}`, d.client.name, actions) +
+    `<div class="doc-grid">${paper(d)}<div class="stack">${advanced.documentExtras(d)}${slot("documentPanels", d)}<section class="panel"><div class="panel-head"><h2>Document status</h2>${badge(d.status)}</div>${d.kind === "delivery_order" ? "" : `<div class="total-row"><span>Document total</span><strong>${money(d.total, cur)}</strong></div>`}${d.kind === "invoice" ? `<div class="total-row"><span>Confirmed payments</span><strong>${money(d.paid, cur)}</strong></div><div class="total-row emphasis"><span>Balance</span><span>${money(d.balance, cur)}</span></div>${cur !== "MYR" ? `<p class="field-hint">${E(cur)} at ${E(d.fx_rate)} MYR = ${money(myr(d.balance, d))}</p>` : ""}` : ""}${d.state === "draft" ? '<p class="field-hint">Review the client, dates, amounts and terms before issuing. Issuing locks the document.</p>' : ""}${d.kind === "invoice" && d.state === "issued" && d.balance > 0 ? `<div class="actions mt22">${button("Record payment", "record-payment", id, true, "plus")}</div>` : ""}${d.kind === "quote" && d.state === "accepted" ? `<p class="field-hint">Accepted by ${E(d.accepted_name)}</p><div class="mt22">${button("Create / open invoice", "convert-quote", id, true)}</div>` : ""}${d.token_hash ? `<div class="mt22">${button("Revoke client link", "revoke-link", id)}</div>` : ""}${d.state !== "void" ? `<div class="mt22">${button("Void document", "void-document", id)}</div>` : ""}</section>${
       d.proofs.filter((p) => p.status === "pending").length
         ? `<section class="panel"><div class="panel-head"><h2>Awaiting review</h2>${badge("Pending review")}</div>${d.proofs
             .filter((p) => p.status === "pending")
@@ -516,7 +655,7 @@ function documentView(id) {
             )
             .join("")}</section>`
         : ""
-    }${d.kind === "invoice" ? `<section class="panel"><div class="panel-head"><h2>Payment history</h2></div>${d.payments.map((p) => `<div class="payment"><div class="payment-top"><strong>${money(p.amount)}</strong>${badge(p.reversed ? "Reversed" : "Confirmed")}</div><p>${dateLabel(p.paid_date)} / ${E(p.method)}<br>Reference: ${E(p.reference)}</p>${p.reversed ? `<p>Reversal: ${E(p.reversal_reason)}</p>` : `<div class="payment-actions"><a href="/api/payments/${p.id}/receipt">Receipt PDF</a><button class="link-button red-text" data-action="reverse-payment" data-id="${p.id}">Reverse</button></div>`}</div>`).join("") || "<p>No payments recorded yet.</p>"}</section>` : ""}${emailHistory(S.emailLog.filter((m) => m.document_id === id))}<section class="panel"><div class="panel-head"><h2>Activity</h2></div><div class="timeline">${events.map((e) => `<div class="timeline-item"><strong>${E(e.action.replaceAll(".", " "))}</strong><small>${timeLabel(e.created)} / ${E(e.actor || "system")}</small>${e.detail ? `<p>${E(e.detail)}</p>` : ""}</div>`).join("") || "<p>No activity yet.</p>"}</div></section></div></div>`
+    }${d.kind === "invoice" ? `<section class="panel"><div class="panel-head"><h2>Payment history</h2></div>${d.payments.map((p) => `<div class="payment"><div class="payment-top"><strong>${money(p.amount, cur)}</strong>${badge(p.reversed ? "Reversed" : "Confirmed")}</div><p>${dateLabel(p.paid_date)} / ${E(p.method)}<br>Reference: ${E(p.reference)}</p>${p.reversed ? `<p>Reversal: ${E(p.reversal_reason)}</p>` : `<div class="payment-actions"><a href="/api/payments/${p.id}/receipt">Receipt PDF</a><button class="link-button red-text" data-action="reverse-payment" data-id="${p.id}">Reverse</button></div>`}</div>`).join("") || "<p>No payments recorded yet.</p>"}</section>` : ""}${emailHistory(S.emailLog.filter((m) => m.document_id === id))}<section class="panel"><div class="panel-head"><h2>Activity</h2></div><div class="timeline">${events.map((e) => `<div class="timeline-item"><strong>${E(e.action.replaceAll(".", " "))}</strong><small>${timeLabel(e.created)} / ${E(e.actor || "system")}</small>${e.detail ? `<p>${E(e.detail)}</p>` : ""}</div>`).join("") || "<p>No activity yet.</p>"}</div></section></div></div>`
   );
 }
 function renderRoute() {
@@ -542,6 +681,15 @@ function renderRoute() {
       break;
     case "quotes":
       html = documentList("quote");
+      break;
+    case "proformas":
+      html = documentList("proforma");
+      break;
+    case "sales-orders":
+      html = documentList("sales_order");
+      break;
+    case "delivery-orders":
+      html = documentList("delivery_order");
       break;
     case "clients":
       html = clients();
@@ -574,10 +722,7 @@ function renderRoute() {
       break;
     case "document":
       html = documentView(id);
-      active =
-        S.documents.find((d) => d.id === id)?.kind === "quote"
-          ? "quotes"
-          : "invoices";
+      active = kindUI(S.documents.find((d) => d.id === id)?.kind).list;
       break;
     default: {
       const owner = plugins.find((p) => p.pages?.[page]);
@@ -618,9 +763,9 @@ function serviceForm(id) {
     `<form data-form="service" data-id="${E(id || "")}">${input("Service name", "name", s.name, "text", true, 'maxlength="160"')}${area("Description", "description", s.description, 240)}<div class="form-grid">${select(
       "Billing unit",
       "unit",
-      ["Project", "Month", "Hour", "Day", "Item"].map((v) => [v, v]),
+      [...new Set(["Project", "Month", "Hour", "Day", "Item", "Unit", "Set", "Lot", s.unit])].map((v) => [v, v]),
       s.unit,
-    )}${input("Rate (MYR)", "rate", dec(s.rate), "number", true, 'min="0" max="99999999.99" step="0.01"')}${select(
+    )}${input("Item code / SKU (optional)", "sku", s.sku || "", "text", false, 'maxlength="40"')}${input("Rate (MYR)", "rate", dec(s.rate), "number", true, 'min="0" max="99999999.99" step="0.01"')}${select(
       "Default SST",
       "tax_rate",
       TAX_RATES.map((r) => [String(r), r ? r + "%" : "No SST"]),
@@ -638,9 +783,14 @@ function serviceForm(id) {
 }
 const TAX_RATES = [0, 5, 6, 8, 10];
 const sstEnabled = () => !!S.settings.sstNumber;
-function lineMarkup(i = { description: "", quantity: 1, rate: 0 }) {
+const editorKind = () => $('form[data-form="editor"]')?.dataset.kind || "invoice";
+// One editor line: description, quantity, rate and SST, then code, unit and line discount.
+function lineMarkup(i = { description: "", quantity: 1, rate: 0 }, kind = editorKind()) {
   const tax = Number(i.tax_rate || 0);
-  return `<div class="line-item"><textarea aria-label="Line description" class="item-description" rows="1" maxlength="240" required>${E(i.description)}</textarea><input aria-label="Quantity" class="item-quantity" type="number" min="0.01" max="99999.99" step="0.01" value="${i.quantity}" required><input aria-label="Rate MYR" class="item-rate" type="number" min="0" max="99999999.99" step="0.01" value="${dec(i.rate)}" required>${sstEnabled() ? `<select aria-label="SST rate" class="item-tax">${TAX_RATES.map((r) => `<option value="${r}" ${r === tax ? "selected" : ""}>${r ? r + "%" : "No SST"}</option>`).join("")}</select>` : ""}<button class="btn ghost" type="button" data-action="remove-line" aria-label="Remove item">${icon("close")}</button></div>`;
+  const priced = kind !== "delivery_order";
+  const percent = !!i.discount_percent;
+  const off = i.discount_percent || (i.discount ? dec(i.discount) : i.discount_amount || "");
+  return `<div class="line-item"><textarea aria-label="Line description" class="item-description" rows="1" maxlength="240" required>${E(i.description)}</textarea><input aria-label="Quantity" class="item-quantity" type="number" min="0.01" max="99999.99" step="0.01" value="${i.quantity}" required>${priced ? `<input aria-label="Rate" class="item-rate" type="number" min="0" max="99999999.99" step="0.01" value="${dec(i.rate)}" required>` : ""}${priced && sstEnabled() ? `<select aria-label="SST rate" class="item-tax">${TAX_RATES.map((r) => `<option value="${r}" ${r === tax ? "selected" : ""}>${r ? r + "%" : "No SST"}</option>`).join("")}</select>` : ""}<button class="btn ghost" type="button" data-action="remove-line" aria-label="Remove item">${icon("close")}</button><div class="line-extra"><input aria-label="Item code" class="item-sku" maxlength="40" placeholder="Code" value="${E(i.sku || "")}"><input aria-label="Unit" class="item-unit" maxlength="30" placeholder="Unit" value="${E(i.unit || "")}">${priced ? `<span class="line-discount"><input aria-label="Line discount" class="item-discount" type="number" min="0" step="0.01" placeholder="Line discount" value="${E(off)}"><select aria-label="Discount type" class="item-discount-type"><option value="amount" ${percent ? "" : "selected"}>Amount</option><option value="percent" ${percent ? "selected" : ""}>%</option></select></span>` : ""}<input type="hidden" class="item-service" value="${E(i.service_id || "")}"></div></div>`;
 }
 function documentForm(kind = "invoice", id = "", clientId = "") {
   if (!S.clients.length) {
@@ -651,26 +801,36 @@ function documentForm(kind = "invoice", id = "", clientId = "") {
   const d = S.documents.find((d) => d.id === id);
   const c =
     S.clients.find((c) => c.id === (d?.client_id || clientId)) || S.clients[0];
+  const priced = kind !== "delivery_order";
   const value = d || {
+    kind,
     client_id: c.id,
     issue_date: S.today,
-    due_date: addDays(S.today, c.terms),
+    due_date: addDays(S.today, kind === "delivery_order" ? 0 : ["invoice", "quote"].includes(kind) ? c.terms : 14),
     items: [{ description: "", quantity: 1, rate: 0 }],
     discount: 0,
     notes: "",
-    terms: S.settings.paymentTerms,
+    terms: priced ? S.settings.paymentTerms : "",
+    currency: c.currency || "MYR",
+    language: c.language || S.settings.documentLanguage || "en",
+    fx_rate: "",
+    meta: {},
   };
+  const tax = priced && sstEnabled();
   showModal(
-    d ? "Edit draft" : kind === "quote" ? "New quotation" : "New invoice",
-    `<form data-form="editor" data-id="${E(id)}" data-kind="${kind}"><div class="editor-grid ${sstEnabled() ? "with-tax" : ""}"><div><div class="form-grid"><div class="span-2">${select("Bill to", "client_id", clientOptions(value.client_id), value.client_id)}</div>${input("Issue date", "issue_date", value.issue_date, "date", true)}${input(kind === "quote" ? "Valid until" : "Due date", "due_date", value.due_date, "date", true)}</div><div class="line-head"><span>DESCRIPTION</span><span>QTY</span><span>RATE (MYR)</span>${sstEnabled() ? "<span>SST</span>" : ""}<span></span></div><div id="line-items">${value.items.map(lineMarkup).join("")}</div><div class="actions mt22">${button("Custom item", "add-line", "", "", "plus")}<label class="catalog-picker"><span class="sr-only">Add service from catalog</span><select id="catalog-service"><option value="">Add from catalog...</option>${S.services
+    d ? "Edit draft" : "New " + kindUI(kind).one,
+    `<form data-form="editor" data-id="${E(id)}" data-kind="${kind}"><div class="editor-grid ${tax ? "with-tax" : ""} ${priced ? "" : "no-price"}"><div><div class="form-grid"><div class="span-2">${select(kind === "delivery_order" ? "Deliver to" : "Bill to", "client_id", clientOptions(value.client_id), value.client_id)}</div>${input("Issue date", "issue_date", value.issue_date, "date", true)}${input(dueLabelFor(labels("en"), kind), "due_date", value.due_date, "date", true)}</div><div class="line-head"><span>DESCRIPTION</span><span>QTY</span>${priced ? '<span class="rate-head">RATE</span>' : ""}${tax ? "<span>SST</span>" : ""}<span></span></div><div id="line-items">${value.items
+      .filter((i) => !i.deposit_id)
+      .map((i) => lineMarkup(i, kind))
+      .join("")}</div>${value.items.some((i) => i.deposit_id) ? `<p class="field-hint">The deposit already invoiced (${E([...new Set(value.items.filter((i) => i.deposit_id).map((i) => i.deposit_number))].join(", "))}) is deducted when you save.</p>` : ""}<div class="actions mt22">${button("Custom item", "add-line", "", "", "plus")}<label class="catalog-picker"><span class="sr-only">Add service from catalog</span><select id="catalog-service"><option value="">Add from catalog...</option>${S.services
       .filter((s) => s.active)
       .map(
         (s) =>
-          `<option value="${s.id}">${E(s.name)} / ${money(s.rate)}</option>`,
+          `<option value="${s.id}">${E(s.sku ? s.sku + " · " : "")}${E(s.name)} / ${money(s.rate)}</option>`,
       )
       .join(
         "",
-      )}</select></label></div><div class="mt22">${slot("documentFields", value, kind)}${input("Discount (MYR)", "discount", dec(value.discount), "number", true, 'min="0" max="99999999.99" step="0.01"')}${area("Payment / project terms", "terms", value.terms)}${area("Notes", "notes", value.notes, 2000)}</div></div><aside class="preview"><div class="eyebrow mb22">Live preview / draft</div><div id="live-preview"></div><p class="field-hint">${sstEnabled() ? "MYR. SST is calculated per line after discount. The saved document is authoritative." : "MYR. Add your SST registration number in Settings to charge SST."} This preview is not a validated e-Invoice.</p></aside></div>${formEnd("Save draft & review")}</form>`,
+      )}</select></label></div><div class="mt22">${slot("documentFields", value, kind)}${priced ? input("Document discount", "discount", dec(value.discount), "number", true, 'min="0" max="99999999.99" step="0.01"') : ""}${area(priced ? "Payment / project terms" : "Delivery terms", "terms", value.terms)}${area("Notes", "notes", value.notes, 2000)}</div></div><aside class="preview"><div class="eyebrow mb22">Live preview / draft</div><div id="live-preview"></div><p class="field-hint">${!priced ? "Delivery orders list items and quantities only." : sstEnabled() ? "SST is calculated per line after line and document discounts. The saved document is authoritative." : "Add your SST registration number in Settings to charge SST."} This preview is not a validated e-Invoice.</p></aside></div>${formEnd("Save draft & review")}</form>`,
     true,
   );
   updatePreview();
@@ -680,71 +840,67 @@ function editorData(form) {
   return {
     kind: form.dataset.kind,
     ...b,
-    items: $$(".line-item", form).map((row) => ({
-      description: $(".item-description", row).value,
-      quantity: $(".item-quantity", row).value,
-      rate: $(".item-rate", row).value,
-      tax_rate: Number($(".item-tax", row)?.value || 0),
-    })),
+    items: $$(".line-item", form).map((row) => {
+      const item = {
+        description: $(".item-description", row).value,
+        quantity: $(".item-quantity", row).value,
+        rate: $(".item-rate", row)?.value ?? "0",
+        tax_rate: Number($(".item-tax", row)?.value || 0),
+        sku: $(".item-sku", row)?.value.trim() || "",
+        unit: $(".item-unit", row)?.value.trim() || "",
+      };
+      const service = $(".item-service", row)?.value;
+      if (service) item.service_id = service;
+      const off = $(".item-discount", row)?.value.trim();
+      if (off) item[$(".item-discount-type", row).value === "percent" ? "discount_percent" : "discount_amount"] = off;
+      return item;
+    }),
   };
 }
+// The same arithmetic as the server (public/ext/documents-calc.mjs).
 function updatePreview() {
   const form = $('form[data-form="editor"]');
   if (!form) return;
   const b = editorData(form);
-  const items = b.items.map((i) => ({
-    ...i,
-    amount: Math.max(
-      0,
-      Math.round(
-        (Math.round(Number(i.rate || 0) * 100) *
-          Math.round(Number(i.quantity || 0) * 100)) /
-          100,
-      ) || 0,
-    ),
-  }));
-  const subtotal = items.reduce((s, i) => s + i.amount, 0);
-  const discount = Math.round(Number(b.discount || 0) * 100);
-  // Mirrors the server's allocateDiscount: shares by line amount, remainders by largest fraction.
-  const off = Math.min(Math.max(discount, 0), subtotal);
-  const shares = items.map((i) => (subtotal ? Number((BigInt(off) * BigInt(i.amount)) / BigInt(subtotal)) : 0));
-  if (subtotal) {
-    let left = off - shares.reduce((s, v) => s + v, 0);
-    const order = items
-      .map((i, n) => [(BigInt(off) * BigInt(i.amount)) % BigInt(subtotal), i.amount, n])
-      .sort((x, y) => (x[0] === y[0] ? y[1] - x[1] : x[0] < y[0] ? 1 : -1));
-    for (const [, a, n] of order) {
-      if (!left) break;
-      if (shares[n] < a) {
-        shares[n]++;
-        left--;
-      }
-    }
-  }
-  const taxes = new Map();
-  items.forEach((i, n) => {
-    if (i.tax_rate)
-      taxes.set(
-        i.tax_rate,
-        (taxes.get(i.tax_rate) || 0) +
-          Math.round(((i.amount - shares[n]) * i.tax_rate) / 100),
-      );
+  const priced = b.kind !== "delivery_order";
+  const cur = b.currency || "MYR";
+  const lines = b.items.map((i) => {
+    const rate = priced ? Math.max(0, Math.round(Number(i.rate || 0) * 100) || 0) : 0;
+    const q = Math.max(0, Math.round(Number(i.quantity || 0) * 100) || 0);
+    const gross = Math.round((rate * q) / 100);
+    let off = 0;
+    if (priced && i.discount_percent) {
+      const bp = basisPoints(i.discount_percent);
+      off = bp !== null && bp <= 10000 ? percentOf(gross, bp) : 0;
+    } else if (priced && i.discount_amount)
+      off = Math.min(gross, Math.max(0, Math.round(Number(i.discount_amount) * 100) || 0));
+    return { gross, discount: off, tax_rate: priced ? Number(i.tax_rate || 0) : 0 };
   });
-  const tax = [...taxes.values()].reduce((s, v) => s + v, 0);
+  const existing = S.documents.find((d) => d.id === form.dataset.id);
+  const deductions = priced ? (existing?.items || []).filter((i) => i.deposit_id) : [];
+  const subtotal = lines.reduce((s, l) => s + l.gross - l.discount, 0);
+  const discount = priced ? Math.min(subtotal, Math.max(0, Math.round(Number(b.discount || 0) * 100) || 0)) : 0;
+  const r = totals(lines, discount, deductions);
+  const taxes = new Map();
+  [...r.lines.map((l, n) => ({ tax_rate: lines[n].tax_rate, tax: l.tax })), ...deductions].forEach((x) => {
+    if (x.tax_rate) taxes.set(x.tax_rate, (taxes.get(x.tax_rate) || 0) + x.tax);
+  });
+  const deducted = deductions.reduce((s, x) => s + x.amount, 0);
   $("#live-preview").innerHTML =
-    `<div class="preview-paper">${logo()}<h3>${E(S.settings.company)}</h3><p class="field-hint">${E(S.clients.find((c) => c.id === b.client_id)?.name || "Select a client")}<br>Due / valid until: ${E(b.due_date)}</p><div class="mt22">${items.map((i) => `<div class="preview-row"><span>${E(i.description || "New line item")}</span><strong>${money(i.amount)}</strong></div>`).join("")}</div>${discount ? `<div class="preview-row"><span>Discount</span><strong>−${money(discount)}</strong></div>` : ""}${[...taxes].map(([r, v]) => `<div class="preview-row"><span>SST ${r}%</span><strong>${money(v)}</strong></div>`).join("")}<div class="preview-total"><span>Total</span><span class="teal">${money(subtotal - discount + tax)}</span></div></div>`;
+    `<div class="preview-paper">${logo()}<h3>${E(S.settings.company)}</h3><p class="field-hint">${E(S.clients.find((c) => c.id === b.client_id)?.name || "Select a client")}<br>${E(dueLabelFor(labels("en"), b.kind))}: ${E(b.due_date)}</p><div class="mt22">${b.items.map((i, n) => `<div class="preview-row"><span>${E(i.description || "New line item")}${lines[n].discount ? `<small>Line discount −${money(lines[n].discount, cur)}</small>` : ""}</span><strong>${priced ? money(r.lines[n].amount, cur) : E(`${i.quantity || 0} ${i.unit || ""}`)}</strong></div>`).join("")}</div>${priced ? `${discount ? `<div class="preview-row"><span>Discount</span><strong>−${money(discount, cur)}</strong></div>` : ""}${deducted ? `<div class="preview-row"><span>Less deposit</span><strong>${money(deducted, cur)}</strong></div>` : ""}${[...taxes].sort((x, y) => x[0] - y[0]).map(([rate, v]) => `<div class="preview-row"><span>SST ${rate}%</span><strong>${money(v, cur)}</strong></div>`).join("")}<div class="preview-total"><span>Total</span><span class="teal">${money(r.total, cur)}</span></div>` : ""}</div>`;
 }
 function paymentForm(id) {
   const d = S.documents.find((d) => d.id === id);
   if (!d || d.balance <= 0)
     return toast("This invoice has no remaining balance.", true);
+  const cur = d.currency || "MYR";
   showModal(
     "Record payment",
-    `<form data-form="payment" data-id="${id}"><div class="notice info"><p>${E(d.number)} / ${E(d.client.name)}<br>Remaining balance: <strong>${money(d.balance)}</strong></p></div><div class="form-grid">${input("Amount received (MYR)", "amount", dec(d.balance), "number", true, `min="0.01" max="${dec(d.balance)}" step="0.01"`)}${input("Date received", "paid_date", S.today, "date", true, `max="${S.today}"`)}${select(
+    `<form data-form="payment" data-id="${id}"><div class="notice info"><p>${E(d.number)} / ${E(d.client.name)}<br>Remaining balance: <strong>${money(d.balance, cur)}</strong></p></div><div class="form-grid">${input(`Amount received (${cur})`, "amount", dec(d.balance), "number", true, `min="0.01" max="${dec(d.balance)}" step="0.01"`)}${input("Date received", "paid_date", S.today, "date", true, `max="${S.today}"`)}${select(
       "Payment method",
       "method",
       ["Bank transfer", "Cash", "Card", "Other"].map((v) => [v, v]),
-    )}${input("Transaction reference", "reference", "", "text", true, 'maxlength="120"')}<div class="span-2">${area("Internal note", "note", "", 500)}</div>${d.proofs.some((p) => p.status === "pending") ? `<div class="span-2">${select("Match a client reference (optional)", "proof_id", [["", "No submitted reference"], ...d.proofs.filter((p) => p.status === "pending").map((p) => [p.id, p.reference])], "", false)}</div>` : ""}</div><label class="check-row"><input type="checkbox" name="confirmed" required> I have checked that this payment was received.</label>${formEnd("Confirm & create receipt")}</form>`,
+    )}${input("Transaction reference", "reference", "", "text", true, 'maxlength="120"')}${cur !== "MYR" ? `<div class="span-2">${input(`Exchange rate on the day (MYR per 1 ${cur})`, "fx_rate", d.fx_rate, "text", true, 'inputmode="decimal" pattern="\\d{1,6}(\\.\\d{1,6})?"')}<p class="field-hint">The receipt is recorded in ${E(cur)}; reports convert it to MYR at this rate.</p></div>` : ""}<div class="span-2">${area("Internal note", "note", "", 500)}</div>${d.proofs.some((p) => p.status === "pending") ? `<div class="span-2">${select("Match a client reference (optional)", "proof_id", [["", "No submitted reference"], ...d.proofs.filter((p) => p.status === "pending").map((p) => [p.id, p.reference])], "", false)}</div>` : ""}</div><label class="check-row"><input type="checkbox" name="confirmed" required> I have checked that this payment was received.</label>${formEnd("Confirm & create receipt")}</form>`,
   );
 }
 function reasonForm(title, type, id) {
@@ -804,6 +960,15 @@ async function runAction(action, id, el) {
       break;
     case "new-quote":
       documentForm("quote");
+      break;
+    case "new-proforma":
+      documentForm("proforma");
+      break;
+    case "new-sales-order":
+      documentForm("sales_order");
+      break;
+    case "new-delivery-order":
+      documentForm("delivery_order");
       break;
     case "edit-document": {
       const d = S.documents.find((d) => d.id === id);
@@ -906,7 +1071,7 @@ async function runAction(action, id, el) {
           "invoice_id",
           docs.map((d) => [
             d.id,
-            `${d.number} / ${d.client.name} / ${money(d.balance)}`,
+            `${d.number} / ${d.client.name} / ${money(d.balance, d.currency)}`,
           ]),
         )}${formEnd("Continue")}</form>`,
       );
@@ -1014,23 +1179,27 @@ async function runAction(action, id, el) {
       toast("Copy created as a new draft. Review the dates before issuing.");
       break;
     }
-    case "public-accept":
+    case "public-accept": {
+      const t = labels(publicDoc?.language);
       showModal(
-        "Accept quotation",
-        `<form data-form="accept">${input("Your full name", "name", "", "text", true, 'maxlength="120"')}<p>Please confirm that you agree to the scope, price and terms in this quotation.</p><label class="check-row mt22"><input type="checkbox" required> I agree to the quotation.</label>${formEnd("Accept quotation")}</form>`,
+        t("acceptQuotation"),
+        `<form data-form="accept">${input(t("yourName"), "name", "", "text", true, 'maxlength="120"')}<p>${t("agreeText")}</p><label class="check-row mt22"><input type="checkbox" required> ${t("agree")}</label>${errorBlock()}<div class="form-actions">${button(t("cancel"), "close-modal")}<button class="btn primary" type="submit">${E(t("acceptQuotation"))}</button></div></form>`,
       );
       break;
+    }
     case "public-pay": {
       const { url } = await api(`/public/${publicToken()}/checkout`, "POST", {});
       if (/^https:\/\//.test(url)) location.href = url;
       break;
     }
-    case "public-reference":
+    case "public-reference": {
+      const t = labels(publicDoc?.language);
       showModal(
-        "Submit payment reference",
-        `<form data-form="public-reference"><p>This reference will be reviewed by Nawlogic. Your invoice remains unpaid until the payment is confirmed.</p><div class="mt22">${input("Bank transaction reference", "reference", "", "text", true, 'maxlength="120"')}${area("Message (optional)", "note", "", 500)}</div>${formEnd("Submit reference")}</form>`,
+        t("submitReference"),
+        `<form data-form="public-reference"><p>${t("referenceText")}</p><div class="mt22">${input(t("bankReference"), "reference", "", "text", true, 'maxlength="120"')}${area(t("messageOptional"), "note", "", 500)}</div>${errorBlock()}<div class="form-actions">${button(t("cancel"), "close-modal")}<button class="btn primary" type="submit">${E(t("submitReference"))}</button></div></form>`,
       );
       break;
+    }
   }
 }
 function publicToken() {
@@ -1055,10 +1224,39 @@ async function renderPublic() {
   }
   try {
     const d = await api(`/public/${token}`);
+    publicDoc = d;
+    const lang = d.language || "en",
+      t = labels(lang),
+      cur = d.currency || "MYR",
+      m = (v) => money(v, cur),
+      dl = (s) => dateIn(lang, s);
+    document.documentElement.lang = lang === "zh" ? "zh-Hans" : lang;
     document.title = `${d.number} | Nawlogic`;
-    app.innerHTML = `<main class="public-wrap"><header class="public-header">${logo()}<span class="badge">Private client document</span></header><div class="public-top"><div><h1>${d.kind === "quote" ? "Quotation" : "Invoice"} ${E(d.number)}</h1><p>${E(d.client.name)} / ${badge(d.status)}</p></div><div class="actions"><a class="btn" href="/api/public/${token}/pdf">${icon("download")} Download PDF</a></div></div><div class="doc-grid">${paper(d, true)}<aside class="stack"><section class="balance-card"><p>${d.kind === "quote" ? "Quotation total" : "Balance due"}</p><div class="value">${money(d.kind === "quote" ? d.total : d.balance)}</div><p>${d.kind === "quote" ? "Valid until" : "Due"} ${dateLabel(d.due_date)}</p><p>Total ${money(d.adjusted_total ?? d.total)}${d.kind === "invoice" ? " / Paid " + money(d.paid) : ""}</p></section><section class="panel"><h2>${d.kind === "quote" ? "Your quotation" : "Payment information"}</h2>${d.kind === "quote" ? (d.state === "accepted" ? `<div class="notice info mt22"><p>Accepted by ${E(d.accepted_name)}. Nawlogic will follow up with the next step.</p></div>` : d.status === "Expired" ? '<p class="mt22">This quotation has expired. Contact Nawlogic for an updated quotation.</p>' : `<p class="mt22">Review the scope and terms. Accept when you are ready to proceed.</p><button class="btn primary full" data-action="public-accept">Accept quotation</button>`) : d.balance <= 0 ? `<div class="notice info mt22"><p>${d.status === "Credited" ? "This invoice is fully credited. No payment is due." : "Thank you. No further payment is due."}</p></div>` : `${d.online_payment ? `<p class="mt22">Pay ${money(d.balance)} now with online banking (FPX), card or DuitNow. The invoice is marked paid as soon as the payment is confirmed.</p><button class="btn primary full" data-action="public-pay">Pay online</button><h3 class="mt22">Or pay by bank transfer</h3>` : ""}<p class="mt22">${d.business.bankAccount ? E(d.business.bankName) + "<br>" + E(d.business.bankHolder) + "<br><strong>" + E(d.business.bankAccount) + "</strong>" : "Bank details are not configured. Contact Nawlogic before paying."}</p><p class="field-hint">Use ${E(d.number)} as the bank transfer reference.</p><button class="btn ${d.online_payment ? "" : "primary "}full" data-action="public-reference">Submit payment reference</button>`}${d.proofs.length ? `<div class="mt22">${d.proofs.map((p) => `<div class="payment"><strong>${E(p.reference)}</strong><p>${badge(p.status === "pending" ? "Pending review" : p.status === "confirmed" ? "Confirmed" : "Rejected")}</p></div>`).join("")}</div>` : ""}</section>${slot("publicPanels", d, token)}</aside></div><footer class="public-footer">Powered by Nawlogic · Keep your document link private.<br>Questions? Contact Nawlogic using the contact details on your document.</footer></main>`;
-    if (returned === "paid") toast("Payment received. Thank you.");
-    else if (returned) toast("Payment was not completed. You can try again or pay by bank transfer.", returned === "error");
+    const ext = d.ext?.documents || {};
+    const brand = ext.logo
+      ? `<img class="logo" src="/api/guest/documents/${E(token)}/logo" alt="${E(d.business.company)}">`
+      : logo();
+    const due = dueLabelFor(t, d.kind);
+    const card =
+      d.kind === "delivery_order"
+        ? `<section class="balance-card"><p>${t("deliveryDate")}</p><div class="value">${dl(d.due_date)}</div></section>`
+        : d.kind === "invoice"
+          ? `<section class="balance-card"><p>${t("balanceDue")}</p><div class="value">${m(d.balance)}</div><p>${d.next_due_date && d.instalments?.length ? E(t("nextPaymentDue", { amount: m(d.next_due_amount), date: dl(d.next_due_date) })) : `${t("due")} ${dl(d.due_date)}`}</p><p>${t("total")} ${m(d.adjusted_total ?? d.total)} / ${t("paid")} ${m(d.paid)}</p></section>`
+          : `<section class="balance-card"><p>${d.kind === "quote" ? t("quotationTotal") : t("documentTotal")}</p><div class="value">${m(d.total)}</div><p>${due} ${dl(d.due_date)}</p><p>${t("total")} ${m(d.adjusted_total ?? d.total)}</p></section>`;
+    const bankLines = d.business.bankAccount
+      ? E(d.business.bankName) + "<br>" + E(d.business.bankHolder) + "<br><strong>" + E(d.business.bankAccount) + "</strong>"
+      : E(t("bankMissing"));
+    let info;
+    if (d.kind === "quote")
+      info = `<h2>${t("yourQuotation")}</h2>${d.deposit?.total ? `<p class="mt22">${E(t("depositOf", { value: d.deposit.type === "percent" ? d.deposit.value + "%" : "", amount: m(d.deposit.total) }).replace("  ", " "))}</p>` : ""}${d.state === "accepted" ? `<div class="notice info mt22"><p>${E(t("acceptedBy", { name: d.accepted_name }))}</p></div>` : d.status === "Expired" ? `<p class="mt22">${t("quoteExpired")}</p>` : `<p class="mt22">${t("reviewAccept")}</p><button class="btn primary full" data-action="public-accept">${t("acceptQuotation")}</button>`}`;
+    else if (d.kind === "invoice")
+      info = `<h2>${t("paymentInformation")}</h2>${d.balance <= 0 ? `<div class="notice info mt22"><p>${d.status === "Credited" ? t("fullyCredited") : t("thankYou")}</p></div>` : `${d.online_payment && cur === "MYR" ? `<p class="mt22">${E(t("payOnline", { amount: m(d.balance) }))}</p><button class="btn primary full" data-action="public-pay">${t("payOnlineButton")}</button><h3 class="mt22">${t("orBank")}</h3>` : ""}<p class="mt22">${bankLines}</p><p class="field-hint">${E(t("useReference", { number: d.number }))}</p><button class="btn ${d.online_payment && cur === "MYR" ? "" : "primary "}full" data-action="public-reference">${t("submitReference")}</button>`}${d.proofs.length ? `<div class="mt22">${d.proofs.map((p) => `<div class="payment"><strong>${E(p.reference)}</strong><p>${badge(p.status === "pending" ? "Pending review" : p.status === "confirmed" ? "Confirmed" : "Rejected", p.status === "pending" ? t("pendingReview") : p.status === "confirmed" ? t("confirmed") : t("rejected"))}</p></div>`).join("")}</div>` : ""}`;
+    else if (d.kind === "proforma")
+      info = `<h2>${t("paymentInformation")}</h2><p class="mt22">${t("proformaNote")}</p>${d.business.pdfShowBank === false ? "" : `<p class="mt22">${bankLines}</p><p class="field-hint">${E(t("useReference", { number: d.number }))}</p>`}`;
+    else info = `<h2>${t("yourDocument")}</h2><p class="mt22">${d.kind === "sales_order" ? t("orderNote") : t("deliveryNote")}</p>`;
+    app.innerHTML = `<main class="public-wrap"><header class="public-header">${brand}<span class="badge">${t("privateDocument")}</span></header><div class="public-top"><div><h1>${E(t("kind_" + d.kind))} ${E(d.number)}</h1><p>${E(d.client.name)} / ${badge(d.status, statusLabel(lang, d.status))}</p></div><div class="actions"><a class="btn" href="/api/public/${token}/pdf">${icon("download")} ${t("downloadPdf")}</a></div></div><div class="doc-grid">${paper(d, true)}<aside class="stack">${card}<section class="panel">${info}</section>${slot("publicPanels", d, token)}</aside></div><footer class="public-footer">${t("poweredBy")}<br>${t("questions")}</footer></main>`;
+    if (returned === "paid") toast(t("paymentDone"));
+    else if (returned) toast(t("paymentNotDone"), returned === "error");
   } catch (e) {
     app.innerHTML = `<main class="error-page">${logo()}<h1>This document link is unavailable.</h1><p>${E(e.message)} Contact Nawlogic for a new link.</p></main>`;
   }
@@ -1231,7 +1429,7 @@ document.addEventListener("input", (event) => {
     search = event.target.value;
     page = 0;
     $("#document-table").innerHTML = documentTable(
-      filteredDocs(location.hash.includes("quotes") ? "quote" : "invoice"),
+      filteredDocs(event.target.dataset.kind || "invoice"),
     );
   } else if (event.target.closest('form[data-form="editor"]')) updatePreview();
 });
@@ -1245,6 +1443,9 @@ document.addEventListener("change", (event) => {
         quantity: 1,
         rate: s.rate,
         tax_rate: s.tax_rate,
+        service_id: s.id,
+        sku: s.sku,
+        unit: s.unit,
       });
     } else
       $("#line-items").insertAdjacentHTML(
@@ -1254,6 +1455,9 @@ document.addEventListener("change", (event) => {
           quantity: 1,
           rate: s.rate,
           tax_rate: s.tax_rate,
+          service_id: s.id,
+          sku: s.sku,
+          unit: s.unit,
         }),
       );
     event.target.value = "";

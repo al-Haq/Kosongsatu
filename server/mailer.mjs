@@ -467,7 +467,11 @@ export class Mailer {
       for (const d of due) {
         const stage = dueStage(d.next_due_date || d.due_date, asOf, stages);
         if (!stage) continue;
-        const dedupeKey = `reminder:${d.id}:${stage.key}`;
+        // Each instalment date gets its own reminders, once each.
+        const plan = d.instalments?.length > 0 && d.next_due_date;
+        const dedupeKey = plan
+          ? `reminder:${d.id}:${d.next_due_date}:${stage.key}`
+          : `reminder:${d.id}:${stage.key}`;
         const done = this.store.db.prepare("SELECT status FROM email_log WHERE dedupe_key=?").get(dedupeKey);
         if (done && done.status !== "failed") continue;
         const use = stage.at > 0 ? "reminder_after" : "reminder_before";
@@ -533,7 +537,11 @@ export function attachMail(Store) {
       const from = b.from_date ? date(b.from_date) : addDays(to, -90);
       check(from <= to, "Choose a valid statement period.");
       const docs = this.documents().filter(
-        (d) => d.client_id === cid && d.kind === "invoice" && d.state === "issued",
+        (d) =>
+          d.client_id === cid &&
+          d.kind === "invoice" &&
+          d.state === "issued" &&
+          (d.currency || "MYR") === (b.currency || "MYR"),
       );
       const entries = [];
       for (const d of docs) {
