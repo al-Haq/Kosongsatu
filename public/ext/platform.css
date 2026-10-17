@@ -1,1 +1,162 @@
 /* Platform: outgoing webhooks, data import, installable app, invoices from plain language, hosting and one-command install. */
+
+/* Quick invoice */
+.pq-panel .panel-head svg {
+  color: var(--orange);
+  width: 22px;
+  height: 22px;
+}
+.pq-form {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+  align-items: center;
+}
+.pq-form input {
+  margin: 0;
+  font-size: 13px;
+  padding: 12px 14px;
+}
+.pq-form .form-error {
+  grid-column: 1/-1;
+}
+.pq-form:not(.inline) {
+  margin-top: 15px;
+}
+.pq-top svg {
+  color: var(--orange);
+}
+.pq-source {
+  margin: 0 0 15px;
+  overflow-wrap: anywhere;
+}
+.pq-warn ul {
+  margin: 0;
+  padding-left: 18px;
+}
+.pq-ai {
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+.pq-ai .check-row {
+  margin: 8px 0 0;
+  color: inherit;
+  font-size: 11px;
+}
+.pq-lines .line-item input.needs {
+  border-color: var(--orange);
+  background: #fff9ef;
+}
+.pq-total {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin-bottom: 15px;
+  align-self: end;
+}
+.pq-total strong {
+  font-size: 18px;
+  color: var(--action);
+}
+
+/* Webhooks */
+.pw-url {
+  max-width: 320px;
+  overflow-wrap: anywhere;
+}
+.pw-section td small,
+.pi-preview td small,
+.pw-detail td small {
+  display: block;
+  color: var(--muted);
+  font-size: 10px;
+  overflow-wrap: anywhere;
+}
+.pw-events {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  max-width: 280px;
+}
+.pw-types {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px 14px 4px;
+  margin: 0 0 15px;
+}
+.pw-types legend {
+  font-size: 10px;
+  font-weight: 700;
+  color: #596a7d;
+  padding: 0 4px;
+}
+.pw-types .check-row {
+  margin-bottom: 8px;
+  font-size: 12px;
+}
+.pw-types small {
+  color: var(--muted);
+  font-size: 10px;
+}
+.pw-code {
+  white-space: pre;
+  margin: 12px 0 0;
+}
+.pw-payload {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px;
+}
+
+/* Import */
+.pi-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 22px;
+}
+.pi-grid .panel {
+  display: flex;
+  flex-direction: column;
+}
+.pi-grid .panel-head svg {
+  color: #95a4b2;
+}
+.pi-grid label {
+  margin-bottom: 0;
+}
+.pi-grid .actions:last-child {
+  margin-top: auto;
+  padding-top: 15px;
+}
+.pi-preview {
+  max-height: 50vh;
+  overflow: auto;
+}
+.pi-error td {
+  background: #fff6f5;
+}
+
+@media (max-width: 1150px) {
+  .pi-grid {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 640px) {
+  .pq-form {
+    grid-template-columns: 1fr;
+  }
+  .pq-top span {
+    display: none;
+  }
+  .pq-top {
+    padding: 9px;
+  }
+  .pw-url,
+  .pw-events {
+    max-width: 200px;
+  }
+}

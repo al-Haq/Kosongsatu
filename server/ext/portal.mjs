@@ -331,7 +331,7 @@ export default {
     }
     if (rimba)
       // A 30-day hold rule shows the limit without blocking other modules' demo invoices.
-      store.saveCreditSettings(rimba.id, { credit_limit: "5000.00", hold_days: 30, on_hold: false, portal_credit: "1" });
+      store.saveCreditSettings(rimba.id, { credit_limit: "25000.00", hold_days: 30, on_hold: false, portal_credit: "1" });
     if (bayu) {
       const paid = store.db
         .prepare("SELECT * FROM documents WHERE client_id=? AND kind='invoice' AND state='issued'")

@@ -1,1 +1,173 @@
-/* Documents and billing: line discounts, item codes, PDF templates, proforma, sales and delivery orders, currencies, languages, custom fields, deposits and instalments. */
+/* Documents module: editor line extras, paper columns, plans, signatures, settings. */
+.is-hidden {
+  display: none !important;
+}
+.line-item .line-extra {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: -3px;
+}
+.line-item .line-extra input,
+.line-item .line-extra select {
+  font-size: 10px;
+  padding: 6px 7px;
+}
+.line-item .item-sku {
+  width: 92px;
+}
+.line-item .item-unit {
+  width: 82px;
+}
+.line-item .line-discount {
+  display: flex;
+  gap: 4px;
+}
+.line-item .item-discount {
+  width: 104px;
+}
+.no-price .line-item,
+.no-price .line-head {
+  grid-template-columns: 1fr 72px 30px;
+}
+.doc-options {
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  padding: 14px 14px 4px;
+  margin-bottom: 16px;
+}
+.preview-row small {
+  display: block;
+  color: var(--muted);
+  font-size: 9px;
+  margin-top: 2px;
+}
+/* Paper: optional code, unit and discount columns */
+.invoice-paper table.wide-lines th,
+.invoice-paper table.wide-lines th:first-child,
+.invoice-paper table.wide-lines th:nth-child(2),
+.invoice-paper table.wide-lines th:nth-child(3),
+.invoice-paper table.wide-lines th:nth-child(4) {
+  width: auto;
+}
+.invoice-paper table.wide-lines .line-code {
+  width: 13%;
+  overflow-wrap: anywhere;
+}
+.invoice-paper table.wide-lines .line-qty {
+  width: 9%;
+}
+.invoice-paper table.wide-lines .line-unit {
+  width: 10%;
+}
+.invoice-paper table.wide-lines .line-rate,
+.invoice-paper table.wide-lines .line-disc {
+  width: 14%;
+}
+.invoice-paper table.wide-lines th:last-child {
+  width: 15%;
+}
+.invoice-paper table.no-price-lines th:last-child {
+  width: 12%;
+}
+.invoice-paper .line-disc small {
+  display: block;
+  color: var(--muted);
+}
+.instalment-list {
+  display: grid;
+  gap: 4px;
+  white-space: normal;
+}
+.instalment-row {
+  display: grid;
+  grid-template-columns: 1fr auto 90px;
+  gap: 12px;
+}
+.signature-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 28px;
+  white-space: normal;
+}
+.signature-line {
+  border-top: 1px solid var(--muted);
+  margin-top: 34px;
+  padding-top: 4px;
+  font-size: 10px;
+  color: var(--muted);
+}
+/* Instalment and custom field editors */
+.instalment-edit,
+.custom-field-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 34px;
+  gap: 10px;
+  align-items: end;
+}
+.custom-field-row {
+  grid-template-columns: 1.4fr 1fr 1.2fr 34px;
+}
+.instalment-edit .btn,
+.custom-field-row .btn {
+  margin-bottom: 14px;
+}
+.doc-logo-row {
+  display: flex;
+  gap: 18px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.doc-logo-preview {
+  width: 150px;
+  max-height: 60px;
+  object-fit: contain;
+}
+.doc-logo-row form {
+  flex: 1;
+  min-width: 220px;
+}
+.doc-show {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 18px;
+}
+@media (max-width: 640px) {
+  .invoice-paper table .line-code,
+  .invoice-paper table .line-unit,
+  .invoice-paper table .line-disc {
+    display: none;
+  }
+  /* Phones show the description and amount only, like the core paper. */
+  .invoice-paper table.wide-lines th,
+  .invoice-paper table.wide-lines th:first-child,
+  .invoice-paper table.wide-lines th:nth-child(2) {
+    width: auto;
+  }
+  .invoice-paper table.wide-lines th:last-child {
+    width: 36%;
+  }
+  .invoice-paper table.no-price-lines .line-qty {
+    display: table-cell;
+    width: 22%;
+  }
+  .signature-grid,
+  .custom-field-row {
+    grid-template-columns: 1fr;
+  }
+  .no-price .line-item,
+  .no-price .line-head {
+    grid-template-columns: 1fr 54px 25px;
+  }
+  .line-item .item-sku,
+  .line-item .item-unit,
+  .line-item .item-discount {
+    width: 80px;
+  }
+}
+form[data-form="doc-template"] input[type="color"] {
+  height: 42px;
+  padding: 4px 6px;
+  cursor: pointer;
+}

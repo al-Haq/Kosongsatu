@@ -1,3 +1,4 @@
+import { toMYR } from "./ext/documents-calc.mjs";
 export function financeUI(h) {
   const {
     get,
@@ -24,6 +25,9 @@ export function financeUI(h) {
     icon,
   } = h;
   let pendingImport = null;
+  // Receipts are in the currency of the invoices they pay; totals are in MYR.
+  const myr = (amount, x) => toMYR(amount || 0, x?.fx_rate || "1");
+  const currencies = () => get().ext?.documents?.currencies || ["MYR"];
   const receipt = (rid) => get().finance.receipts.find((r) => r.id === rid);
   const transaction = (tid) =>
     get().finance.bankTransactions.find((t) => t.id === tid);
@@ -41,7 +45,7 @@ export function financeUI(h) {
       }
       showModal(
         t ? "Record bank receipt" : "Record money received",
-        `<form data-form="cash-receipt" data-id="${E(tid)}">${select("Client", "client_id", clientOptions())}<div class="form-grid">${input("Amount received (MYR)", "amount", t ? dec(t.amount) : "", "number", true, `min="0.01" step="0.01" ${t ? "readonly" : ""}`)}${input("Date received", "paid_date", t?.txn_date || S.today, "date", true, `max="${S.today}" ${t ? "readonly" : ""}`)}${select(
+        `<form data-form="cash-receipt" data-id="${E(tid)}">${select("Client", "client_id", clientOptions())}<div class="form-grid">${t ? "" : select("Currency", "currency", currencies().map((c) => [c, c]), "MYR")}${t ? "" : input("Exchange rate (MYR per 1 unit, other currencies)", "fx_rate", "", "text", false, 'inputmode="decimal" maxlength="13"')}${input(t ? "Amount received (MYR)" : "Amount received", "amount", t ? dec(t.amount) : "", "number", true, `min="0.01" step="0.01" ${t ? "readonly" : ""}`)}${input("Date received", "paid_date", t?.txn_date || S.today, "date", true, `max="${S.today}" ${t ? "readonly" : ""}`)}${select(
           "Method",
           "method",
           ["Bank transfer", "Cash", "Card", "Other"].map((v) => [v, v]),
@@ -57,21 +61,22 @@ export function financeUI(h) {
             d.client_id === r.client_id &&
             d.kind === "invoice" &&
             d.state === "issued" &&
-            d.balance > 0,
+            d.balance > 0 &&
+            (d.currency || "MYR") === (r.currency || "MYR"),
         );
       if (!docs.length) {
         toast(
-          "No unpaid issued invoices for this client. Funds remain available.",
+          "No unpaid issued invoices in this receipt's currency for this client. Funds remain available.",
         );
         return;
       }
       showModal(
         "Allocate existing receipt",
-        `<form data-form="cash-allocate" data-id="${rid}"><div class="notice info"><p>${E(r.number)} / ${E(r.client.name)}<br>Available: ${money(r.available)}. This does not record new cash.</p></div>${select(
+        `<form data-form="cash-allocate" data-id="${rid}"><div class="notice info"><p>${E(r.number)} / ${E(r.client.name)}<br>Available: ${money(r.available, r.currency)}. This does not record new cash.</p></div>${select(
           "Invoice",
           "invoice_id",
-          docs.map((d) => [d.id, `${d.number} / balance ${money(d.balance)}`]),
-        )}${input("Amount to apply (MYR)", "amount", dec(Math.min(r.available, docs[0].balance)), "number", true, `min="0.01" max="${dec(r.available)}" step="0.01"`)}${formEnd("Apply funds")}</form>`,
+          docs.map((d) => [d.id, `${d.number} / balance ${money(d.balance, d.currency)}`]),
+        )}${input(`Amount to apply (${r.currency || "MYR"})`, "amount", dec(Math.min(r.available, docs[0].balance)), "number", true, `min="0.01" max="${dec(r.available)}" step="0.01"`)}${formEnd("Apply funds")}</form>`,
       );
       modal
         .querySelector("[name=invoice_id]")
@@ -87,7 +92,7 @@ export function financeUI(h) {
         r = receipt(rid);
       showModal(
         "Record bank refund",
-        `<form data-form="cash-refund" data-id="${rid}"><p>${E(r.number)} / available ${money(r.available)}</p><div class="form-grid">${input("Amount returned (MYR)", "amount", "", "number", true, `min="0.01" max="${dec(r.available)}" step="0.01"`)}${input("Date returned", "paid_date", S.today, "date", true, `min="${r.paid_date}" max="${S.today}"`)}</div>${input("Refund transaction reference", "reference", "", "text", true, 'maxlength="120"')}${area("Refund reason", "reason", "", 1000)}<label class="check-row"><input type="checkbox" required>I have already returned this money to the customer.</label>${formEnd("Record refund")}</form>`,
+        `<form data-form="cash-refund" data-id="${rid}"><p>${E(r.number)} / available ${money(r.available, r.currency)}</p><div class="form-grid">${input(`Amount returned (${r.currency || "MYR"})`, "amount", "", "number", true, `min="0.01" max="${dec(r.available)}" step="0.01"`)}${input("Date returned", "paid_date", S.today, "date", true, `min="${r.paid_date}" max="${S.today}"`)}</div>${input("Refund transaction reference", "reference", "", "text", true, 'maxlength="120"')}${area("Refund reason", "reason", "", 1000)}<label class="check-row"><input type="checkbox" required>I have already returned this money to the customer.</label>${formEnd("Record refund")}</form>`,
       );
       modal.querySelector("[name=reason]").required = true;
     },
@@ -96,14 +101,14 @@ export function financeUI(h) {
         d = S.documents.find((d) => d.id === did);
       showModal(
         "Issue adjustment note",
-        `<form data-form="adjustment" data-id="${did}"><div class="notice info"><p>${E(d.number)} / current invoice value ${money(d.adjusted_total)}<br>The original invoice stays unchanged. Credits release any excess allocation to customer funds.</p></div>${select(
+        `<form data-form="adjustment" data-id="${did}"><div class="notice info"><p>${E(d.number)} / current invoice value ${money(d.adjusted_total, d.currency)}<br>The original invoice stays unchanged. Credits release any excess allocation to customer funds.</p></div>${select(
           "Note type",
           "kind",
           [
             ["credit", "Credit note - reduce invoice"],
             ["debit", "Debit note - add charge"],
           ],
-        )}<div class="form-grid">${input("Adjustment amount (MYR)", "amount", "", "number", true, 'min="0.01" step="0.01"')}${input("Issue date", "issue_date", S.today, "date", true, `max="${S.today}"`)}</div>${area("Reason shown on the note", "reason", "", 1000)}${formEnd("Issue note")}</form>`,
+        )}<div class="form-grid">${input(`Adjustment amount (${d.currency || "MYR"})`, "amount", "", "number", true, 'min="0.01" step="0.01"')}${input("Issue date", "issue_date", S.today, "date", true, `max="${S.today}"`)}</div>${area("Reason shown on the note", "reason", "", 1000)}${formEnd("Issue note")}</form>`,
       );
       modal.querySelector("[name=reason]").required = true;
     },
@@ -185,15 +190,15 @@ export function financeUI(h) {
       receipts = S.finance.receipts;
     const total = receipts
         .filter((r) => !r.voided)
-        .reduce((s, r) => s + r.amount - r.refunded, 0),
-      available = receipts.reduce((s, r) => s + r.available, 0);
+        .reduce((s, r) => s + myr(r.amount - r.refunded, r), 0),
+      available = receipts.reduce((s, r) => s + myr(r.available, r), 0);
     return (
       heading(
         "Cash & customer credits",
         "Record each payment once. Apply it across invoices or retain available customer funds.",
         button("New receipt", "cash-receive", "", true, "plus"),
       ) +
-      `${receipts.some((r) => r.legacy_review) ? '<div class="notice"><p>Legacy transactions need review. Cash totals may include duplicate old entries until verified and corrected.</p></div>' : ""}<div class="metrics"><div class="metric"><div class="label">Net cash recorded</div><div class="value">${money(total)}</div><div class="hint">All dates / receipts less refunds</div></div><div class="metric"><div class="label">Available customer funds</div><div class="value teal">${money(available)}</div><div class="hint">Available for allocation or refund</div></div></div><section class="panel">${receipts.length ? `<div class="table-wrap"><table><thead><tr><th>Receipt / client</th><th>Received</th><th class="num">Original</th><th class="num">Allocated</th><th class="num">Available</th><th>Actions</th></tr></thead><tbody>${receipts.map((r) => `<tr><td><strong>${E(r.number)}</strong><small>${E(r.client.name)} / ${E(r.reference)}</small>${r.voided ? badge("Void") : r.legacy_review ? badge("Pending review") : ""}</td><td>${dateLabel(r.paid_date)}</td><td class="num">${money(r.amount)}</td><td class="num">${money(r.allocated)}</td><td class="num">${money(r.available)}${r.refunded ? `<small>Refunded ${money(r.refunded)}</small>` : ""}</td><td><div class="actions">${!r.voided ? `<a class="btn small" href="/api/receipts/${r.id}/pdf">PDF</a>` : ""}${!r.voided && r.legacy_review ? button("Review legacy", "cash-review", r.id) : r.available > 0 ? button("Allocate", "cash-allocate", r.id) + button("Refund", "cash-refund", r.id) : ""}${!r.voided && r.allocated === 0 && r.refunded === 0 ? button("Void entry", "cash-void", r.id) : ""}</div></td></tr>`).join("")}</tbody></table></div>` : empty("No cash receipts yet", "Record verified customer payments, then apply them to invoices.")}</section>${receipts.some((r) => r.refunds.length) ? `<section class="panel mt22"><h2>Refund notes</h2>${receipts.flatMap((r) => r.refunds.map((f) => `<div class="attention"><div><strong>${E(f.number)} / ${money(f.amount)}</strong><small>${E(r.client.name)} / ${E(f.reference)} / ${E(f.reason)}</small></div><a class="btn small" href="/api/refunds/${f.id}/pdf">PDF</a></div>`)).join("")}</section>` : ""}`
+      `${receipts.some((r) => r.legacy_review) ? '<div class="notice"><p>Legacy transactions need review. Cash totals may include duplicate old entries until verified and corrected.</p></div>' : ""}<div class="metrics"><div class="metric"><div class="label">Net cash recorded</div><div class="value">${money(total)}</div><div class="hint">All dates / receipts less refunds</div></div><div class="metric"><div class="label">Available customer funds</div><div class="value teal">${money(available)}</div><div class="hint">Available for allocation or refund</div></div></div><section class="panel">${receipts.length ? `<div class="table-wrap"><table><thead><tr><th>Receipt / client</th><th>Received</th><th class="num">Original</th><th class="num">Allocated</th><th class="num">Available</th><th>Actions</th></tr></thead><tbody>${receipts.map((r) => `<tr><td><strong>${E(r.number)}</strong><small>${E(r.client.name)} / ${E(r.reference)}</small>${r.voided ? badge("Void") : r.legacy_review ? badge("Pending review") : ""}</td><td>${dateLabel(r.paid_date)}</td><td class="num">${money(r.amount, r.currency)}</td><td class="num">${money(r.allocated, r.currency)}</td><td class="num">${money(r.available, r.currency)}${r.refunded ? `<small>Refunded ${money(r.refunded, r.currency)}</small>` : ""}</td><td><div class="actions">${!r.voided ? `<a class="btn small" href="/api/receipts/${r.id}/pdf">PDF</a>` : ""}${!r.voided && r.legacy_review ? button("Review legacy", "cash-review", r.id) : r.available > 0 ? button("Allocate", "cash-allocate", r.id) + button("Refund", "cash-refund", r.id) : ""}${!r.voided && r.allocated === 0 && r.refunded === 0 ? button("Void entry", "cash-void", r.id) : ""}</div></td></tr>`).join("")}</tbody></table></div>` : empty("No cash receipts yet", "Record verified customer payments, then apply them to invoices.")}</section>${receipts.some((r) => r.refunds.length) ? `<section class="panel mt22"><h2>Refund notes</h2>${receipts.flatMap((r) => r.refunds.map((f) => `<div class="attention"><div><strong>${E(f.number)} / ${money(f.amount, r.currency)}</strong><small>${E(r.client.name)} / ${E(f.reference)} / ${E(f.reason)}</small></div><a class="btn small" href="/api/refunds/${f.id}/pdf">PDF</a></div>`)).join("")}</section>` : ""}`
     );
   }
   function bank() {
@@ -210,7 +215,8 @@ export function financeUI(h) {
   }
   function documentExtras(d) {
     if (d.kind !== "invoice" || d.state !== "issued") return "";
-    return `<section class="panel"><div class="panel-head"><h2>Invoice adjustments</h2></div><div class="total-row"><span>Original</span><strong>${money(d.total)}</strong></div><div class="total-row"><span>Credits / debits</span><strong>−${money(d.credit)} / +${money(d.debit)}</strong></div><div class="total-row emphasis"><span>Adjusted value</span><span>${money(d.adjusted_total)}</span></div><div class="actions mt22">${button("Credit / debit note", "invoice-adjust", d.id)}</div>${d.adjustments.map((a) => `<div class="payment"><strong>${E(a.number)} / ${money(a.amount)}</strong><p>${E(a.kind)} / ${E(a.reason)}</p><a href="/api/adjustments/${a.id}/pdf">Note PDF</a></div>`).join("")}<div class="mt22"><a href="#/ledger">Manage customer funds →</a></div></section>`;
+    const m = (v) => money(v, d.currency);
+    return `<section class="panel"><div class="panel-head"><h2>Invoice adjustments</h2></div><div class="total-row"><span>Original</span><strong>${m(d.total)}</strong></div><div class="total-row"><span>Credits / debits</span><strong>−${m(d.credit)} / +${m(d.debit)}</strong></div><div class="total-row emphasis"><span>Adjusted value</span><span>${m(d.adjusted_total)}</span></div><div class="actions mt22">${button("Credit / debit note", "invoice-adjust", d.id)}</div>${d.adjustments.map((a) => `<div class="payment"><strong>${E(a.number)} / ${m(a.amount)}</strong><p>${E(a.kind)} / ${E(a.reason)}</p><a href="/api/adjustments/${a.id}/pdf">Note PDF</a></div>`).join("")}<div class="mt22"><a href="#/ledger">Manage customer funds →</a></div></section>`;
   }
   // Encrypted backups (local and off-site) are shown by the team module.
   function security() {

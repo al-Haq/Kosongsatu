@@ -1,0 +1,39 @@
+# systemd unit for running Nawlogic Invoice without Docker (behind nginx).
+# See "Alternative: systemd and nginx" in docs/DEPLOYMENT.md.
+#   sudo cp deploy/nawlogic.service /etc/systemd/system/
+#   sudo systemctl daemon-reload && sudo systemctl enable --now nawlogic
+[Unit]
+Description=Nawlogic Invoice
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=nawlogic
+Group=nawlogic
+WorkingDirectory=/opt/nawlogic
+# Private settings, mode 600, owned by root: NODE_ENV, APP_URL, TRUST_PROXY,
+# BACKUP_DIRECTORY, BACKUP_KEY, MFA_ENCRYPTION_KEY and optional keys.
+EnvironmentFile=/opt/nawlogic/.env
+Environment=HOST=127.0.0.1 PORT=3000 DATABASE_PATH=/opt/nawlogic/data/nawlogic.sqlite
+ExecStart=/usr/bin/node server/app.mjs
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=20
+# Hardening: the app only writes its database and backup folders.
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+CapabilityBoundingSet=
+ReadWritePaths=/opt/nawlogic/data /var/backups/nawlogic
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target
