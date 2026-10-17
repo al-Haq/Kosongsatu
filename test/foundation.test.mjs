@@ -152,3 +152,25 @@ test("email log accepts module email kinds after the rebuild", () => {
   assert.equal(s.emailLog()[0].kind, "notification");
   assert.equal(s.db.prepare("PRAGMA foreign_key_check").all().length, 0);
 });
+
+test("modules can register proposal types that apply on approval", async () => {
+  const { registerProposalKind } = await import("../server/automation.mjs");
+  const { z } = await import("zod");
+  const s = openDatabase(":memory:");
+  registerProposalKind("test_note", {
+    schema: z.object({ text: z.string().min(1).max(50) }).strict(),
+    validate: (store, b) => {
+      if (b.text === "bad") throw new Error("bad text");
+    },
+    apply: (store, b) => {
+      store.audit("test.note.applied", null, b.text);
+      return { kind: "note", id: "n1" };
+    },
+    summary: (b) => "Note: " + b.text,
+  });
+  const p = s.propose("test_note", { text: "hello" }, "owner:test", "request-key-000001");
+  assert.equal(s.automationState().proposals[0].summary, "Note: hello");
+  assert.deepEqual(s.reviewProposal(p.id, true), { kind: "note", id: "n1" });
+  assert.throws(() => s.propose("test_note", { text: "bad" }, "owner:test", "request-key-000002"), /bad text/);
+  assert.throws(() => s.propose("test_note", { extra: 1 }, "owner:test", "request-key-000003"), /Invalid tool input/);
+});

@@ -69,7 +69,7 @@ The request object `r`: `{ req, res, url, path, method, ip, body(), rawBody(limi
 - **Automation events**: `store.emit(type, entity_id, payload)` feeds the automation rules (`server/sales.mjs`).
 - **PDF blocks**: wrap `Store.prototype.pdfBlocks` (async) and append `{ heading, text, qr, qrSize, image, imageWidth, imageHeight }`. Blocks print after the notes. Keep the original call.
 - **QR codes** (`server/qr.mjs`): `qrSvg(text)`, `qrDataUri(text)`, `drawQr(pdf, text, x, y, size)`.
-- **Proposals**: `store.propose(kind, data, source, request_key)` queues an action for owner approval (`server/automation.mjs`).
+- **Proposals**: `store.propose(kind, data, source, request_key)` queues an action for owner approval. Add your own types in `attach()` with `registerProposalKind(kind, { schema (zod), validate(store, b), apply(store, b) → { kind, id }, summary(b) })` from `server/automation.mjs`; `apply` runs inside the approval transaction.
 - **Mail**: `ctx.mailer.deliver({ kind, to, cc, subject, body, attachments, documentId, clientId, dedupeKey })` (`kind` is any short label, e.g. `notification`).
 - **Test fixture** (`test/helpers.mjs`): `fixture()` gives a signed-in server (`auth`, `json`, `request`), `issuedInvoice(store)`, `PNG_1PX`.
 
@@ -87,6 +87,7 @@ export default function exampleUI(h) {
     async submit(form, b) { /* return true when handled */ },
     async guestPage(location) { /* render a page without sign-in; return true */ },
     slots: {
+      topbar: () => "",                      // small items in the top bar (e.g. a bell)
       overview: () => "",                    // panels on the overview page
       documentActions: (d) => "",            // buttons on a document
       documentPanels: (d) => "",             // side panels on a document

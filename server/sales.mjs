@@ -1,4 +1,5 @@
 import { id, now, today, text, date, money, check } from "./domain.mjs";
+import { PROPOSAL_KINDS } from "./automation.mjs";
 export const RULES = [
   {
     id: "accepted_quote_review",
@@ -272,11 +273,15 @@ export function attachSales(Store) {
             "SELECT * FROM automation_proposals ORDER BY created DESC,id LIMIT 100",
           )
           .all()
-          .map((p) => ({
-            ...p,
-            payload: JSON.parse(p.payload),
-            result: p.result ? JSON.parse(p.result) : null,
-          })),
+          .map((p) => {
+            const payload = JSON.parse(p.payload);
+            return {
+              ...p,
+              payload,
+              result: p.result ? JSON.parse(p.result) : null,
+              summary: PROPOSAL_KINDS[p.kind]?.summary?.(payload, this) || null,
+            };
+          }),
         runs: this.db
           .prepare(
             "SELECT * FROM automation_runs ORDER BY created DESC,id LIMIT 100",
