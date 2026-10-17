@@ -11,7 +11,7 @@ export const RULES = [
     id: "customer_po_invoice",
     name: "Customer PO → invoice draft",
     description:
-      "Automatically create one draft invoice from the accepted quotation when its matching customer PO is recorded. Never issue or send it.",
+      "Automatically create a draft invoice when a customer PO is recorded or amended: the whole quotation for a full-value PO, or the PO's own amount for a partial PO. Never issue or send it.",
   },
 ];
 export function attachSales(Store) {
@@ -349,7 +349,7 @@ export function attachSales(Store) {
                 (rule.id === "accepted_quote_review" &&
                   e.type === "quote.accepted") ||
                 (rule.id === "customer_po_invoice" &&
-                  e.type === "customer_po.received")
+                  ["customer_po.received", "customer_po.amended"].includes(e.type))
               )
             )
               continue;

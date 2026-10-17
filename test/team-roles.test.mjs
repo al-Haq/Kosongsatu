@@ -71,7 +71,7 @@ test("role matrix: owner everything, staff day-to-day billing, accountant read-o
       ["POST", "/api/team/backup/key", {}, [O]],
       // Not classified by anyone: owner gets the normal answer, everyone else is refused.
       ["GET", "/api/unclassified/report", null, [O]],
-      ["POST", "/api/books/expenses", {}, [O]],
+      ["POST", "/api/unclassified/write", {}, [O]],
     ];
     // Read-only and denied checks first, the owner last (some owner calls change state).
     for (const [who, client] of [[A, accountant], [S, staff], [O, f]]) {
@@ -251,4 +251,39 @@ test("MFA is per user, setup returns a scannable QR code, and the owner can rese
   } finally {
     await f.close();
   }
+});
+
+test("module routes follow each module's role rules", async () => {
+  const { accessRules, allowed } = await import("../server/team-roles.mjs");
+  const { PLUGINS } = await import("../server/plugins.mjs");
+  const rules = accessRules(PLUGINS);
+  const cases = [
+    ["staff", "POST", "/api/ops/time", true],
+    ["staff", "PUT", "/api/ops/inventory", false],
+    ["staff", "DELETE", "/api/ops/projects/abc", false],
+    ["accountant", "GET", "/api/ops/projects/abc", true],
+    ["accountant", "POST", "/api/ops/time", false],
+    ["staff", "POST", "/api/recurring/schedules/abc/run", true],
+    ["staff", "PUT", "/api/recurring/settings", false],
+    ["staff", "POST", "/api/recurring/late-fees/abc/waive", false],
+    ["accountant", "GET", "/api/recurring/packs/2026-09.zip", true],
+    ["accountant", "POST", "/api/recurring/packs/2026-09/send", false],
+    ["staff", "POST", "/api/portal/clients/abc/contacts", true],
+    ["staff", "PUT", "/api/portal/clients/abc/credit", false],
+    ["staff", "POST", "/api/portal/documents/abc/credit-override", false],
+    ["accountant", "GET", "/api/portal/feedback.csv", true],
+    ["accountant", "DELETE", "/api/portal/contacts/abc", false],
+    ["staff", "POST", "/api/books/expenses", true],
+    ["staff", "GET", "/api/books/reports/pnl", false],
+    ["staff", "POST", "/api/books/bills/abc/void", false],
+    ["accountant", "GET", "/api/books/exports/xero/invoices.csv", true],
+    ["accountant", "POST", "/api/books/expenses", false],
+    ["staff", "POST", "/api/comms/documents/abc/whatsapp", true],
+    ["staff", "PUT", "/api/comms/settings", false],
+    ["staff", "PUT", "/api/comms/templates/invoice/en", false],
+    ["accountant", "GET", "/api/comms/notifications", true],
+    ["accountant", "POST", "/api/comms/receipts/abc/email", false],
+  ];
+  for (const [role, method, path, expected] of cases)
+    assert.equal(allowed(rules, role, method, path), expected, `${role} ${method} ${path}`);
 });

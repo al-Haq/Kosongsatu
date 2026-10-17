@@ -104,7 +104,7 @@ test("expired, rejected and invalid proposals cannot mutate business records", (
     s.db.close();
   }
 });
-test("customer PO validates acceptance, currency amount, unique refs and links a single invoice", () => {
+test("customer PO validates acceptance, amount within the quotation, unique refs and links a single invoice", () => {
   const { s, c, q, accept } = fixture();
   try {
     const quote = q();
@@ -116,7 +116,8 @@ test("customer PO validates acceptance, currency amount, unique refs and links a
     };
     assert.throws(() => s.registerPO(payload), /acceptance/);
     accept(quote);
-    assert.throws(() => s.registerPO({ ...payload, amount: 99 }), /matching/);
+    // Partial POs are allowed (test/ops-po.test.mjs); more than the quotation is not.
+    assert.throws(() => s.registerPO({ ...payload, amount: 101 }), /exceeds/);
     const po = s.registerPO(payload);
     assert.throws(() => s.registerPO(payload), /already/);
     const d = s.invoiceFromQuote(quote.id, po.id);

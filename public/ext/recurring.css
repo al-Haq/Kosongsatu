@@ -1,1 +1,87 @@
 /* Recurring billing: weekly to yearly schedules, multi-line plans, auto-issue and auto-send, late fees, contracts and retainers, monthly accountant report. */
+.rec-lines-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.rec-lines-head h3 {
+  margin: 0;
+}
+.rec-line {
+  display: grid;
+  grid-template-columns: 150px minmax(0, 1fr) 72px 104px 34px;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+}
+.rec-lines.with-tax .rec-line {
+  grid-template-columns: 140px minmax(0, 1fr) 64px 96px 78px 34px;
+}
+.rec-line input,
+.rec-line select {
+  margin: 0;
+  font-size: 11px;
+  padding: 9px 7px;
+  min-width: 0;
+}
+.rec-line-labels {
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--muted);
+  padding: 10px 0 4px;
+}
+.rec-estimate {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  padding: 10px 0;
+}
+.rec-estimate strong {
+  font-size: 18px;
+  color: var(--action);
+}
+.rec-link-check {
+  align-self: end;
+  padding-bottom: 14px;
+}
+.rec-notice {
+  justify-content: space-between;
+  align-items: flex-start;
+}
+.rec-notice p + p {
+  margin-top: 4px;
+}
+.rec-notice .actions {
+  flex-shrink: 0;
+}
+.rec-table td small {
+  display: block;
+  margin-top: 3px;
+}
+.rec-table td .actions {
+  flex-wrap: nowrap;
+}
+.rec-tabs a.tab {
+  text-decoration: none;
+}
+@media (max-width: 640px) {
+  .rec-line {
+    grid-template-columns: 1fr 1fr 34px;
+  }
+  .rec-lines.with-tax .rec-line {
+    grid-template-columns: 1fr 1fr 1fr 34px;
+  }
+  .rec-line [data-field="service_id"],
+  .rec-line [data-field="description"] {
+    grid-column: 1 / -1;
+  }
+  .rec-line-labels {
+    display: none;
+  }
+  .rec-notice {
+    flex-direction: column;
+  }
+}

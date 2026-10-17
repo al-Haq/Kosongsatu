@@ -45,7 +45,8 @@ const mime = {
   ".webmanifest": "application/manifest+json; charset=utf-8",
   ".woff2": "font/woff2",
 };
-function safeDoc(d) {
+// Client-safe document fields for client links (and the client portal module).
+export function safeDoc(d) {
   return {
     id: d.id,
     kind: d.kind,

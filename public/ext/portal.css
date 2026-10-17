@@ -1,1 +1,238 @@
 /* Client portal: client accounts, multiple contacts, credit limits, quotation e-signatures and client feedback. */
+
+/* Portal pages */
+.portal-header {
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.portal-who {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 3px;
+  margin-left: auto;
+  text-align: right;
+}
+.portal-who small {
+  color: var(--muted);
+  font-size: 11px;
+}
+.portal-back {
+  margin: 0 0 -10px;
+  font-size: 12px;
+}
+.portal-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+}
+.portal-card {
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  padding: 20px 22px;
+}
+.portal-card p {
+  font-size: 11px;
+  color: var(--muted);
+}
+.portal-card .value {
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+  margin: 6px 0 4px;
+}
+.portal-card small {
+  color: var(--muted);
+  font-size: 11px;
+}
+.portal-card.dark {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: white;
+}
+.portal-card.dark p,
+.portal-card.dark small {
+  color: #aab9cc;
+}
+.portal-card.alert .value {
+  color: var(--red);
+}
+.portal-tabs {
+  margin-bottom: 0;
+}
+.portal-wrap .panel-head {
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.portal-signin {
+  max-width: 460px;
+  margin: 10vh auto;
+  padding: 0 16px;
+}
+.portal-signin .logo {
+  width: 170px;
+  margin-bottom: 26px;
+}
+.portal-signin h1 {
+  font-size: 22px;
+  margin: 6px 0 12px;
+}
+.portal-signin form {
+  margin-top: 18px;
+}
+.portal-signin .btn.full {
+  width: 100%;
+  margin-top: 10px;
+}
+.portal-signin .notice {
+  margin: 14px 0;
+}
+
+/* Signature pad */
+.portal-sign-tabs {
+  margin: 16px 0 10px;
+}
+.portal-pad {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 3 / 1;
+  background: white;
+  border: 1px dashed #94a3b8;
+  border-radius: 9px;
+  touch-action: none;
+  cursor: crosshair;
+}
+.portal-pad-typed {
+  margin-top: 10px;
+  cursor: default;
+}
+.portal-pad-foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  margin-top: 6px;
+}
+.portal-signature {
+  margin-top: 14px;
+}
+.portal-signature img {
+  display: block;
+  max-width: 100%;
+  max-height: 110px;
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  padding: 6px;
+}
+.portal-signature p {
+  margin-top: 8px;
+  font-size: 12px;
+}
+
+/* Ratings */
+.portal-stars {
+  display: inline-flex;
+  flex-direction: row-reverse;
+  gap: 4px;
+  margin: 12px 0 8px;
+}
+.portal-stars input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+}
+.portal-stars label {
+  font-size: 30px;
+  line-height: 1;
+  color: #cbd5e1;
+  cursor: pointer;
+  padding: 2px;
+  border-radius: 6px;
+}
+.portal-stars input:checked ~ label,
+.portal-stars label:hover,
+.portal-stars label:hover ~ label {
+  color: var(--orange);
+}
+.portal-stars input:focus-visible + label {
+  outline: 2px solid var(--action);
+  outline-offset: 2px;
+}
+.portal-rating {
+  color: var(--orange);
+  letter-spacing: 1px;
+  white-space: nowrap;
+}
+.portal-rating span {
+  color: #cbd5e1;
+}
+.portal-dist {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.portal-bar {
+  display: grid;
+  grid-template-columns: 28px 1fr 28px;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+}
+.portal-bar-track {
+  height: 7px;
+  background: var(--line);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.portal-bar-fill {
+  height: 100%;
+  width: 0;
+  background: var(--teal);
+}
+
+/* Owner screens */
+.portal-form-head {
+  border-top: 1px solid var(--line);
+  padding-top: 14px;
+  margin-top: 4px;
+}
+.portal-form-head h3 {
+  font-size: 13px;
+}
+.portal-form-head .field-hint {
+  margin-bottom: 4px;
+}
+.portal-credit-note {
+  margin-bottom: 14px;
+}
+.portal-detail dd code,
+.setting-line code {
+  font-size: 11px;
+  word-break: break-all;
+}
+.portal-wrap-text {
+  word-break: break-word;
+}
+.portal-contact .actions {
+  gap: 6px;
+}
+
+@media (max-width: 640px) {
+  .portal-who {
+    align-items: flex-start;
+    text-align: left;
+    margin-left: 0;
+    order: 3;
+    width: 100%;
+  }
+  .portal-card .value {
+    font-size: 22px;
+  }
+  .portal-stars label {
+    font-size: 34px;
+  }
+}

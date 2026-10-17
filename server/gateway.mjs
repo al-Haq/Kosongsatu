@@ -106,7 +106,8 @@ export class Gateway {
     return data;
   }
   // Starts (or resumes) an online payment for the full balance of a shared invoice.
-  async checkout(token, origin) {
+  // returnUrl lets the client portal bring the client back to its own page.
+  async checkout(token, origin, returnUrl = `${origin}/client/${token}`) {
     const d = this.store.publicDocument(token);
     check(
       d.kind === "invoice" && d.state === "issued" && d.balance > 0,
@@ -135,7 +136,7 @@ export class Gateway {
       name: d.client.name.slice(0, 255),
       amount: String(d.balance),
       callback_url: `${origin}/api/payments/billplz/callback`,
-      redirect_url: `${origin}/client/${token}`,
+      redirect_url: returnUrl,
       description: `Invoice ${d.number} from ${business.company || "Nawlogic"}`.slice(0, 200),
       reference_1_label: "Invoice",
       reference_1: d.number,

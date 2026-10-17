@@ -84,7 +84,7 @@ const icon = (n) =>
 const logo = () =>
   '<img class="logo" src="/assets/nawlogic-logo.png" alt="Nawlogic">';
 const badge = (s) =>
-  `<span class="badge ${{ Paid: "green", Accepted: "green", Active: "green", "Part-paid": "orange", "Pending review": "orange", Overdue: "red", Void: "red", Declined: "red", Viewed: "blue", Issued: "blue", Expired: "orange", Archived: "orange", Sent: "green", Failed: "red", Sending: "blue", Connected: "green" }[s] || ""}"><span class="dot"></span>${E(s)}</span>`;
+  `<span class="badge ${{ Paid: "green", Accepted: "green", Active: "green", "Part-paid": "orange", "Pending review": "orange", Overdue: "red", Void: "red", Declined: "red", Viewed: "blue", Issued: "blue", Expired: "orange", Archived: "orange", Sent: "green", Failed: "red", Sending: "blue", Connected: "green", Opened: "green", Delivered: "green", Read: "green", Bounced: "red", "Spam complaint": "red", "Soft bounce": "orange", "Partly sent": "orange", Pending: "orange", Edited: "blue", Received: "blue" }[s] || ""}"><span class="dot"></span>${E(s)}</span>`;
 const button = (label, action, id = "", primary = false, iconName = "") =>
   !allowed("action", action)
     ? ""
@@ -178,7 +178,6 @@ const navItems = [
   ["sales", "Sales & POs", "trend", "Sell"],
   ["quotes", "Quotations", "doc", "Sell"],
   ["invoices", "Invoices", "doc", "Sell"],
-  ["recurring", "Recurring", "clock", "Sell"],
   ["payments", "Payments", "wallet", "Get paid"],
   ["ledger", "Cash & credits", "wallet", "Get paid"],
   ["bank", "Bank matching", "trend", "Get paid"],
@@ -379,50 +378,6 @@ function services() {
     `<section class="panel">${S.services.length ? `<div class="table-wrap"><table><thead><tr><th>Service</th><th>Unit</th><th class="num">Default rate</th><th>Status</th><th>Action</th></tr></thead><tbody>${S.services.map((s) => `<tr><td><strong>${E(s.name)}</strong><small>${E(s.description)}</small></td><td>${E(s.unit)}</td><td class="num">${money(s.rate)}</td><td>${badge(s.active ? "Active" : "Inactive")}</td><td><div class="actions">${button("Edit", "edit-service", s.id)}${button("Delete", "delete-service", s.id)}</div></td></tr>`).join("")}</tbody></table></div>` : empty("Build your service catalog", "Add a service or use custom items directly on an invoice.", button("Add service", "new-service", "", true))}</section>`
   );
 }
-function recurring() {
-  return (
-    heading(
-      "Recurring billing",
-      "Monthly maintenance plans. Generate a draft, then review before issuing.",
-      button("New schedule", "new-schedule", "", true, "plus"),
-    ) +
-    `<section class="panel"><div class="panel-head"><div><h2>Maintenance plans</h2><p>Draft-first mode / no automatic charging or sending</p></div>${badge("Owner review")}</div>${
-      S.schedules.length
-        ? `<div class="table-wrap"><table><thead><tr><th>Client / plan</th><th>Next run</th><th class="num">Amount</th><th>Status</th><th>Action</th></tr></thead><tbody>${S.schedules
-            .map((s) => {
-              const c = S.clients.find((c) => c.id === s.client_id),
-                service = S.services.find((v) => v.id === s.service_id);
-              return `<tr><td><strong>${E(c?.name)}</strong><small>${E(service?.name)}</small></td><td>${dateLabel(s.next_date)}</td><td class="num">${money(service?.rate)}</td><td>${badge(!s.active ? "Paused" : service?.active ? "Active" : "Service inactive")}</td><td><div class="actions">${s.active && service?.active && s.next_date <= S.today ? button("Generate draft", "run-schedule", s.id, true) : ""}${button(s.active ? "Pause" : "Resume", s.active ? "pause-schedule" : "resume-schedule", s.id)}${button("Edit", "edit-schedule", s.id)}${button("Delete", "delete-schedule", s.id)}</div></td></tr>`;
-            })
-            .join("")}</tbody></table></div>`
-        : empty(
-            "No recurring plans yet",
-            "Create a monthly schedule for an agreed maintenance service.",
-          )
-    }</section><section class="panel mt22"><div class="panel-head"><h2>How recurring billing works</h2></div><div class="steps">${[
-      [
-        "01 / SCHEDULE",
-        "Generate draft",
-        "A due period creates a draft invoice once.",
-      ],
-      [
-        "02 / OWNER",
-        "Review & issue",
-        "Check scope, service period and final amount.",
-      ],
-      [
-        "03 / CLIENT",
-        "Share & collect",
-        "Share the invoice and record the payment received.",
-      ],
-    ]
-      .map(
-        ([n, t, d]) =>
-          `<div class="step"><span class="eyebrow teal">${n}</span><strong>${t}</strong><p>${d}</p></div>`,
-      )
-      .join("")}</div></section>`
-  );
-}
 function payments() {
   const all = S.documents
     .filter((d) => d.kind === "invoice")
@@ -452,7 +407,7 @@ function settings() {
       "Workspace settings",
       "Your company identity, document defaults and payment instructions.",
     ) +
-    `<div class="grid-equal"><section class="panel"><div class="panel-head"><h2>Brand & company</h2></div>${logo()}<div class="palette"><div class="swatch teal-bg"><span></span>Teal<br>#0EA5A4</div><div class="swatch orange-bg"><span></span>Orange<br>#F97316</div><div class="swatch ink-bg"><span></span>Ink<br>#0F172A</div></div><form data-form="settings"><div class="form-grid">${input("Registered business name", "company", b.company, "text", true, 'maxlength="180"')}${input("Registration number", "registration", b.registration, "text", false, 'maxlength="80"')}${input("Tax identification number (TIN)", "tin", b.tin || "", "text", false, 'maxlength="20"')}${input("SST registration number", "sstNumber", b.sstNumber || "", "text", false, 'maxlength="40"')}${input("Billing email", "email", b.email, "email", false, 'maxlength="160"')}${input("Phone", "phone", b.phone, "text", false, 'maxlength="60"')}<div class="span-2">${area("Business address", "address", b.address, 600)}</div>${input("Invoice prefix", "invoicePrefix", b.invoicePrefix, "text", true, 'pattern="[A-Z][A-Z0-9-]{0,11}" maxlength="12"')}${input("Quotation prefix", "quotePrefix", b.quotePrefix, "text", true, 'pattern="[A-Z][A-Z0-9-]{0,11}" maxlength="12"')}<div class="span-2">${area("Default terms", "paymentTerms", b.paymentTerms)}</div>${input("Bank name", "bankName", b.bankName, "text", false, 'maxlength="100"')}${input("Account number", "bankAccount", b.bankAccount, "text", false, 'maxlength="60"')}<div class="span-2">${input("Account holder", "bankHolder", b.bankHolder, "text", false, 'maxlength="180"')}</div></div>${errorBlock()}<p class="field-hint">Issued documents keep a snapshot of the company and client details. SST is charged only after you add your SST registration number.</p><div class="form-actions"><button class="btn primary" type="submit">Save settings</button></div></form></section><div class="stack"><section class="panel"><div class="panel-head"><h2>Access & integrations</h2></div><div class="setting-line"><div><h3>Owner access</h3><p>${E(session.email)}</p></div>${badge("Password protected")}</div><div class="setting-line"><div><h3>Client invoice links</h3><p>Document only / 1–90 days / revocable</p></div>${icon("shield")}</div><div class="setting-line"><div><h3>LHDN MyInvois</h3><p>Requires separate integration and validation</p></div>${badge("Not connected")}</div><div class="setting-line"><div><h3>Online payment (Billplz)</h3><p>${S.gateway?.configured ? (S.gateway.sandbox ? "Sandbox mode" : "Live") : "Set Billplz keys on the server"}</p></div>${badge(S.gateway?.configured ? "Connected" : "Not connected")}</div><div class="setting-line"><div><h3>Email & scheduled reminders</h3><p>${S.mail?.configured ? "Sending from " + E(S.mail.from) : "Set SMTP settings on the server"}</p></div>${badge(S.mail?.configured ? "Connected" : "Not connected")}</div></section><section class="panel"><div class="panel-head"><h2>Account password</h2></div><form data-form="password">${input("Current password", "current", "", "password", true, 'autocomplete="current-password"')}${input("New password (at least 12 characters)", "password", "", "password", true, 'minlength="12" maxlength="256" autocomplete="new-password"')}${S.security.enabled ? input("Authenticator or recovery code", "code", "", "text", true, 'autocomplete="one-time-code"') : ""}${errorBlock()}<button type="submit" class="btn">Change password & sign out</button></form></section><section class="panel"><div class="panel-head"><h2>Your business data</h2></div><p>Download a business data export, including documents, payments and audit history. Store it privately.</p><div class="actions mt22"><a class="btn" href="/api/backup">${icon("download")} Export JSON</a><a class="btn" href="/api/invoices.csv">Export CSV</a></div><p class="field-hint">For full disaster recovery, use the encrypted backup and restore procedure in the deployment guide.</p></section></div></div>`
+    `<div class="grid-equal"><section class="panel"><div class="panel-head"><h2>Brand & company</h2></div>${logo()}<div class="palette"><div class="swatch teal-bg"><span></span>Teal<br>#0EA5A4</div><div class="swatch orange-bg"><span></span>Orange<br>#F97316</div><div class="swatch ink-bg"><span></span>Ink<br>#0F172A</div></div><form data-form="settings"><div class="form-grid">${input("Registered business name", "company", b.company, "text", true, 'maxlength="180"')}${input("Registration number", "registration", b.registration, "text", false, 'maxlength="80"')}${input("Tax identification number (TIN)", "tin", b.tin || "", "text", false, 'maxlength="20"')}${input("SST registration number", "sstNumber", b.sstNumber || "", "text", false, 'maxlength="40"')}${input("Billing email", "email", b.email, "email", false, 'maxlength="160"')}${input("Phone", "phone", b.phone, "text", false, 'maxlength="60"')}<div class="span-2">${area("Business address", "address", b.address, 600)}</div>${input("Invoice prefix", "invoicePrefix", b.invoicePrefix, "text", true, 'pattern="[A-Z][A-Z0-9-]{0,11}" maxlength="12"')}${input("Quotation prefix", "quotePrefix", b.quotePrefix, "text", true, 'pattern="[A-Z][A-Z0-9-]{0,11}" maxlength="12"')}<div class="span-2">${area("Default terms", "paymentTerms", b.paymentTerms)}</div>${input("Bank name", "bankName", b.bankName, "text", false, 'maxlength="100"')}${input("Account number", "bankAccount", b.bankAccount, "text", false, 'maxlength="60"')}<div class="span-2">${input("Account holder", "bankHolder", b.bankHolder, "text", false, 'maxlength="180"')}</div></div>${errorBlock()}<p class="field-hint">Issued documents keep a snapshot of the company and client details. SST is charged only after you add your SST registration number.</p><div class="form-actions"><button class="btn primary" type="submit">Save settings</button></div></form></section><div class="stack"><section class="panel"><div class="panel-head"><h2>Access & integrations</h2></div><div class="setting-line"><div><h3>Owner access</h3><p>${E(session.email)}</p></div>${badge("Password protected")}</div><div class="setting-line"><div><h3>Client invoice links</h3><p>Document only / 1–90 days / revocable</p></div>${icon("shield")}</div><div class="setting-line"><div><h3>LHDN MyInvois</h3><p>Requires separate integration and validation</p></div>${badge("Not connected")}</div><div class="setting-line"><div><h3>Online payment (Billplz)</h3><p>${S.gateway?.configured ? (S.gateway.sandbox ? "Sandbox mode" : "Live") : "Set Billplz keys on the server"}</p></div>${badge(S.gateway?.configured ? "Connected" : "Not connected")}</div><div class="setting-line"><div><h3>Email & scheduled reminders</h3><p>${S.mail?.configured ? "Sending from " + E(S.mail.from) : "Add SMTP settings under Integration keys"}</p></div>${badge(S.mail?.configured ? "Connected" : "Not connected")}</div></section><section class="panel"><div class="panel-head"><h2>Account password</h2></div><form data-form="password">${input("Current password", "current", "", "password", true, 'autocomplete="current-password"')}${input("New password (at least 12 characters)", "password", "", "password", true, 'minlength="12" maxlength="256" autocomplete="new-password"')}${S.security.enabled ? input("Authenticator or recovery code", "code", "", "text", true, 'autocomplete="one-time-code"') : ""}${errorBlock()}<button type="submit" class="btn">Change password & sign out</button></form></section><section class="panel"><div class="panel-head"><h2>Your business data</h2></div><p>Download a business data export, including documents, payments and audit history. Store it privately.</p><div class="actions mt22"><a class="btn" href="/api/backup">${icon("download")} Export JSON</a><a class="btn" href="/api/invoices.csv">Export CSV</a></div><p class="field-hint">For full disaster recovery, use the encrypted backup and restore procedure in the deployment guide.</p></section></div></div>`
   );
 }
 function paper(d, publicView = false) {
@@ -479,7 +434,7 @@ function emailHistory(list) {
     .slice(0, 8)
     .map(
       (m) =>
-        `<div class="payment"><div class="payment-top"><strong>${E(m.subject)}</strong>${badge(m.status === "sent" ? "Sent" : m.status === "failed" ? "Failed" : "Sending")}</div><p>${E(m.recipients)}<br>${timeLabel(m.created)}${m.kind === "reminder" ? " / automatic reminder" : ""}</p>${m.error ? `<p>${E(m.error)}</p>` : ""}</div>`,
+        `<div class="payment"><div class="payment-top"><strong>${E(m.subject)}</strong><span class="actions">${m.bounce_type ? badge(m.bounce_type === "complaint" ? "Spam complaint" : m.bounce_type === "soft" ? "Soft bounce" : "Bounced") : m.opened_first ? badge("Opened") : ""}${badge(m.status === "sent" ? "Sent" : m.status === "failed" ? "Failed" : "Sending")}</span></div><p>${E(m.recipients)}<br>${timeLabel(m.created)}${m.kind === "reminder" ? " / automatic reminder" : ""}</p>${m.error ? `<p>${E(m.error)}</p>` : ""}${m.bounce_type ? `<p>${E(m.bounce_detail || "Reported by the mail provider.")}</p>` : m.opened_first ? `<p>Opened ${m.open_count === 1 ? "once" : m.open_count + " times"}, last ${timeLabel(m.opened_last)} (approximate)</p>` : ""}</div>`,
     )
     .join("")}</section>`;
 }
@@ -495,7 +450,7 @@ function gatewayPanel() {
 }
 function remindersPanel() {
   const b = S.settings;
-  return `<section class="panel mt22"><div class="panel-head"><div><h2>Email & payment reminders</h2><p>${S.mail.configured ? "Sending from " + E(S.mail.from) : "Email is not configured. Set SMTP_HOST, SMTP_USER, SMTP_PASS and MAIL_FROM on the server."}</p></div>${badge(S.mail.configured ? "Connected" : "Not connected")}</div><form data-form="reminders"><label class="check-row"><input type="checkbox" name="remindersEnabled" ${b.remindersEnabled ? "checked" : ""} ${S.mail.configured ? "" : "disabled"}> Send automatic reminders for unpaid invoices to the client's email.</label><div class="form-grid">${input("Days before due date (0 = none)", "reminderBeforeDays", b.reminderBeforeDays ?? 3, "number", true, 'min="0" max="30" step="1"')}${input("Days after due date (comma separated)", "reminderAfterDays", b.reminderAfterDays ?? "1,7,14", "text", true, 'pattern="\\s*\\d{1,3}(\\s*,\\s*\\d{1,3}){0,4}\\s*" maxlength="40"')}</div><p class="field-hint">Each invoice gets each reminder once. A missed reminder is skipped after 2 days instead of being sent late. Reminders attach the invoice PDF and your bank details.</p>${errorBlock()}<div class="form-actions">${S.mail.configured ? button("Send due reminders now", "run-reminders") : ""}<button class="btn primary" type="submit">Save reminders</button></div></form>${emailHistory(S.emailLog.filter((m) => m.kind === "reminder")).replace("<h2>Emails</h2>", "<h2>Recent reminders</h2>")}</section>`;
+  return `<section class="panel mt22"><div class="panel-head"><div><h2>Email & payment reminders</h2><p>${S.mail.configured ? "Sending from " + E(S.mail.from) : "Email is not set up. Add the SMTP settings under Integration keys below."}</p></div>${badge(S.mail.configured ? "Connected" : "Not connected")}</div><form data-form="reminders"><label class="check-row"><input type="checkbox" name="remindersEnabled" ${b.remindersEnabled ? "checked" : ""} ${S.mail.configured ? "" : "disabled"}> Send automatic reminders for unpaid invoices to the client's email.</label><div class="form-grid">${input("Days before due date (0 = none)", "reminderBeforeDays", b.reminderBeforeDays ?? 3, "number", true, 'min="0" max="30" step="1"')}${input("Days after due date (comma separated)", "reminderAfterDays", b.reminderAfterDays ?? "1,7,14", "text", true, 'pattern="\\s*\\d{1,3}(\\s*,\\s*\\d{1,3}){0,4}\\s*" maxlength="40"')}</div><p class="field-hint">Each invoice gets each reminder once. A missed reminder is skipped after 2 days instead of being sent late. Reminders attach the invoice PDF and your bank details.</p>${errorBlock()}<div class="form-actions">${S.mail.configured ? button("Send due reminders now", "run-reminders") : ""}<button class="btn primary" type="submit">Save reminders</button></div></form>${emailHistory(S.emailLog.filter((m) => m.kind === "reminder")).replace("<h2>Emails</h2>", "<h2>Recent reminders</h2>")}</section>`;
 }
 // Integration keys declared by feature modules. Values are write-only.
 function integrationKeysPanel() {
@@ -522,23 +477,12 @@ function secretForm(name, clear = false) {
     `<form data-form="secret-save" data-id="${E(name)}" data-clear="${clear ? 1 : ""}">${clear ? `<p>${E(x.label)} will be removed from this server.</p>` : x.secret ? input(x.label, "value", "", "password", true, 'autocomplete="off" maxlength="8000"') : area(x.label, "value", "", 8000)}${x.help ? `<p class="field-hint">${E(x.help)}</p>` : ""}${input("Current password", "password", "", "password", true, 'autocomplete="current-password"')}${S.security.enabled ? input("Authenticator or recovery code", "code", "", "text", true, 'autocomplete="one-time-code"') : ""}${formEnd(clear ? "Clear" : "Save")}</form>`,
   );
 }
-function emailForm(id) {
-  const d = S.documents.find((d) => d.id === id);
-  if (!S.mail.configured) {
-    toast("Email is not configured on the server. Use the client link instead.", true);
-    return;
-  }
-  showModal(
-    "Email " + (d.kind === "quote" ? "quotation" : "invoice"),
-    `<form data-form="email-document" data-id="${E(id)}">${input("To", "to", d.client.email || "", "text", true, 'maxlength="600" placeholder="client@example.com"')}${input("Cc (optional)", "cc", "", "text", false, 'maxlength="600"')}${input("Subject", "subject", `${d.kind === "quote" ? "Quotation" : "Invoice"} ${d.number} from ${d.business.company}`, "text", true, 'maxlength="200"')}${area("Message (optional)", "message", "", 4000)}<label class="check-row"><input type="checkbox" name="include_link"> Include a private online link. This replaces any existing link for this document.</label>${input("Link validity (days)", "link_days", 30, "number", true, 'min="1" max="90" step="1"')}<p class="field-hint">The PDF is attached. Separate addresses with commas.</p>${formEnd("Send email")}</form>`,
-  );
-}
-function statementForm(id) {
-  const c = S.clients.find((c) => c.id === id);
-  showModal(
-    "Statement of account",
-    `<form data-form="statement" data-id="${E(id)}"><div class="form-grid">${input("From", "from_date", addDays(S.today, -90), "date", true)}${input("To", "to_date", S.today, "date", true, `max="${S.today}"`)}</div><div class="actions mt22">${button("Download PDF", "statement-pdf", id)}</div>${S.mail.configured ? `${input("Email to", "to", c.email || "", "text", true, 'maxlength="600"')}${area("Message (optional)", "message", "", 4000)}${formEnd("Email statement")}` : `<p class="field-hint">Email is not configured; download the PDF to send it yourself.</p>${errorBlock()}`}</form>`,
-  );
+// Email forms (public/ext/comms.mjs) start from these values; modules may change them (e.g. recipients
+// from client contacts) with emailPrefill(kind, record, values) and add fields
+// with the emailFields slot. kind is "document" or "statement".
+function emailPrefill(kind, record, values) {
+  for (const p of plugins) Object.assign(values, p.emailPrefill?.(kind, record, { ...values }) || {});
+  return values;
 }
 function documentView(id) {
   const d = S.documents.find((d) => d.id === id);
@@ -608,9 +552,6 @@ function renderRoute() {
       break;
     case "services":
       html = services();
-      break;
-    case "recurring":
-      html = recurring();
       break;
     case "ledger":
       html = advanced.ledger();
@@ -806,24 +747,6 @@ function paymentForm(id) {
     )}${input("Transaction reference", "reference", "", "text", true, 'maxlength="120"')}<div class="span-2">${area("Internal note", "note", "", 500)}</div>${d.proofs.some((p) => p.status === "pending") ? `<div class="span-2">${select("Match a client reference (optional)", "proof_id", [["", "No submitted reference"], ...d.proofs.filter((p) => p.status === "pending").map((p) => [p.id, p.reference])], "", false)}</div>` : ""}</div><label class="check-row"><input type="checkbox" name="confirmed" required> I have checked that this payment was received.</label>${formEnd("Confirm & create receipt")}</form>`,
   );
 }
-function scheduleForm(sid) {
-  const s = S.schedules.find((x) => x.id === sid);
-  if (s) {
-    showModal(
-      "Edit monthly schedule",
-      `<form data-form="schedule" data-id="${E(sid)}"><p>${E(S.clients.find((c) => c.id === s.client_id)?.name || "")}</p>${select("Monthly service", "service_id", [["", "Select a service"], ...S.services.filter((v) => v.active || v.id === s.service_id).map((v) => [v.id, `${v.name} / ${money(v.rate)}`])], s.service_id)}<div class="form-grid">${input("Next run date", "next_date", s.next_date, "date", true)}${input("Payment terms (days)", "terms", s.terms, "number", true, 'min="0" max="365" step="1"')}</div><label class="check-row"><input type="checkbox" name="month_end" ${s.month_end ? "checked" : ""}>Bill on the last day of each month.</label>${formEnd("Save schedule")}</form>`,
-    );
-    return;
-  }
-  if (!S.clients.length || !S.services.some((s) => s.active)) {
-    toast("Add a client and an active service first.");
-    return;
-  }
-  showModal(
-    "New monthly schedule",
-    `<form data-form="schedule">${select("Client", "client_id", clientOptions())}${select("Monthly service", "service_id", [["", "Select a service"], ...S.services.filter((s) => s.active).map((s) => [s.id, `${s.name} / ${money(s.rate)}`])])}<div class="form-grid">${input("First run date", "next_date", S.today, "date", true)}${input("Payment terms (days)", "terms", 14, "number", true, 'min="0" max="365" step="1"')}</div><label class="check-row"><input type="checkbox" name="month_end">Bill on the last day of each month.</label><div class="notice info"><p>Monthly / draft-first. Generating a draft does not send an invoice or charge the client.</p></div>${formEnd("Save schedule")}</form>`,
-  );
-}
 function reasonForm(title, type, id) {
   showModal(
     title,
@@ -1002,21 +925,6 @@ async function runAction(action, id, el) {
       toast("Quotation linked to a draft invoice.");
       break;
     }
-    case "new-schedule":
-      scheduleForm();
-      break;
-    case "edit-schedule":
-      scheduleForm(id);
-      break;
-    case "delete-schedule":
-      confirmModal(
-        "Delete schedule?",
-        "Only schedules that never generated an invoice can be deleted. Pause a used schedule instead.",
-        "confirm-delete-schedule",
-        id,
-        "Delete schedule",
-      );
-      break;
     case "delete-draft":
       confirmModal(
         "Delete this draft?",
@@ -1044,14 +952,13 @@ async function runAction(action, id, el) {
         "Delete service",
       );
       break;
-    case "confirm-delete-schedule":
     case "confirm-delete-draft":
     case "confirm-delete-client":
     case "confirm-delete-service": {
       const target = action.slice("confirm-delete-".length);
       try {
         await api(
-          `/${{ schedule: "schedules", draft: "documents", client: "clients", service: "services" }[target]}/${id}`,
+          `/${{ draft: "documents", client: "clients", service: "services" }[target]}/${id}`,
           "DELETE",
         );
       } catch (e) {
@@ -1076,12 +983,6 @@ async function runAction(action, id, el) {
       await refresh();
       renderRoute();
       toast(action === "archive-client" ? "Client archived." : "Client restored.");
-      break;
-    case "email-document":
-      emailForm(id);
-      break;
-    case "client-statement":
-      statementForm(id);
       break;
     case "statement-pdf": {
       const f = modal.querySelector("form[data-form=statement]");
@@ -1113,24 +1014,6 @@ async function runAction(action, id, el) {
       toast("Copy created as a new draft. Review the dates before issuing.");
       break;
     }
-    case "run-schedule": {
-      const d = await api(`/schedules/${id}/run`, "POST", {});
-      await refresh();
-      navigate("document/" + d.id);
-      toast("Recurring draft created. Review before issuing.");
-      break;
-    }
-    case "pause-schedule":
-    case "resume-schedule":
-      await api(
-        `/schedules/${id}/${action === "pause-schedule" ? "pause" : "resume"}`,
-        "POST",
-        {},
-      );
-      await refresh();
-      renderRoute();
-      toast("Schedule updated.");
-      break;
     case "public-accept":
       showModal(
         "Accept quotation",
@@ -1281,25 +1164,6 @@ async function submitForm(form) {
     toast("Payment reversed. Invoice balance updated.");
     return;
   }
-  if (type === "email-document") {
-    await api(`/documents/${id}/email`, "POST", {
-      ...b,
-      include_link: b.include_link === "on",
-      link_days: Number(b.link_days),
-    });
-    modal.close();
-    await refresh();
-    renderRoute();
-    toast("Email sent.");
-    return;
-  }
-  if (type === "statement") {
-    await api(`/clients/${id}/statement/email`, "POST", b);
-    modal.close();
-    await refresh();
-    toast("Statement emailed.");
-    return;
-  }
   if (type === "sst-report") {
     location.href = `/api/reports/sst.csv?${new URLSearchParams({ from: b.from, to: b.to })}`;
     return;
@@ -1313,17 +1177,6 @@ async function submitForm(form) {
     await refresh();
     renderRoute();
     toast("Reminder settings saved.");
-    return;
-  }
-  if (type === "schedule") {
-    await api(id ? "/schedules/" + id : "/schedules", id ? "PUT" : "POST", {
-      ...b,
-      month_end: b.month_end === "on",
-    });
-    modal.close();
-    await refresh();
-    renderRoute();
-    toast(id ? "Schedule updated." : "Monthly schedule created.");
     return;
   }
   if (type === "accept") {
@@ -1457,7 +1310,10 @@ async function upload(file, params) {
   return data;
 }
 const uiHelpers = {
+  emailPrefill,
   get: () => S,
+  paper,
+  logo,
   session: () => session,
   upload,
   slot,

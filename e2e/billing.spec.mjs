@@ -87,11 +87,19 @@ test("quotation: client accepts online and the owner converts it", async ({ page
   const guest = await context.browser().newPage();
   await guest.goto(link);
   await guest.click('[data-action="public-accept"]');
-  const accept = guest.locator('form[data-form="accept"]');
+  // The client signs on a pad before accepting.
+  const accept = guest.locator("form.portal-sign");
   await accept.locator("input[name=name]").fill("Aminah Binti Ali");
-  await accept.locator('input[type=checkbox]').check();
+  const pad = await accept.locator(".portal-sign-draw canvas").boundingBox();
+  await guest.mouse.move(pad.x + 30, pad.y + pad.height / 2);
+  await guest.mouse.down();
+  for (const [dx, dy] of [[60, -20], [120, 25], [180, -15], [240, 20], [300, 0]])
+    await guest.mouse.move(pad.x + 30 + dx, pad.y + pad.height / 2 + dy, { steps: 4 });
+  await guest.mouse.up();
+  await accept.locator("input[name=agree]").check();
   await accept.locator("button[type=submit]").click();
-  await expect(guest.locator("#toast")).toContainText("accepted");
+  await expect(guest.locator("#toast")).toContainText("Quotation accepted");
+  await expect(guest.locator(".portal-signature img")).toBeVisible();
   await guest.close();
 
   await page.reload();
