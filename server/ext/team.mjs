@@ -10,6 +10,9 @@ import { USER_MIGRATION, attachUsers, normalEmail } from "../team-users.mjs";
 import { migrateAuditChain, sealAudit, chainHead, verifyAuditChain } from "../team-audit.mjs";
 import { BACKUP_MIGRATION, RemoteBackups, attachBackups, configureBackups, latestLocalBackup } from "../team-backup.mjs";
 
+// Longest a storage request may take (uploads allow 10 minutes), plus margin.
+const REMOTE_TIMEOUT = 11 * 60000;
+
 // Route classification for every module, built once the module list is loaded
 // (a static import of plugins.mjs would be circular).
 let rules = null;
@@ -329,16 +332,20 @@ export default {
       if (path === "/api/team/backup/test" && method === "POST") {
         owner();
         r.allow("team-backup-test:" + r.session.owner_id, 10, 600000);
+        // Storage calls can take minutes; keep the response open past the default 20 s.
+        r.res.setTimeout(REMOTE_TIMEOUT);
         return sendJson(200, await r.ctx.backups.remote.test());
       }
       if (path === "/api/team/backup/remote" && method === "GET") {
         owner();
         r.allow("team-backup-list:" + r.session.owner_id, 20, 600000);
+        r.res.setTimeout(REMOTE_TIMEOUT);
         return sendJson(200, await r.ctx.backups.remote.list());
       }
       if (path === "/api/team/backup/upload" && method === "POST") {
         owner();
         r.allow("team-backup-upload:" + r.session.owner_id, 10, 600000);
+        r.res.setTimeout(REMOTE_TIMEOUT);
         const latest = await latestLocalBackup(configureBackups(r.ctx.backups, store));
         check(latest, "There is no local backup to upload yet. Run a backup first.", 409);
         const out = await r.ctx.backups.remote.upload(latest.path);

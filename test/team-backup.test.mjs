@@ -274,3 +274,39 @@ test("a failed upload never fails the local backup and can be retried; the conne
     await rm(dir, { recursive: true, force: true });
   }
 });
+
+test("console commands combine server and saved storage settings key by key", async () => {
+  const { mkdtempSync, rmSync } = await import("node:fs");
+  const { tmpdir } = await import("node:os");
+  const { join } = await import("node:path");
+  const { openDatabase } = await import("../server/db.mjs");
+  const { remoteBackups } = await import("../server/team-cli.mjs");
+  const dir = mkdtempSync(join(tmpdir(), "nwl-cli-"));
+  const saved = { ...process.env };
+  try {
+    const path = join(dir, "work.sqlite");
+    const s = openDatabase(path);
+    s.setSecret("BACKUP_S3_ENDPOINT", "https://account.r2.cloudflarestorage.com");
+    s.setSecret("BACKUP_S3_REGION", "auto");
+    s.setSecret("BACKUP_S3_PREFIX", "office/");
+    s.db.close();
+    Object.assign(process.env, {
+      DATABASE_PATH: path,
+      BACKUP_S3_BUCKET: "env-bucket",
+      BACKUP_S3_ACCESS_KEY_ID: "AKIDEXAMPLE",
+      BACKUP_S3_SECRET_ACCESS_KEY: "secret-from-env",
+    });
+    const { remote, close } = await remoteBackups();
+    const cfg = remote.config();
+    close();
+    assert.equal(cfg.bucket, "env-bucket");
+    assert.equal(cfg.region, "auto");
+    assert.equal(cfg.prefix, "office/");
+    assert.match(cfg.endpoint, /r2\.cloudflarestorage\.com/);
+  } finally {
+    for (const k of ["DATABASE_PATH", "BACKUP_S3_BUCKET", "BACKUP_S3_ACCESS_KEY_ID", "BACKUP_S3_SECRET_ACCESS_KEY"])
+      if (saved[k] === undefined) delete process.env[k];
+      else process.env[k] = saved[k];
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

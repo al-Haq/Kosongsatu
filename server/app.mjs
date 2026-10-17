@@ -764,8 +764,11 @@ export function createApp({
           }
           if (path === "/api/recovery/status" && method === "GET")
             return send(200, backups.status());
-          if (path === "/api/recovery/backup" && method === "POST")
+          if (path === "/api/recovery/backup" && method === "POST") {
+            // A run may also upload the backup off-site, which can take minutes.
+            res.setTimeout(11 * 60000);
             return send(201, await backups.run());
+          }
           const mfa = path.match(/^\/api\/mfa\/(status|begin|enable|disable)$/);
           if (mfa) {
             const action = mfa[1];

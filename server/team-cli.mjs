@@ -18,17 +18,26 @@ function readOnly() {
   return new DatabaseSync(path, { readOnly: true });
 }
 
-// Storage settings from the environment, or from the database's saved
-// integration keys when it is available (needs its MFA key file).
-async function remoteBackups() {
-  const fromEnv = storageConfig((n) => process.env[n] || null);
-  if (fromEnv || !existsSync(databasePath())) {
-    if (!fromEnv)
+// Storage settings, each one from the environment first and otherwise from the
+// database's saved integration keys, like the running app. Without a readable
+// database (e.g. restoring on a new server) the environment alone is used.
+export async function remoteBackups() {
+  const env = (n) => process.env[n] || null;
+  const envOnly = () => {
+    if (!storageConfig(env))
       throw new Error("Set BACKUP_S3_BUCKET, BACKUP_S3_REGION, BACKUP_S3_ACCESS_KEY_ID and BACKUP_S3_SECRET_ACCESS_KEY (and BACKUP_S3_ENDPOINT for non-AWS storage).");
-    return { remote: new RemoteBackups({ config: (n) => process.env[n] || null, db: null }), close() {} };
-  }
+    return { remote: new RemoteBackups({ config: env, db: null }), close() {} };
+  };
+  if (!existsSync(databasePath())) return envOnly();
   const { openDatabase } = await import("./db.mjs");
-  const store = openDatabase(databasePath());
+  let store;
+  try {
+    store = openDatabase(databasePath());
+  } catch (e) {
+    // e.g. the MFA key file is missing; fall back to the environment if it is complete.
+    if (storageConfig(env)) return envOnly();
+    throw e;
+  }
   return { remote: new RemoteBackups(store), close: () => store.db.close() };
 }
 
