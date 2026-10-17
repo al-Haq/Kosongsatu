@@ -13,7 +13,7 @@ const KIND_NAMES = {
 const LAYOUT_NAMES = { classic: "Classic (default)", modern: "Modern colour header", compact: "Compact" };
 
 export default function documentsUI(h) {
-  const { E, money, dec, dateLabel, button, badge, input, area, select, api, refresh, renderRoute, navigate, showModal, modal, toast } = h;
+  const { dateValue, E, money, dec, dateLabel, button, badge, input, area, select, api, refresh, renderRoute, navigate, showModal, modal, toast } = h;
   const S = () => h.get();
   const ext = () => S().ext?.documents || {};
   const template = () => ({ ...(ext().template || {}), ...S().settings });
@@ -330,7 +330,7 @@ export default function documentsUI(h) {
         await reload("File attached.");
         return true;
       case "doc-instalments": {
-        const dates = [...form.querySelectorAll("[name=due_date]")].map((el) => el.value);
+        const dates = [...form.querySelectorAll("[name=due_date]")].map((el) => dateValue(el));
         const amounts = [...form.querySelectorAll("[name=amount]")].map((el) => el.value);
         await api(`/ext/documents/${form.dataset.id}/instalments`, "PUT", {
           instalments: dates.map((due_date, n) => ({ due_date, amount: amounts[n] })),

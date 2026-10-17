@@ -594,6 +594,51 @@ textarea {
   resize: vertical;
   min-height: 83px;
 }
+/* Date fields: dd/mm/yyyy text with the browser's picker behind a button. */
+.date-field {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
+  margin-top: 7px;
+}
+.date-field input[data-date] {
+  margin-top: 0;
+  flex: 1;
+}
+.date-field .date-picker {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+.date-pick {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  padding: 0;
+  font: inherit;
+  border: 1px solid #d7e1e9;
+  border-radius: 6px;
+  background: white;
+  color: #0f8077;
+  cursor: pointer;
+}
+.date-pick:hover {
+  background: #f1f5f9;
+}
+.date-pick svg {
+  width: 16px;
+  height: 16px;
+}
 input:focus,
 select:focus,
 textarea:focus {

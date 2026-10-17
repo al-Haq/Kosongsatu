@@ -113,7 +113,9 @@ export default function exampleUI(h) {
 }
 ```
 
-`h` provides: `get()` (workspace state `S`, module data in `S.ext.<name>`), `session()`, `api(path, method, body)`, `upload(file, params)`, `refresh()`, `renderRoute()`, `navigate(route)`, `showModal(title, html, wide)`, `modal`, `toast(msg, error)`, `confirmModal`, `reasonForm`, `E` (escape), `money`, `dec`, `dateLabel`, `timeLabel`, `addDays`, `button`, `badge`, `input`, `area`, `select`, `formEnd`, `errorBlock`, `heading`, `empty`, `icon`, `icons`, `paged`, `invoiceTable`, `clientOptions`, `slot`, `paper(d, publicView)` (the document paper), `logo()`.
+`h` provides: `get()` (workspace state `S`, module data in `S.ext.<name>`), `session()`, `api(path, method, body)`, `upload(file, params)`, `refresh()`, `renderRoute()`, `navigate(route)`, `showModal(title, html, wide)`, `modal`, `toast(msg, error)`, `confirmModal`, `reasonForm`, `E` (escape), `money`, `dec`, `dateLabel`, `timeLabel`, `addDays`, `button`, `badge`, `input`, `formValues(form)`, `dateValue(el)`, `setDateValue(el, iso)`, `area`, `select`, `formEnd`, `errorBlock`, `heading`, `empty`, `icon`, `icons`, `paged`, `invoiceTable`, `clientOptions`, `slot`, `paper(d, publicView)` (the document paper), `logo()`.
+
+Date fields: `input(label, name, value, "date")` renders a dd/mm/yyyy text field with a calendar button; the record value stays ISO. Read a form with `formValues(form)` (not `new FormData`) and a single field with `dateValue(el)`; write one with `setDateValue(el, iso)`.
 
 Named form fields added through `clientFields` and `documentFields` are sent with the core save request (checkboxes arrive as `"on"`). Plugins see actions and form submits before the core does, so a module can take over a core action by handling its name.
 

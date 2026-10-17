@@ -1,4 +1,5 @@
 import { automationUI } from "./automation.mjs";
+import { dmy, isoDate, tidyDmy } from "./dates.mjs";
 import { financeUI } from "./finance.mjs";
 import { UI_PLUGINS } from "./plugins.mjs";
 import { totals, toMYR, basisPoints, percentOf } from "./ext/documents-calc.mjs";
@@ -61,6 +62,7 @@ const addDays = (s, n) => {
   return d.toISOString().slice(0, 10);
 };
 const icons = {
+  calendar: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 11h18"/>',
   grid: '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>',
   doc: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h6"/>',
   users:
@@ -154,7 +156,25 @@ const input = (
   required = false,
   extra = "",
 ) =>
-  `<label>${E(label)}<input name="${name}" type="${type}" value="${E(value)}" ${required ? "required" : ""} ${extra}></label>`;
+  type === "date"
+    ? dateInput(label, name, value, required, extra)
+    : `<label>${E(label)}<input name="${name}" type="${type}" value="${E(value)}" ${required ? "required" : ""} ${extra}></label>`;
+// Dates are typed as dd/mm/yyyy; the calendar button opens the browser's own
+// picker. Read them with dateValue() or formValues(), which return ISO dates.
+function dateInput(label, name, value, required, extra) {
+  const bounds = (extra.match(/\b(?:min|max)="[^"]*"/g) || []).join(" ");
+  return `<label>${E(label)}<span class="date-field"><input name="${name}" type="text" inputmode="numeric" autocomplete="off" placeholder="dd/mm/yyyy" title="dd/mm/yyyy" pattern="\\d{2}/\\d{2}/\\d{4}|\\d{4}-\\d{2}-\\d{2}" value="${E(dmy(value))}" data-date ${required ? "required" : ""} ${extra}><input type="date" class="date-picker" tabindex="-1" aria-hidden="true" ${bounds}><button type="button" class="date-pick" aria-label="Choose a date" title="Choose a date">${icon("calendar")}</button></span></label>`;
+}
+const dateValue = (el) => isoDate(el.value);
+const setDateValue = (el, iso) => {
+  el.value = dmy(iso);
+};
+// A form's fields as an object; dd/mm/yyyy date fields come back as ISO dates.
+function formValues(form) {
+  const b = Object.fromEntries(new FormData(form));
+  for (const el of form.querySelectorAll("input[data-date]")) if (el.name in b) b[el.name] = isoDate(b[el.name]);
+  return b;
+}
 const area = (label, name, value = "", max = 1000) =>
   `<label>${E(label)}<textarea name="${name}" maxlength="${max}">${E(value)}</textarea></label>`;
 const select = (label, name, options, selected = "", required = true) =>
@@ -830,7 +850,7 @@ function documentForm(kind = "invoice", id = "", clientId = "") {
   updatePreview();
 }
 function editorData(form) {
-  const b = Object.fromEntries(new FormData(form));
+  const b = formValues(form);
   return {
     kind: form.dataset.kind,
     ...b,
@@ -881,7 +901,7 @@ function updatePreview() {
   });
   const deducted = deductions.reduce((s, x) => s + x.amount, 0);
   $("#live-preview").innerHTML =
-    `<div class="preview-paper">${logo()}<h3>${E(S.settings.company)}</h3><p class="field-hint">${E(S.clients.find((c) => c.id === b.client_id)?.name || "Select a client")}<br>${E(dueLabelFor(labels("en"), b.kind))}: ${E(b.due_date)}</p><div class="mt22">${b.items.map((i, n) => `<div class="preview-row"><span>${E(i.description || "New line item")}${lines[n].discount ? `<small>Line discount −${money(lines[n].discount, cur)}</small>` : ""}</span><strong>${priced ? money(r.lines[n].amount, cur) : E(`${i.quantity || 0} ${i.unit || ""}`)}</strong></div>`).join("")}</div>${priced ? `${discount ? `<div class="preview-row"><span>Discount</span><strong>−${money(discount, cur)}</strong></div>` : ""}${deducted ? `<div class="preview-row"><span>Less deposit</span><strong>${money(deducted, cur)}</strong></div>` : ""}${[...taxes].sort((x, y) => x[0] - y[0]).map(([rate, v]) => `<div class="preview-row"><span>SST ${rate}%</span><strong>${money(v, cur)}</strong></div>`).join("")}<div class="preview-total"><span>Total</span><span class="teal">${money(r.total, cur)}</span></div>` : ""}</div>`;
+    `<div class="preview-paper">${logo()}<h3>${E(S.settings.company)}</h3><p class="field-hint">${E(S.clients.find((c) => c.id === b.client_id)?.name || "Select a client")}<br>${E(dueLabelFor(labels("en"), b.kind))}: ${E(/^\d{4}-\d{2}-\d{2}$/.test(b.due_date || "") ? dateLabel(b.due_date) : b.due_date || "")}</p><div class="mt22">${b.items.map((i, n) => `<div class="preview-row"><span>${E(i.description || "New line item")}${lines[n].discount ? `<small>Line discount −${money(lines[n].discount, cur)}</small>` : ""}</span><strong>${priced ? money(r.lines[n].amount, cur) : E(`${i.quantity || 0} ${i.unit || ""}`)}</strong></div>`).join("")}</div>${priced ? `${discount ? `<div class="preview-row"><span>Discount</span><strong>−${money(discount, cur)}</strong></div>` : ""}${deducted ? `<div class="preview-row"><span>Less deposit</span><strong>${money(deducted, cur)}</strong></div>` : ""}${[...taxes].sort((x, y) => x[0] - y[0]).map(([rate, v]) => `<div class="preview-row"><span>SST ${rate}%</span><strong>${money(v, cur)}</strong></div>`).join("")}<div class="preview-total"><span>Total</span><span class="teal">${money(r.total, cur)}</span></div>` : ""}</div>`;
 }
 function paymentForm(id) {
   const d = S.documents.find((d) => d.id === id);
@@ -1146,8 +1166,8 @@ async function runAction(action, id, el) {
     case "statement-pdf": {
       const f = modal.querySelector("form[data-form=statement]");
       const q = new URLSearchParams({
-        from: f.from_date.value,
-        to: f.to_date.value,
+        from: dateValue(f.from_date),
+        to: dateValue(f.to_date),
       });
       location.href = `/api/clients/${id}/statement/pdf?${q}`;
       break;
@@ -1240,7 +1260,7 @@ async function renderPublic() {
 }
 async function submitForm(form) {
   const type = form.dataset.form,
-    b = Object.fromEntries(new FormData(form)),
+    b = formValues(form),
     id = form.dataset.id;
   for (const p of plugins) if (await p.submit?.(form, b)) return;
   if (await workflow.submit(form, b)) return;
@@ -1383,6 +1403,39 @@ document.addEventListener("click", async (event) => {
     el.disabled = false;
   }
 });
+// Date fields: dd/mm/yyyy typing help and the calendar picker.
+document.addEventListener("input", (event) => {
+  const el = event.target;
+  if (!el.matches?.("input[data-date]") || event.inputType !== "insertText") return;
+  if (/^\d{2}$/.test(el.value) || /^\d{2}\/\d{2}$/.test(el.value)) el.value += "/";
+});
+document.addEventListener("focusout", (event) => {
+  const el = event.target;
+  if (el.matches?.("input[data-date]")) el.value = tidyDmy(el.value);
+});
+document.addEventListener("click", (event) => {
+  const btn = event.target.closest?.(".date-pick");
+  if (!btn) return;
+  const field = btn.closest(".date-field");
+  const text = field.querySelector("input[data-date]"),
+    picker = field.querySelector(".date-picker");
+  const iso = isoDate(text.value);
+  picker.value = /^\d{4}-\d{2}-\d{2}$/.test(iso) ? iso : "";
+  try {
+    picker.showPicker();
+  } catch {
+    picker.focus();
+    picker.click();
+  }
+});
+document.addEventListener("change", (event) => {
+  const picker = event.target;
+  if (!picker.matches?.(".date-picker") || !picker.value) return;
+  const text = picker.closest(".date-field").querySelector("input[data-date]");
+  text.value = dmy(picker.value);
+  text.dispatchEvent(new Event("input", { bubbles: true }));
+  text.dispatchEvent(new Event("change", { bubbles: true }));
+});
 document.addEventListener("submit", async (event) => {
   const form = event.target.closest("form[data-form]");
   if (!form) return;
@@ -1446,11 +1499,7 @@ document.addEventListener("change", (event) => {
   ) {
     const form = event.target.form,
       c = S.clients.find((c) => c.id === event.target.value);
-    if (c)
-      form.elements.due_date.value = addDays(
-        form.elements.issue_date.value,
-        c.terms,
-      );
+    if (c) setDateValue(form.elements.due_date, addDays(dateValue(form.elements.issue_date), c.terms));
     updatePreview();
   }
 });
@@ -1521,6 +1570,9 @@ const uiHelpers = {
   button,
   badge,
   input,
+  formValues,
+  dateValue,
+  setDateValue,
   area,
   select,
   formEnd,

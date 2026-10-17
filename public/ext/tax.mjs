@@ -1,7 +1,7 @@
 // Tax and compliance: SST-02 worksheet, SST on notes, exemptions, LHDN MyInvois e-Invoice, readiness checks and tax threshold monitor.
 // Browser module contract: see docs/PLUGINS.md.
 export default function taxUI(h) {
-  const { E, money, dec, dateLabel, timeLabel, button, input, area, select, formEnd, heading, empty, api, refresh, renderRoute, navigate, showModal, modal, toast } = h;
+  const { dateValue, E, money, dec, dateLabel, timeLabel, button, input, area, select, formEnd, heading, empty, api, refresh, renderRoute, navigate, showModal, modal, toast } = h;
   const S = () => h.get();
   const T = () => S()?.ext?.tax;
   const STATES = {
@@ -451,7 +451,7 @@ export default function taxUI(h) {
     const form = event.target.closest?.('form[data-form="editor"]');
     if (!form || !["client_id", "issue_date"].includes(event.target.name) || !T()) return;
     const note = form.querySelector("[data-tax-exempt-note]");
-    if (note) note.innerHTML = exemptText(form.elements.client_id.value, form.elements.issue_date.value);
+    if (note) note.innerHTML = exemptText(form.elements.client_id.value, dateValue(form.elements.issue_date));
   });
 
   return {
