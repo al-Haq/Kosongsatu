@@ -273,7 +273,7 @@ export function attachAccess(Store) {
           outstanding: invoices.reduce((s, d) => s + inMYR(d, d.balance), 0),
           overdue: invoices.filter((d) => d.balance > 0 && d.due_date < asOf).reduce((s, d) => s + inMYR(d, d.balance), 0),
           open_invoices: invoices.filter((d) => d.balance > 0).length,
-          credit_available: receipts.reduce((s, r) => s + r.available, 0),
+          credit_available: receipts.reduce((s, r) => s + inMYR(r, r.available), 0),
         },
         documents: docs.map((d) => ({
           id: d.id,
@@ -292,6 +292,7 @@ export function attachAccess(Store) {
           number: r.number,
           paid_date: r.paid_date,
           amount: r.amount,
+          currency: r.currency || "MYR",
           method: r.method,
           refunded: r.refunded,
           available: r.available,

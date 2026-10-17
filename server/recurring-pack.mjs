@@ -1,5 +1,6 @@
 // Monthly accountant pack: a PDF summary and CSV files for one calendar month.
 // Only invoices affect money; quotations and other kinds are left out.
+import { toMYR } from "../public/ext/documents-calc.mjs";
 import PDFDocument from "pdfkit";
 import { crc32 } from "node:zlib";
 import { fileURLToPath } from "node:url";
@@ -28,30 +29,32 @@ export function packData(store, month) {
       due_date: d.due_date,
       client: d.client.name,
       client_tin: d.client.tin || "",
-      subtotal: d.subtotal,
-      discount: d.discount,
-      tax: d.tax || 0,
-      total: d.total,
+      // Foreign-currency documents are reported in MYR at their frozen rate.
+      currency: d.currency || "MYR",
+      subtotal: toMYR(d.subtotal, d.fx_rate),
+      discount: toMYR(d.discount, d.fx_rate),
+      tax: toMYR(d.tax || 0, d.fx_rate),
+      total: toMYR(d.total, d.fx_rate),
       status: d.state === "void" ? "Void" : "Issued",
     }));
   const notes = store.db
     .prepare(
-      "SELECT a.number,a.kind,a.amount,a.reason,a.issue_date,d.number invoice,d.client_snapshot FROM adjustments a JOIN documents d ON d.id=a.invoice_id WHERE a.issue_date BETWEEN ? AND ? ORDER BY a.issue_date,a.number",
+      "SELECT a.number,a.kind,a.amount,a.reason,a.issue_date,d.number invoice,d.client_snapshot,d.currency,d.fx_rate FROM adjustments a JOIN documents d ON d.id=a.invoice_id WHERE a.issue_date BETWEEN ? AND ? ORDER BY a.issue_date,a.number",
     )
     .all(r.from, r.to)
-    .map(({ client_snapshot, ...n }) => ({ ...n, client: name(client_snapshot) }));
+    .map(({ client_snapshot, fx_rate, ...n }) => ({ ...n, amount: toMYR(n.amount, fx_rate), currency: n.currency || "MYR", client: name(client_snapshot) }));
   const receipts = store.db
     .prepare(
-      "SELECT number,paid_date,method,reference,amount,client_snapshot FROM cash_receipts WHERE voided=0 AND paid_date BETWEEN ? AND ? ORDER BY paid_date,number",
+      "SELECT number,paid_date,method,reference,amount,client_snapshot,currency,fx_rate FROM cash_receipts WHERE voided=0 AND paid_date BETWEEN ? AND ? ORDER BY paid_date,number",
     )
     .all(r.from, r.to)
-    .map(({ client_snapshot, ...x }) => ({ ...x, client: name(client_snapshot) }));
+    .map(({ client_snapshot, fx_rate, ...x }) => ({ ...x, amount: toMYR(x.amount, fx_rate), currency: x.currency || "MYR", client: name(client_snapshot) }));
   const refunds = store.db
     .prepare(
-      "SELECT f.number,f.paid_date,f.reference,f.amount,f.reason,r.number receipt,r.client_snapshot FROM refunds f JOIN cash_receipts r ON r.id=f.receipt_id WHERE f.paid_date BETWEEN ? AND ? ORDER BY f.paid_date,f.number",
+      "SELECT f.number,f.paid_date,f.reference,f.amount,f.reason,r.number receipt,r.client_snapshot,r.currency,r.fx_rate FROM refunds f JOIN cash_receipts r ON r.id=f.receipt_id WHERE f.paid_date BETWEEN ? AND ? ORDER BY f.paid_date,f.number",
     )
     .all(r.from, r.to)
-    .map(({ client_snapshot, ...x }) => ({ ...x, client: name(client_snapshot) }));
+    .map(({ client_snapshot, fx_rate, ...x }) => ({ ...x, amount: toMYR(x.amount, fx_rate), currency: x.currency || "MYR", client: name(client_snapshot) }));
   // Balances as at the last day of the month, with the same rules as the statement of account.
   const aging = { current: 0, d30: 0, d60: 0, d90: 0, over90: 0 };
   const open = [];
@@ -64,8 +67,9 @@ export function packData(store, month) {
     if (balance <= 0) continue;
     const late = daysBetween(d.due_date, r.to);
     const bucket = late <= 0 ? "current" : late <= 30 ? "d30" : late <= 60 ? "d60" : late <= 90 ? "d90" : "over90";
-    aging[bucket] += balance;
-    open.push({ number: d.number, client: d.client.name, due_date: d.due_date, days_late: Math.max(0, late), balance });
+    const balanceMyr = toMYR(balance, d.fx_rate);
+    aging[bucket] += balanceMyr;
+    open.push({ number: d.number, client: d.client.name, due_date: d.due_date, days_late: Math.max(0, late), balance: balanceMyr, currency: d.currency || "MYR" });
   }
   open.sort((a, b) => a.due_date.localeCompare(b.due_date));
   const sst = store.sstReport({ from: r.from, to: r.to });

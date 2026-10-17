@@ -25,7 +25,7 @@ import {
 import { depositParts, basisPoints } from "../public/ext/documents-calc.mjs";
 import { labels } from "../public/ext/documents-i18n.mjs";
 import { hasCjk, cjkFontPath, CJK_MESSAGE } from "./documents-fonts.mjs";
-import { bindPdf } from "./documents-assets.mjs";
+import { bindPdf, freezeBusiness } from "./documents-assets.mjs";
 
 export const LAYOUTS = ["classic", "modern", "compact"];
 export const TEMPLATE_DEFAULTS = {
@@ -389,6 +389,7 @@ export function attachDocuments(Store) {
     hydrate(row) {
       const d = original.hydrate.call(this, row);
       bindPdf(d.business, this);
+      if (row.business_snapshot) freezeBusiness(d.business);
       const children = this.db
         .prepare(
           "SELECT id,kind,number,state,source_role,total,currency FROM documents WHERE source_id=? OR source_quote=? ORDER BY created,id",
@@ -707,9 +708,12 @@ export function attachDocuments(Store) {
       this.db.prepare("UPDATE settings SET data=? WHERE id=1").run(JSON.stringify({ ...s, logoFileId: null }));
       this.audit("settings.logo.changed", null, "Logo removed", { logoFileId: s.logoFileId || null }, { logoFileId: null });
     },
-    // Logo bytes for a document's business snapshot: its own logo, else the current one.
+    // Logo bytes for a document's business snapshot. A frozen snapshot (issued
+    // document, receipt) shows only the logo it was issued with, possibly none;
+    // drafts and live settings fall back to the current logo.
     logoFor(business) {
-      for (const fid of [business?.logoFileId, this.settings().logoFileId]) {
+      const ids = business?.frozen ? [business.logoFileId] : [business?.logoFileId, this.settings().logoFileId];
+      for (const fid of ids) {
         if (!fid) continue;
         const f = this.db.prepare("SELECT mime,data FROM files WHERE id=? AND purpose='logo'").get(fid);
         if (f && ["image/png", "image/jpeg"].includes(f.mime)) return { mime: f.mime, data: Buffer.from(f.data) };
@@ -739,6 +743,7 @@ export function attachDocuments(Store) {
     receipt(rid) {
       const r = original.receipt.call(this, rid);
       bindPdf(r.business, this);
+      freezeBusiness(r.business);
       return { ...r, currency: r.currency || "MYR", fx_rate: r.fx_rate || "1" };
     },
     allocate(rid, b) {

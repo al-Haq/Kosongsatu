@@ -7,4 +7,11 @@ export function bindPdf(business, store) {
   if (business && typeof business === "object") stores.set(business, store);
   return business;
 }
+// Marks a business snapshot as frozen (issued document, receipt), so the PDF
+// never falls back to the current logo. Not enumerable: never serialised.
+export function freezeBusiness(business) {
+  if (business && typeof business === "object" && !business.frozen)
+    Object.defineProperty(business, "frozen", { value: true, enumerable: false, configurable: true });
+  return business;
+}
 export const pdfStore = (business) => (business && typeof business === "object" && stores.get(business)) || null;
