@@ -45,6 +45,18 @@ export const FILE_EXTENSIONS = {
 };
 const meta = ({ data, ...row }) => row;
 export function attachFiles(Store) {
+  // Deleting a record also deletes its files, inside the same transaction.
+  for (const name of ["deleteDraft", "deleteClient", "deleteService", "deleteSchedule", "deleteOpportunity"]) {
+    const original = Store.prototype[name];
+    if (!original) continue;
+    Store.prototype[name] = function (entityId, ...rest) {
+      return this.tx(() => {
+        const out = original.call(this, entityId, ...rest);
+        this.deleteFilesFor(entityId);
+        return out;
+      });
+    };
+  }
   Object.assign(Store.prototype, {
     // Saves an uploaded file for one record. `accept` limits the allowed types,
     // e.g. ["image/png","image/jpeg"] for a logo.
@@ -93,6 +105,17 @@ export function attachFiles(Store) {
       const f = this.db.prepare("SELECT * FROM files WHERE id=?").get(fid);
       check(f, "File not found.", 404);
       return { ...f, data: Buffer.from(f.data) };
+    },
+    // Removes every file attached to a record that is being deleted.
+    // Record ids are UUIDs, so the id alone identifies the owner.
+    deleteFilesFor(entityId) {
+      const rows = this.db
+        .prepare("SELECT id,purpose,name FROM files WHERE entity_id=?")
+        .all(entityId);
+      if (!rows.length) return 0;
+      this.db.prepare("DELETE FROM files WHERE entity_id=?").run(entityId);
+      this.audit("file.deleted", entityId, `${rows.length} attached file(s) removed with the record`);
+      return rows.length;
     },
     deleteFile(fid) {
       const f = this.file(fid);
