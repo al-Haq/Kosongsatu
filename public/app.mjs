@@ -163,7 +163,7 @@ const input = (
 // picker. Read them with dateValue() or formValues(), which return ISO dates.
 function dateInput(label, name, value, required, extra) {
   const bounds = (extra.match(/\b(?:min|max)="[^"]*"/g) || []).join(" ");
-  return `<label>${E(label)}<span class="date-field"><input name="${name}" type="text" inputmode="numeric" autocomplete="off" placeholder="dd/mm/yyyy" title="dd/mm/yyyy" pattern="\\d{2}/\\d{2}/\\d{4}" value="${E(dmy(value))}" data-date ${required ? "required" : ""} ${extra}><input type="date" class="date-picker" tabindex="-1" aria-hidden="true" ${bounds}><button type="button" class="date-pick" aria-label="Choose a date" title="Choose a date">${icon("calendar")}</button></span></label>`;
+  return `<label>${E(label)}<span class="date-field"><input name="${name}" type="text" inputmode="numeric" autocomplete="off" placeholder="dd/mm/yyyy" title="dd/mm/yyyy" pattern="\\d{2}/\\d{2}/\\d{4}|\\d{4}-\\d{2}-\\d{2}" value="${E(dmy(value))}" data-date ${required ? "required" : ""} ${extra}><input type="date" class="date-picker" tabindex="-1" aria-hidden="true" ${bounds}><button type="button" class="date-pick" aria-label="Choose a date" title="Choose a date">${icon("calendar")}</button></span></label>`;
 }
 const dateValue = (el) => isoDate(el.value);
 const setDateValue = (el, iso) => {

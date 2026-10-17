@@ -1,7 +1,7 @@
 // Books and reports: expenses and vendor bills, receipt scanning, sales reports, profit and loss, accounting exports, cash flow, tax summaries, late-payment prediction and cash health.
 // Browser module contract: see docs/PLUGINS.md.
 export default function booksUI(h) {
-  const { E, money, dec, dateLabel, button, input, area, select, formEnd, heading, empty, icon, showModal, modal, toast } = h;
+  const { E, money, dec, dateLabel, button, input, setDateValue, area, select, formEnd, heading, empty, icon, showModal, modal, toast } = h;
   const S = () => h.get();
   const B = () => S()?.ext?.books || null;
   const T = () => S().today;
@@ -214,7 +214,9 @@ export default function booksUI(h) {
     if (!f) return;
     const set = (name, value) => {
       const el = field(f, name);
-      if (el && value) el.value = value;
+      if (!el || !value) return;
+      if (el.matches("input[data-date]")) setDateValue(el, value);
+      else el.value = value;
     };
     set("date", d.date);
     set("paid_date", d.date);
