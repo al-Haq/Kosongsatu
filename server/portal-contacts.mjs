@@ -154,7 +154,7 @@ export function attachContacts(Store) {
       });
     },
     // Who gets a client's invoices and statements: the main email, plus a copy
-    // for every contact marked "copy on invoices". Mail allows 5 recipients.
+    // for every contact marked "copy on invoices". Mail allows 5 To and 5 Cc.
     clientRecipients(clientId) {
       const client = this.client(clientId);
       const to = client.email ? [client.email] : [];
@@ -165,7 +165,7 @@ export function attachContacts(Store) {
           seen.add(c.email.toLowerCase());
           cc.push(c.email);
         }
-      return { to, cc: cc.slice(0, Math.max(0, 5 - to.length)) };
+      return { to, cc: cc.slice(0, 5) };
     },
   });
 }

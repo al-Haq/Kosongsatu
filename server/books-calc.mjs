@@ -12,6 +12,8 @@
 //   count as cash out on their paid date and are never added to the accrual cost
 //   a second time.
 import { addDays, allocateDiscount, nextMonth } from "./domain.mjs";
+import { planOf, planAmounts } from "./recurring-plans.mjs";
+import { stepPeriod } from "./recurring-dates.mjs";
 
 // Typical Malaysian Form B / Form P "financial particulars" expense lines.
 export const FORM_LINES = [
@@ -534,10 +536,31 @@ function step(day, every, s = {}) {
   for (let i = 0; i < months; i++) d = nextMonth(d, s.anchor_day ?? Number(day.slice(-2)), !!s.month_end);
   return d;
 }
+const planLabel = (s) => {
+  const lines = typeof s.lines === "string" ? planOf(s).lines : Array.isArray(s.lines) ? s.lines : [];
+  return lines[0]?.description ? lines[0].description + (lines.length > 1 ? ` +${lines.length - 1}` : "") : "";
+};
+// A plan's expected invoice total. Plans store their lines and discount, so
+// the amount is worked out exactly as the invoice will be; older one-service
+// rows fall back to the catalog rate.
 export function scheduleAmount(s, service) {
+  const lines = typeof s.lines === "string" ? planOf(s).lines : Array.isArray(s.lines) ? s.lines : [];
+  if (lines.length)
+    try {
+      return planAmounts(lines, s.discount || 0).total;
+    } catch {
+      // A plan the recurring module refuses to bill adds nothing to the forecast.
+      return 0;
+    }
   if (Number.isInteger(s.amount) && s.amount > 0) return s.amount;
   if (!service) return 0;
   return service.rate + Math.round((service.rate * (service.tax_rate || 0)) / 100);
+}
+// The next billing date of a plan: weekly to yearly, keeping the anchor day.
+export function scheduleStep(day, s) {
+  if (s.freq_unit)
+    return stepPeriod(day, { unit: s.freq_unit, interval: s.freq_interval || 1, anchor_day: s.anchor_day, month_end: s.month_end });
+  return step(day, s.frequency || "month", s);
 }
 export function cashForecast({
   docs,
@@ -612,11 +635,11 @@ export function cashForecast({
       if (s.end_date && day > s.end_date) break;
       put(addDays(day, (s.terms ?? 14) + delayOf(s.client_id)), amount, {
         kind: "schedule",
-        label: `${service?.name || "Recurring"} · ${name}`,
+        label: `${service?.name || planLabel(s) || "Recurring plan"} · ${name}`,
         note: `billed ${day}`,
         ref: s.id,
       });
-      day = step(day, s.frequency || "month", s);
+      day = scheduleStep(day, s);
     }
   }
   // Outflows

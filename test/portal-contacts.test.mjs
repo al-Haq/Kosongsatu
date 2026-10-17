@@ -78,6 +78,9 @@ test("invoices and statements go to the main email with copies for flagged conta
     const statement = await f.json(`/api/clients/${c.id}/statement/email`, "POST", { to: "aina@client.example" });
     assert.equal(statement.status, "sent");
     assert.equal(f.transport.sent.at(-1).cc, undefined);
+    // Up to five copies, independent of the To address.
+    for (let n = 0; n < 5; n++) f.store.saveContact(c.id, { name: "Copy " + n, email: `copy${n}@client.example`, cc_invoices: true });
+    assert.equal(f.server.ctx.services.portal.recipients(c.id).cc.length, 5);
   } finally {
     await f.close();
   }

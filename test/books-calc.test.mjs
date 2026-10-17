@@ -281,6 +281,21 @@ test("forecast without a bank balance starts at zero and recurring schedules add
   const items = f.weeks.flatMap((w) => w.items).filter((i) => i.kind === "schedule");
   assert.ok(items.length >= 2 && items.every((i) => i.amount === 75000));
   assert.equal(f.weeks[2].inflow, 75000, "billed today, paid 14 days later");
+  // A two-line plan with a discount, every 2 weeks: its own total, on its own cadence.
+  s.saveSchedule({
+    client_id: c.id,
+    frequency: "biweekly",
+    terms: 0,
+    next_date: T,
+    discount: "10.00",
+    lines: [
+      { description: "Support", quantity: 2, rate: "100.00", tax_rate: 0 },
+      { description: "Hosting", quantity: 1, rate: "50.00", tax_rate: 0 },
+    ],
+  });
+  const plan = s.cashPicture(T).forecast.weeks.flatMap((w) => w.items).filter((i) => i.kind === "schedule" && i.amount === 24000);
+  assert.equal(plan.length, 7, "every 14 days over 13 weeks");
+  assert.match(plan[0].label, /^Support \+1/);
 });
 
 test("cash health ranks the most critical overdue invoices by amount and risk", () => {
