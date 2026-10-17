@@ -1,5 +1,6 @@
 export function automationUI(h) {
   const {
+    setDateValue,
     get,
     api,
     refresh,
@@ -149,9 +150,7 @@ export function automationUI(h) {
     });
     const until = new Date(S.today + "T00:00:00Z");
     until.setUTCDate(until.getUTCDate() + 14);
-    modal.querySelector("[name=due_date]").value = until
-      .toISOString()
-      .slice(0, 10);
+    setDateValue(modal.querySelector("[name=due_date]"), until.toISOString().slice(0, 10));
   }
   function poForm() {
     const S = get(),

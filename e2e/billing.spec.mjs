@@ -11,6 +11,9 @@ test("invoice: draft, issue, client link, payment and receipt", async ({ page, c
   await page.click('[data-action="new-invoice"]');
   const editor = page.locator('form[data-form="editor"]');
   await editor.locator("select[name=client_id]").selectOption({ label: client });
+  // Dates are typed as dd/mm/yyyy and stored as ISO.
+  await expect(editor.locator("input[name=issue_date]")).toHaveValue(/^\d{2}\/\d{2}\/\d{4}$/);
+  await editor.locator("input[name=due_date]").fill("31/12/2026");
   await editor.locator(".item-description").first().fill("Website maintenance");
   await editor.locator(".item-quantity").first().fill("2");
   await editor.locator(".item-rate").first().fill("750.50");
@@ -23,6 +26,7 @@ test("invoice: draft, issue, client link, payment and receipt", async ({ page, c
   await expect(page.locator("#toast")).toContainText("Document issued");
   const number = (await page.locator("main h1").first().textContent()).trim();
   expect(number).toMatch(/^INV-\d{4}-\d{4}$/);
+  await expect(page.locator("main")).toContainText("31 Dec 2026");
 
   await page.click('[data-action="share-document"]');
   await page.click('[data-action="generate-link"]');

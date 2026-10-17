@@ -1,7 +1,7 @@
 // Platform: outgoing webhooks, data import, installable app, invoices from plain language, hosting and one-command install.
 // Browser module contract: see docs/PLUGINS.md.
 export default function platformUI(h) {
-  const { get, api, refresh, renderRoute, navigate, showModal, modal, toast, E, money, dateLabel, timeLabel, button, input, area, select, formEnd, heading, empty, icon } = h;
+  const { get, api, refresh, renderRoute, navigate, showModal, modal, toast, E, money, dateLabel, timeLabel, button, input, formValues, dateValue, setDateValue, area, select, formEnd, heading, empty, icon } = h;
   let quick = null; // the draft being reviewed
   let quickText = "";
   let pendingImport = null; // { kind, bytes, name, result }
@@ -72,7 +72,7 @@ export default function platformUI(h) {
     quickTotal();
   }
   function quickData(form) {
-    const b = Object.fromEntries(new FormData(form));
+    const b = formValues(form);
     const items = [...form.querySelectorAll(".pq-line")].map((row) => ({
       description: row.querySelector(".pq-desc").value,
       quantity: row.querySelector(".pq-qty").value,
@@ -115,7 +115,7 @@ export default function platformUI(h) {
     const form = e.target.closest?.('form[data-form="platform-quick-save"]');
     if (!form || e.target.name !== "client_id" || !quick || quick.due_source === "text") return;
     const c = get().clients.find((x) => x.id === e.target.value);
-    if (c) form.elements.due_date.value = addDays(form.elements.issue_date.value, c.terms);
+    if (c) setDateValue(form.elements.due_date, addDays(dateValue(form.elements.issue_date), c.terms));
   });
 
   // ---------- webhooks ----------
