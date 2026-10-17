@@ -220,6 +220,17 @@ nav {
   flex-direction: column;
   gap: 5px;
 }
+.nav-group {
+  margin: 12px 16px 2px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 1.2px;
+  color: var(--muted);
+  text-transform: uppercase;
+}
+.nav-group:first-child {
+  margin-top: 0;
+}
 nav a {
   display: flex;
   align-items: center;

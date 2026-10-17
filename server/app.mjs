@@ -10,6 +10,8 @@ import { readFile } from "node:fs/promises";
 import { resolve, extname, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { openDatabase } from "./db.mjs";
+import { PLUGINS, SECRETS, JOBS } from "./plugins.mjs";
+import { MAX_FILE_BYTES } from "./files.mjs";
 import { check, AppError, hash, text } from "./domain.mjs";
 import {
   sessionFrom,
@@ -36,6 +38,12 @@ const mime = {
   ".png": "image/png",
   ".ttf": "font/ttf",
   ".svg": "image/svg+xml",
+  ".jpg": "image/jpeg",
+  ".webp": "image/webp",
+  ".ico": "image/x-icon",
+  ".json": "application/json; charset=utf-8",
+  ".webmanifest": "application/manifest+json; charset=utf-8",
+  ".woff2": "font/woff2",
 };
 function safeDoc(d) {
   return {
@@ -131,6 +139,18 @@ export function createApp({
     ...(assistantConfig !== undefined ? { config: assistantConfig } : {}),
     ...(aiFetch ? { fetcher: aiFetch } : {}),
   });
+  // Shared services for feature modules (see docs/PLUGINS.md).
+  const ctx = {
+    store,
+    appUrl: allowedOrigin,
+    secure,
+    mailer,
+    gateway,
+    assistant,
+    backups,
+    services: {},
+  };
+  for (const p of PLUGINS) p.init?.(ctx);
   const allow = (key, max, ms) => {
     const t = Date.now();
     if (limits.size > 5000) {
@@ -169,6 +189,19 @@ export function createApp({
             : JSON.stringify(data),
         );
       };
+      // Stored files are served with a locked-down policy; only images and
+      // PDFs exist, and PDFs download unless ?inline=1 is asked for.
+      const sendFile = (f, url) => {
+        const inline = f.mime.startsWith("image/") || url?.searchParams.get("inline") === "1";
+        res.writeHead(200, {
+          ...headers,
+          "Content-Type": f.mime,
+          "Content-Length": f.data.length,
+          "Content-Security-Policy": "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; sandbox",
+          "Content-Disposition": `${inline ? "inline" : "attachment"}; filename="${f.name.replace(/[^\w.-]/g, "_")}"`,
+        });
+        res.end(f.data);
+      };
       try {
         check(
           ["GET", "POST", "PUT", "PATCH", "DELETE"].includes(req.method),
@@ -178,9 +211,12 @@ export function createApp({
         const url = new URL(req.url, "http://localhost");
         const path = url.pathname;
         const method = req.method;
+        // Webhooks under /api/hooks/ come from other servers and must authenticate
+        // themselves (signatures or secret tokens); browsers never call them.
         if (
           method !== "GET" &&
           !path.startsWith("/api/integrations/") &&
+          !path.startsWith("/api/hooks/") &&
           path !== "/api/payments/billplz/callback"
         )
           check(
@@ -214,6 +250,37 @@ export function createApp({
             throw new AppError("Invalid JSON body.");
           }
         };
+        // Raw request bodies, e.g. file uploads. The caller decides the allowed types.
+        const rawBody = async (limit = MAX_FILE_BYTES) => {
+          const chunks = [];
+          let size = 0;
+          for await (const chunk of req) {
+            size += chunk.length;
+            check(size <= limit, "Upload is too large.", 413);
+            chunks.push(chunk);
+          }
+          return Buffer.concat(chunks);
+        };
+        // The request as feature modules see it.
+        const r = {
+          req,
+          res,
+          url,
+          path,
+          method,
+          ip: ipOf(req),
+          body,
+          rawBody,
+          send,
+          allow,
+          ctx,
+          sendFile,
+          session: null,
+          write: null,
+        };
+        if (path.startsWith("/api/hooks/") || path.startsWith("/api/public/") || path.startsWith("/api/guest/"))
+          for (const p of PLUGINS)
+            if (await p.routes?.guest?.(r)) return;
         if (path.startsWith("/api/integrations/")) {
           allow("connector-ip:" + ipOf(req), 120, 60000);
           const raw = req.headers.authorization || "";
@@ -326,6 +393,15 @@ export function createApp({
               online_payment:
                 gateway.status().configured &&
                 !!(d.client.email || d.client.phone || store.settings().email),
+              // Client-safe extras from feature modules (never owner-only data).
+              ext: Object.fromEntries(
+                await Promise.all(
+                  PLUGINS.filter((p) => p.publicDocument).map(async (p) => [
+                    p.name,
+                    await p.publicDocument(d, r),
+                  ]),
+                ),
+              ),
             });
           }
           if (method === "POST" && action === "checkout") {
@@ -356,7 +432,7 @@ export function createApp({
           }
           if (method === "GET" && action === "pdf") {
             const d = store.publicDocument(token);
-            return send(200, await renderPdf(d), {
+            return send(200, await renderPdf(d, null, await store.pdfBlocks(d)), {
               "Content-Type": "application/pdf",
               "Content-Disposition": `attachment; filename="${d.number}.pdf"`,
             });
@@ -389,6 +465,10 @@ export function createApp({
               "Session verification failed. Refresh and try again.",
               403,
             );
+          r.session = session;
+          r.write = write;
+          // Modules may restrict owner routes (e.g. read-only roles).
+          for (const p of PLUGINS) await p.routes?.authorize?.(r);
           if (path === "/api/session" && method === "GET")
             return send(200, { email: session.email, csrf: session.csrf });
           if (path === "/api/logout" && method === "POST") {
@@ -560,6 +640,18 @@ export function createApp({
                   "SELECT id,prompt,response,state,tool_log,created FROM assistant_runs WHERE owner_id=? ORDER BY created DESC LIMIT 20",
                 )
                 .all(session.owner_id),
+              secrets: store.secretStatus(SECRETS.map((x) => x.name)).map((x, i) => ({
+                ...x,
+                label: SECRETS[i].label,
+                help: SECRETS[i].help || "",
+                plugin: SECRETS[i].plugin,
+                secret: SECRETS[i].secret !== false,
+              })),
+              ext: Object.fromEntries(
+                await Promise.all(
+                  PLUGINS.filter((p) => p.workspace).map(async (p) => [p.name, await p.workspace(r)]),
+                ),
+              ),
             });
           if (path === "/api/settings" && method === "PUT")
             return send(200, store.saveSettings(await body()));
@@ -574,6 +666,14 @@ export function createApp({
                 sales: store.sales(),
                 automation: store.automationState(),
                 onlinePayments: gateway.list(100000),
+                files: store.db
+                  .prepare("SELECT id,entity_type,entity_id,purpose,name,mime,size,sha256,visibility,created FROM files ORDER BY created")
+                  .all(),
+                ext: Object.fromEntries(
+                  await Promise.all(
+                    PLUGINS.filter((p) => p.exportData).map(async (p) => [p.name, await p.exportData(store)]),
+                  ),
+                ),
                 audit: store.db
                   .prepare("SELECT * FROM audit ORDER BY id")
                   .all(),
@@ -931,7 +1031,7 @@ export function createApp({
               return send(200, store.saveDocument(await body(), idv));
             if (method === "GET" && action === "pdf") {
               const d = store.document(idv);
-              return send(200, await renderPdf(d), {
+              return send(200, await renderPdf(d, null, await store.pdfBlocks(d)), {
                 "Content-Type": "application/pdf",
                 "Content-Disposition": `attachment; filename="${d.number || "DRAFT"}.pdf"`,
               });
@@ -1043,13 +1143,76 @@ export function createApp({
             store.audit("schedule." + action, sid);
             return send(200, { ok: true });
           }
+          if (path === "/api/files" && method === "POST") {
+            // Raw upload: the body is the file; details travel in the query string.
+            allow("upload:" + session.owner_id, 60, 600000);
+            const data = await rawBody();
+            return send(
+              201,
+              store.saveFile({
+                entity_type: url.searchParams.get("entity_type"),
+                entity_id: url.searchParams.get("entity_id"),
+                purpose: url.searchParams.get("purpose"),
+                name: url.searchParams.get("name") || "upload",
+                visibility: url.searchParams.get("visibility") || "private",
+                data,
+              }),
+            );
+          }
+          if (path === "/api/files" && method === "GET")
+            return send(
+              200,
+              store.files(
+                url.searchParams.get("entity_type") || "",
+                url.searchParams.get("entity_id") || "",
+                url.searchParams.get("purpose") || null,
+              ),
+            );
+          const fileRoute = path.match(/^\/api\/files\/([\w-]+)$/);
+          if (fileRoute && method === "GET") return sendFile(store.file(fileRoute[1]), url);
+          if (fileRoute && method === "DELETE") {
+            store.deleteFile(fileRoute[1]);
+            return send(200, { ok: true });
+          }
+          const secretRoute = path.match(/^\/api\/secrets\/([A-Z][A-Z0-9_]{1,63})$/);
+          if (secretRoute && method === "PUT") {
+            // Integration keys need the password again, like connector tokens.
+            allow("secret:" + session.owner_id, 20, 600000);
+            const b = await body();
+            const known = SECRETS.find((x) => x.name === secretRoute[1]);
+            check(known, "Unknown setting.", 404);
+            const owner = store.db
+              .prepare("SELECT password FROM owners WHERE id=?")
+              .get(session.owner_id);
+            check(
+              await verifyPassword(b.password, owner.password),
+              "Current password is incorrect.",
+              403,
+            );
+            check(
+              verifySecondFactor(store, session.owner_id, b.code),
+              "Authenticator or recovery code required/invalid.",
+              403,
+            );
+            store.setSecret(known.name, b.value ?? null);
+            return send(200, store.secretStatus([known.name])[0]);
+          }
+          if (path === "/api/jobs" && method === "GET")
+            return send(200, Object.values(jobState));
+          const jobRoute = path.match(/^\/api\/jobs\/([a-z]+:[a-z0-9-]+)\/run$/);
+          if (jobRoute && method === "POST") {
+            check(jobs.has(jobRoute[1]), "Job not found.", 404);
+            return send(200, await server.runJob(jobRoute[1]));
+          }
+          for (const p of PLUGINS) if (await p.routes?.owner?.(r)) return;
           throw new AppError("Not found.", 404);
         }
         check(method === "GET", "Not found.", 404);
-        const staticPath =
-          path === "/" || /^\/client\/[\w-]+$/.test(path)
-            ? "/index.html"
-            : path;
+        // Browser pages: the workspace, client links and guest pages from modules
+        // (e.g. /portal/<token>). Anything with a file extension is a static asset.
+        const page =
+          path === "/" || /^\/[a-z][a-z-]{1,30}\/[\w-]{1,100}(\/[\w-]{1,100})?$/.test(path);
+        const staticPath = page ? "/index.html" : path;
         let decoded;
         try {
           decoded = decodeURIComponent(staticPath);
@@ -1071,6 +1234,16 @@ export function createApp({
         } catch {
           throw new AppError("Not found.", 404);
         }
+        if (page) {
+          // Modules may add <head> tags, e.g. link previews for shared invoices.
+          const heads = (
+            await Promise.all(PLUGINS.map((p) => p.pageHead?.(r)))
+          ).filter(Boolean);
+          if (heads.length)
+            bytes = Buffer.from(
+              bytes.toString("utf8").replace("</head>", heads.join("\n") + "\n  </head>"),
+            );
+        }
         return send(200, bytes, { "Content-Type": contentType });
       } catch (e) {
         const status = e instanceof AppError ? e.status : 500;
@@ -1087,6 +1260,33 @@ export function createApp({
     }),
   );
   server.backups = backups;
+  server.ctx = ctx;
+  // Background jobs from feature modules. A job never overlaps itself.
+  const jobs = new Map(JOBS.map((j) => [j.name, j]));
+  const jobState = Object.fromEntries(
+    JOBS.map((j) => [j.name, { name: j.name, every: j.every, running: false, lastRun: null, lastError: null, lastResult: null }]),
+  );
+  server.runJob = async (name) => {
+    const job = jobs.get(name),
+      state = jobState[name];
+    check(job, "Job not found.", 404);
+    if (state.running) return { skipped: true };
+    state.running = true;
+    try {
+      const result = await requestContext.run({ actor: "job:" + name }, () => job.run(ctx));
+      state.lastResult = result ?? null;
+      state.lastError = null;
+      return result ?? { ok: true };
+    } catch (e) {
+      state.lastError = e instanceof AppError ? e.message : "Job failed; see server log.";
+      console.error(`Job ${name} failed:`, e.message);
+      throw e;
+    } finally {
+      state.running = false;
+      state.lastRun = new Date().toISOString();
+    }
+  };
+  const jobTimers = [];
   let automationTimer, reminderTimer;
   server.startAutomations = () => {
     if (automationTimer) return;
@@ -1111,11 +1311,20 @@ export function createApp({
     remind();
     reminderTimer = setInterval(remind, 3600000);
     reminderTimer.unref();
+    for (const job of JOBS) {
+      const tick = () => server.runJob(job.name).catch(() => {});
+      const first = setTimeout(tick, job.delay ?? 15000);
+      first.unref();
+      const timer = setInterval(tick, job.every);
+      timer.unref();
+      jobTimers.push(first, timer);
+    }
   };
   server.on("close", () => {
     backups.stop();
     if (automationTimer) clearInterval(automationTimer);
     if (reminderTimer) clearInterval(reminderTimer);
+    for (const t of jobTimers) clearInterval(t);
   });
   server.requestTimeout = 20000;
   server.headersTimeout = 15000;

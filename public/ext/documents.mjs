@@ -1,0 +1,5 @@
+// Documents and billing: line discounts, item codes, PDF templates, proforma, sales and delivery orders, currencies, languages, custom fields, deposits and instalments.
+// Browser module contract: see docs/PLUGINS.md.
+export default function documentsUI() {
+  return {};
+}
