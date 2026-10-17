@@ -18,7 +18,9 @@
     "backup": "node --env-file-if-exists=.env server/cli.mjs backup",
     "restore": "node --env-file-if-exists=.env server/cli.mjs restore",
     "recover": "node --env-file-if-exists=.env server/cli.mjs recover",
-    "mcp": "node --env-file-if-exists=.env server/mcp.mjs"
+    "mcp": "node --env-file-if-exists=.env server/mcp.mjs",
+    "audit-verify": "node --env-file-if-exists=.env server/cli.mjs audit-verify",
+    "audit-head": "node --env-file-if-exists=.env server/cli.mjs audit-head"
   },
   "dependencies": {
     "@modelcontextprotocol/server": "2.3.1",

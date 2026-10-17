@@ -10,6 +10,10 @@ let advanced, workflow;
 let plugins = [];
 const slot = (name, ...args) =>
   plugins.map((p) => p.slots?.[name]?.(...args) || "").join("");
+// Modules may hide navigation, pages and actions (e.g. by user role) with
+// can(kind, name) returning false. The server still enforces every permission.
+const allowed = (kind, name) =>
+  plugins.every((p) => p.can?.(kind, name) !== false);
 const requestKeys = new Map();
 let S = null,
   session = null,
@@ -82,7 +86,9 @@ const logo = () =>
 const badge = (s) =>
   `<span class="badge ${{ Paid: "green", Accepted: "green", Active: "green", "Part-paid": "orange", "Pending review": "orange", Overdue: "red", Void: "red", Declined: "red", Viewed: "blue", Issued: "blue", Expired: "orange", Archived: "orange", Sent: "green", Failed: "red", Sending: "blue", Connected: "green" }[s] || ""}"><span class="dot"></span>${E(s)}</span>`;
 const button = (label, action, id = "", primary = false, iconName = "") =>
-  `<button type="button" class="btn ${primary ? "primary" : ""}" data-action="${action}" data-id="${E(id)}">${iconName ? icon(iconName) : ""}${E(label)}</button>`;
+  !allowed("action", action)
+    ? ""
+    : `<button type="button" class="btn ${primary ? "primary" : ""}" data-action="${action}" data-id="${E(id)}">${iconName ? icon(iconName) : ""}${E(label)}</button>`;
 const empty = (title, body = "", cta = "") =>
   `<div class="empty">${icon("doc")}<h2>${E(title)}</h2><p>${E(body)}</p>${cta}</div>`;
 function toast(message, error = false) {
@@ -164,7 +170,7 @@ const confirmModal = (title, message, action, id, label) =>
     `<p>${E(message)}</p><div class="form-error" role="alert"></div><div class="form-actions">${button("Cancel", "close-modal")}${button(label, action, id, true)}</div>`,
   );
 function renderLogin() {
-  app.innerHTML = `<div class="login-screen"><section class="login-brand"><span class="eyebrow">NAWLOGIC / BILLING WORKSPACE</span><h1>Good work deserves<br><span class="accent">a clear invoice.</span></h1><p>From the first quotation to the final receipt. A quieter way to keep your business moving.</p><div class="login-points"><span>${icon("doc")}Create with confidence</span><span>${icon("wallet")}Track every payment</span><span>${icon("shield")}Your private workspace</span></div></section><section class="login-form"><div class="login-inner">${logo()}<h2>Welcome back.</h2><p>Sign in to your Nawlogic workspace.</p><form data-form="login">${input("Email address", "email", "", "email", true, 'autocomplete="username" maxlength="160"')}${input("Password", "password", "", "password", true, 'autocomplete="current-password" maxlength="256"')}${input("Authenticator or recovery code (if enabled)", "code", "", "text", false, 'autocomplete="one-time-code" maxlength="40"')}${errorBlock()}<button class="btn primary" type="submit">Sign in ${icon("arrow")}</button></form><div class="login-footer">${icon("shield")} Owner access only. Customer invoices use a separate private link.</div></div></section></div>`;
+  app.innerHTML = `<div class="login-screen"><section class="login-brand"><span class="eyebrow">NAWLOGIC / BILLING WORKSPACE</span><h1>Good work deserves<br><span class="accent">a clear invoice.</span></h1><p>From the first quotation to the final receipt. A quieter way to keep your business moving.</p><div class="login-points"><span>${icon("doc")}Create with confidence</span><span>${icon("wallet")}Track every payment</span><span>${icon("shield")}Your private workspace</span></div></section><section class="login-form"><div class="login-inner">${logo()}<h2>Welcome back.</h2><p>Sign in to your Nawlogic workspace.</p><form data-form="login">${input("Email address", "email", "", "email", true, 'autocomplete="username" maxlength="160"')}${input("Password", "password", "", "password", true, 'autocomplete="current-password" maxlength="256"')}${input("Authenticator or recovery code (if enabled)", "code", "", "text", false, 'autocomplete="one-time-code" maxlength="40"')}${errorBlock()}<button class="btn primary" type="submit">Sign in ${icon("arrow")}</button></form>${slot("login")}<div class="login-footer">${icon("shield")} Team access only. Customer invoices use a separate private link.</div></div></section></div>`;
 }
 const NAV_GROUPS = ["Sell", "Get paid", "Records", "Books", "Operations", "Workspace"];
 const navItems = [
@@ -184,7 +190,9 @@ const navItems = [
 // Modules add entries as { key, label, icon, group, hidden?() }.
 function allNav() {
   const extra = plugins.flatMap((p) => p.nav || []).filter((n) => !n.hidden?.());
-  const list = [...navItems.map(([key, label, ic, group]) => ({ key, label, icon: ic, group })), ...extra];
+  const list = [...navItems.map(([key, label, ic, group]) => ({ key, label, icon: ic, group })), ...extra].filter((n) =>
+    allowed("nav", n.key),
+  );
   const groups = [...NAV_GROUPS, ...new Set(extra.map((n) => n.group).filter((g) => !NAV_GROUPS.includes(g)))];
   return groups
     .map((g) => [g, list.filter((n) => (n.group || "Workspace") === g)])
@@ -573,7 +581,9 @@ function renderRoute() {
   const page = rawPage || "overview";
   let html,
     active = page;
-  switch (page) {
+  if (!allowed("page", page))
+    html = empty("Not available", "Your access does not include this page. Ask the workspace owner.");
+  else switch (page) {
     case "sales":
       html = workflow.sales();
       break;

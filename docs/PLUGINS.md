@@ -52,6 +52,9 @@ export default {
   pageHead(r) { return ""; },
   // Added to the JSON business export as ext.<name>. No secrets or file bytes.
   exportData(store) { return {}; },
+  // Routes staff and accountants may use (server/ext/team.mjs). Unlisted owner
+  // routes are refused for them, so new routes stay owner-only by default.
+  access: { staff: [["POST", /^\/api\/example$/]], accountant: [["GET", /^\/api\/example$/]] },
   // Called on a restored copy of the database: revoke links, tokens, outgoing jobs.
   onRestore(db) {},
   // Demo workspace records.
@@ -86,7 +89,9 @@ export default function exampleUI(h) {
     async action(type, id, el) { /* return true when handled */ },
     async submit(form, b) { /* return true when handled */ },
     async guestPage(location) { /* render a page without sign-in; return true */ },
+    can(kind, name) { /* "nav" | "page" | "action": return false to hide (e.g. by role) */ },
     slots: {
+      login: () => "",                       // under the sign-in form (e.g. "Forgot password?")
       topbar: () => "",                      // small items in the top bar (e.g. a bell)
       overview: () => "",                    // panels on the overview page
       documentActions: (d) => "",            // buttons on a document

@@ -6,6 +6,7 @@ import { now } from "./domain.mjs";
 import { openDatabase } from "./db.mjs";
 import { createOwner } from "./auth.mjs";
 import { seedDemo } from "./seed.mjs";
+import { sealAudit } from "./team-audit.mjs";
 import { createApp } from "./app.mjs";
 import { randomBytes } from "node:crypto";
 import { createInterface } from "node:readline/promises";
@@ -68,13 +69,16 @@ if (mode === "setup") {
   const db = new DatabaseSync(path);
   const rl = createInterface({ input: stdin, output: stdout });
   try {
-    const owner = db.prepare("SELECT * FROM owners LIMIT 1").get();
-    if (!owner) throw new Error("Owner not found.");
+    if (!db.prepare("SELECT id FROM owners LIMIT 1").get()) throw new Error("Owner not found.");
     const answer = await rl.question(
-      "Console recovery resets owner password, disables MFA and revokes sessions. Type the owner email to confirm: ",
+      "Console recovery resets a user's password, disables their MFA and revokes their sessions. Type the account email to confirm: ",
     );
-    if (answer.trim().toLowerCase() !== owner.email)
-      throw new Error("Owner email did not match. No changes made.");
+    // With several users (server/ext/team.mjs), the typed email picks the account.
+    const owner = db
+      .prepare("SELECT * FROM owners WHERE email=?")
+      .get(answer.trim().toLowerCase());
+    if (!owner) throw new Error("No user with that email. No changes made.");
+    const isOwner = !owner.role || owner.role === "owner";
     const password = randomBytes(18).toString("base64url");
     const hashed = await passwordHash(password);
     db.exec("PRAGMA foreign_keys=ON;BEGIN IMMEDIATE");
@@ -85,6 +89,7 @@ if (mode === "setup") {
       db.prepare("DELETE FROM sessions WHERE owner_id=?").run(owner.id);
       db.prepare("DELETE FROM recovery_codes WHERE owner_id=?").run(owner.id);
       if (
+        isOwner &&
         db
           .prepare(
             "SELECT name FROM sqlite_master WHERE name='integration_tokens'",
@@ -97,6 +102,9 @@ if (mode === "setup") {
       db.prepare(
         "INSERT INTO audit(action,entity_id,detail,created,actor) VALUES('owner.console_recovery',?,'Password reset; MFA disabled; sessions revoked',?,'local-console')",
       ).run(String(owner.id), now());
+      // Chain the entry like every other audit entry.
+      if (db.prepare("SELECT 1 FROM pragma_table_info('audit') WHERE name='hash'").get())
+        sealAudit(db);
       db.exec("COMMIT");
     } catch (e) {
       db.exec("ROLLBACK");
@@ -140,6 +148,12 @@ if (mode === "setup") {
         process.exit(0);
       }),
     );
+} else if (
+  ["audit-verify", "audit-head", "remote-backups", "fetch-backup"].includes(mode)
+) {
+  // Audit chain and off-site backup commands (server/team-cli.mjs).
+  const { runTeamCli } = await import("./team-cli.mjs");
+  process.exitCode = await runTeamCli(mode, process.argv.slice(3));
 } else {
   console.error("Use npm run setup or npm run demo.");
   process.exitCode = 1;
