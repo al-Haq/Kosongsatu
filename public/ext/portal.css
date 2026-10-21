@@ -53,7 +53,7 @@
 }
 .portal-card.dark p,
 .portal-card.dark small {
-  color: var(--muted);
+  color: var(--muted-on-dark);
 }
 .portal-card.alert .value {
   color: var(--red);
@@ -156,14 +156,14 @@
 .portal-stars input:checked ~ label,
 .portal-stars label:hover,
 .portal-stars label:hover ~ label {
-  color: var(--orange);
+  color: var(--ink);
 }
 .portal-stars input:focus-visible + label {
   outline: 2px solid var(--action);
   outline-offset: 2px;
 }
 .portal-rating {
-  color: var(--orange);
+  color: var(--ink);
   letter-spacing: 1px;
   white-space: nowrap;
 }

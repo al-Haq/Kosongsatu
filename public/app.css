@@ -25,6 +25,8 @@
   --soft: #f2f2f2;
   --red: #e11d48;
   --radius: 0;
+  /* Secondary text on the black surfaces (login panel, banners, balance cards). */
+  --muted-on-dark: rgba(255, 255, 255, 0.72);
 }
 * {
   box-sizing: border-box;
@@ -1159,7 +1161,7 @@ dialog.wide {
   border-radius: var(--radius);
 }
 .balance-card p {
-  color: var(--muted);
+  color: var(--muted-on-dark);
   font-size: 11px;
 }
 .balance-card .value {
@@ -1625,7 +1627,7 @@ select:disabled {
   display: grid;
   grid-template-columns: 1.5fr 1fr;
   gap: 32px;
-  background: var(--ink, var(--ink));
+  background: var(--ink);
   color: white;
   border-radius: var(--radius);
   padding: 32px;
@@ -1636,12 +1638,12 @@ select:disabled {
   margin: 12px 0;
 }
 .automation-banner p {
-  color: #cccccc;
+  color: var(--muted-on-dark);
   margin: 12px 0;
   line-height: 1.6;
 }
 .automation-banner .eyebrow {
-  color: var(--ink);
+  color: var(--muted-on-dark);
 }
 .proposal-card,
 .assistant-message {
@@ -1792,7 +1794,7 @@ textarea:focus {
 }
 .login-brand p,
 .login-points {
-  color: rgba(255, 255, 255, 0.72);
+  color: var(--muted-on-dark);
 }
 .login-brand .eyebrow {
   color: rgba(255, 255, 255, 0.6);
