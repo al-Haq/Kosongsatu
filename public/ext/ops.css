@@ -45,7 +45,7 @@
   align-items: center;
   gap: 6px;
   padding: 5px 10px;
-  border-radius: var(--radius);
+  border-radius: var(--radius-pill);
   background: var(--soft);
   color: var(--action);
   font-weight: 700;
