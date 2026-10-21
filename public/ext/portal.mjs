@@ -162,7 +162,7 @@ export default function portalUI(h) {
   });
 
   return {
-    nav: [{ key: "feedback", label: "Client feedback", icon: "star", group: "Records" }],
+    nav: [{ key: "feedback", label: "Feedback", icon: "star", group: "Records" }],
     pages: {
       feedback: () => {
         sizeBars();

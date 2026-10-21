@@ -12,7 +12,7 @@ export function createMcpServer({
 } = {}) {
   if (!base || !token)
     throw new Error(
-      "Set NAWLOGIC_URL and NAWLOGIC_CONNECTOR_TOKEN. Create a scoped token in AI & automation.",
+      "Set NAWLOGIC_URL and NAWLOGIC_CONNECTOR_TOKEN. Create a scoped token in Automation.",
     );
   const url = new URL(base);
   if (

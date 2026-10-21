@@ -259,10 +259,10 @@ export function supplierGaps(store, s = taxSettings(store)) {
   const out = [];
   if (!validTin(p.tin)) out.push("Your business TIN (Settings)");
   if (!validIdNumber(p.idType, p.idValue)) out.push("Your registration number (Settings)");
-  if (!MSIC_CODES.has(p.msic)) out.push("Your MSIC code (Tax & e-Invoice settings)");
-  if (!p.activity) out.push("Your business activity description (Tax & e-Invoice settings)");
+  if (!MSIC_CODES.has(p.msic)) out.push("Your MSIC code (Tax settings)");
+  if (!p.activity) out.push("Your business activity description (Tax settings)");
   if (!validPhone(p.phone)) out.push("Your business phone, e.g. +60123456789 (Settings)");
-  out.push(...addressGaps(p.address, "Your business").map((x) => x + " (Tax & e-Invoice settings)"));
+  out.push(...addressGaps(p.address, "Your business").map((x) => x + " (Tax settings)"));
   return out;
 }
 export function buyerGaps(c) {

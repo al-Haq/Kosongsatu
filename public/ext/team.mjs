@@ -229,7 +229,7 @@ export default function teamUI(h) {
   return {
     nav: [
       { key: "team", label: "Team", icon: "users", group: "Workspace", hidden: () => !isOwner() },
-      { key: "audit", label: "Audit trail", icon: "shield", group: "Workspace", hidden: () => !["owner", "accountant"].includes(role()) },
+      { key: "audit", label: "Audit", icon: "shield", group: "Workspace", hidden: () => !["owner", "accountant"].includes(role()) },
       { key: "account", label: "My account", icon: "settings", group: "Workspace", hidden: () => isOwner() },
     ],
     pages: {

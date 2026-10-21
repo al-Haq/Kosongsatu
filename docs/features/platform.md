@@ -6,7 +6,7 @@ This module covers roadmap items 80, 84, 85, 88 and 100. Everything here works w
 | --- | --- | --- |
 | Quick invoice from plain language (88) | Overview, **Quick invoice** button in the top bar | Nothing. Optional: your AI model, WhatsApp connection |
 | Outgoing webhooks (84) | Workspace › **Webhooks** | An HTTPS endpoint (n8n, Zapier, Make, your own server) |
-| Data import (85) | Workspace › **Import data** | A CSV file |
+| Data import (85) | Workspace › **Import** | A CSV file |
 | Installable app (85) | Settings › **Install the app** | HTTPS (or localhost) |
 | Hosting kit and one-command install (80, 100) | `docker-compose.yml`, `scripts/`, [DEPLOYMENT.md](../DEPLOYMENT.md) | Your own server and domain |
 
@@ -66,7 +66,7 @@ Webhooks send business events to your automation tools the moment they happen, w
 | `client.created` / `client.updated` | A client is added or changed |
 | `webhook.test` | You pressed Send test (always sent, `"test": true`) |
 
-Events that happened before an endpoint existed are not sent. Records added by **Import data** do not send events.
+Events that happened before an endpoint existed are not sent. Records added by **Import** do not send events.
 
 ### Payload
 
@@ -141,7 +141,7 @@ In n8n, use a Webhook node with "Raw body" on, then a Code node with the Node.js
 - Creating an endpoint, changing its URL and making a new secret need your password again. Secrets are stored encrypted with the workspace key.
 - After a database restore, all endpoints are turned off until you check them.
 
-## Import data
+## Import
 
 Bring records over from a spreadsheet or your previous system: **clients first, then services, then historical invoices**.
 

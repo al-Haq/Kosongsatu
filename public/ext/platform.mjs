@@ -209,7 +209,7 @@ const valid = fresh && /^[0-9a-f]{64}$/.test(v1) &&
   function importPage() {
     const { imports } = ext();
     return (
-      heading("Import data", "Bring clients, services and past invoices over from a spreadsheet or your previous system.") +
+      heading("Import", "Clients, services and past invoices from a spreadsheet or your previous system.") +
       `<div class="notice info">${icon("shield")}<p>Imports never email, share or issue anything. Each file is checked row by row first and imported only if every row is valid. Import clients first, then services, then invoices.</p></div><div class="pi-grid">${Object.entries(IMPORTS)
         .map(
           ([kind, [title, text, cols]]) =>
@@ -425,7 +425,7 @@ const valid = fresh && /^[0-9a-f]{64}$/.test(v1) &&
   return {
     nav: [
       { key: "webhooks", label: "Webhooks", icon: "hook", group: "Workspace" },
-      { key: "import", label: "Import data", icon: "upload", group: "Workspace" },
+      { key: "import", label: "Import", icon: "upload", group: "Workspace" },
     ],
     pages: { webhooks: webhooksPage, import: importPage },
     icons: {

@@ -20,7 +20,7 @@ Open **Settings > Online payments**. Each provider shows whether it is connected
 
 Keys take effect at once; no restart is needed. A key set on the server environment (for example `BILLPLZ_API_KEY` in `.env`) always wins over the value saved in Settings, and `PAYMENT_PROVIDER` on the server fixes the provider.
 
-When a provider is active, client links for unpaid invoices show **Pay online** for the full balance. When the provider confirms the payment, the app records **one receipt** and allocates it to the invoice, so the invoice switches to **Paid** by itself. If the invoice was already settled another way, the money is kept as customer funds on the Cash & credits page for you to allocate or refund.
+When a provider is active, client links for unpaid invoices show **Pay online** for the full balance. When the provider confirms the payment, the app records **one receipt** and allocates it to the invoice, so the invoice switches to **Paid** by itself. If the invoice was already settled another way, the money is kept as customer funds on the Credits page for you to allocate or refund.
 
 | Provider | Keys | Where to find them | Notes |
 |---|---|---|---|

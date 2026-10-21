@@ -3,7 +3,7 @@
 The **Books** group in the sidebar covers money going out and the reports built from your invoices, receipts and expenses:
 
 - **Expenses**: costs and receipts, vendors and expense categories.
-- **Bills & POs**: supplier bills, purchase orders and recurring costs.
+- **Bills**: supplier bills, purchase orders and recurring costs.
 - **Reports**: sales, profit and loss, cash flow forecast, late payers, the annual income tax summary and exports for accounting software.
 
 It also adds a **Cash health** panel to the Overview, a **Payment behaviour** panel to each client profile and a **Payment forecast** panel to each open invoice.
@@ -55,7 +55,7 @@ The model must be able to read images. Images are sent as a `data:` URL in an `i
 
 ## 64. Supplier purchase orders and bills
 
-**Purchase orders** (Bills & POs > Purchase orders):
+**Purchase orders** (Bills > Purchase orders):
 
 1. **New purchase order**: vendor, order date, optional needed-by date, lines (description, category, quantity, rate, SST) and terms. It is a draft and can be edited.
 2. **Issue order** gives it the next number, `PO-2026-00001` (the prefix can be changed in Settings > Books) and locks it. Issuing sends nothing.
@@ -63,7 +63,7 @@ The model must be able to read images. Images are sent as a `data:` URL in an `i
 4. **Mark received** when the goods or service arrive.
 5. **Convert to bill** creates one supplier bill with the order's lines. Converting again opens the same bill. Cancelled orders cannot be billed.
 
-**Supplier bills** (Bills & POs > Supplier bills): vendor, the supplier's invoice number, bill date, due date (defaults to the vendor's terms), lines with categories and SST, notes and attachments (the supplier's invoice as a photo or PDF).
+**Supplier bills** (Bills > Supplier bills): vendor, the supplier's invoice number, bill date, due date (defaults to the vendor's terms), lines with categories and SST, notes and attachments (the supplier's invoice as a photo or PDF).
 
 - **Record payment** records an amount, date, method and bank reference. Each payment is saved as an **expense linked to the bill** (shown with the bill number in Expenses). The bill shows Unpaid, Part-paid, Paid or Overdue.
 - You can also link an expense to a bill yourself with *This pays a supplier bill* on the expense form.
@@ -71,7 +71,7 @@ The model must be able to read images. Images are sent as a `data:` URL in an `i
 
 **No double counting:** in accrual reports a bill counts once, on its bill date, split by its line categories; its payments are not added again. In cash reports only the payments count, on the date paid, split by the bill's categories. The cash flow forecast uses only the bill's remaining balance.
 
-**Recurring costs** (Bills & POs > Recurring costs): rent, salaries or subscriptions with an amount and how often they repeat (weekly, monthly, quarterly, yearly). They are used only by the cash flow forecast and never create expenses.
+**Recurring costs** (Bills > Recurring costs): rent, salaries or subscriptions with an amount and how often they repeat (weekly, monthly, quarterly, yearly). They are used only by the cash flow forecast and never create expenses.
 
 ## 57. Sales reports
 

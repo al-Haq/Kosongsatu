@@ -934,7 +934,7 @@ export default function opsUI(h) {
           : "";
       },
       overview: overviewPanel,
-      documentActions: (d) => (d.state !== "void" && ["invoice", "quote"].includes(d.kind) ? button("Proof of work", "ops-work-jump", d.id, false, "camera") : ""),
+      documentActions: (d) => (d.state !== "void" && ["invoice", "quote"].includes(d.kind) ? button("Proof", "ops-work-jump", d.id, false, "camera") : ""),
       documentPanels: (d) => poPanel(d) + billingPanel(d) + workPanel(d),
       clientFields: (c) =>
         input("Default hourly rate (MYR)", "ops_hourly_rate", c.ops_hourly_rate ? dec(c.ops_hourly_rate) : "", "number", false, 'min="0" step="0.01" placeholder="For timesheets"'),

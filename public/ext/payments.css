@@ -12,7 +12,7 @@
   width: 56px;
   height: 56px;
   object-fit: cover;
-  border-radius: 6px;
+  border-radius: var(--radius);
   border: 1px solid var(--line);
   background: var(--bg);
 }
@@ -31,7 +31,7 @@
   height: 120px;
   object-fit: contain;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--radius);
   background: #fff;
   flex: none;
 }
@@ -46,7 +46,7 @@
   height: auto;
   margin: 16px auto 8px;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--radius);
   background: #fff;
 }
 .bank-metrics {
@@ -100,7 +100,7 @@
 .bank-mapping {
   margin-top: 18px;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--radius);
   padding: 12px 14px;
 }
 .bank-mapping summary {
@@ -110,7 +110,7 @@
 }
 .col-checks {
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--radius);
   padding: 10px 12px;
   min-width: 0;
 }

@@ -68,7 +68,7 @@ Malaysia's Electronic Commerce Act 2006 (section 9) accepts an electronic signat
 
 When an invoice is fully paid, the client's document page and the portal offer a 1–5 star rating with an optional comment (once per invoice). The client may tick "You may show my rating and comment as a testimonial" and give a name to show.
 
-**Client feedback** (in the menu under Records) shows the average rating, the spread of ratings, averages per client and every comment. For feedback with consent, choose **Show** to mark it as a testimonial. **Export CSV** downloads all feedback; **Testimonials CSV** only the testimonials. The client page shows each client's average, and the overview shows the latest ratings.
+**Feedback** (in the menu under Records) shows the average rating, the spread of ratings, averages per client and every comment. For feedback with consent, choose **Show** to mark it as a testimonial. **Export CSV** downloads all feedback; **Testimonials CSV** only the testimonials. The client page shows each client's average, and the overview shows the latest ratings.
 
 **Automatic feedback request (optional):** in Settings, **Client portal and feedback**, tick "After an invoice is fully paid, email the client once to ask for a rating". It needs email set up. Requests go only for payments recorded after you turn it on, to the client's main email, at most once per invoice. The emailed link works for 30 days and only until feedback is given. A background job checks every 10 minutes.
 

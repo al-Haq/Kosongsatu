@@ -45,7 +45,7 @@
 }
 .pq-lines .line-item input.needs {
   border-color: var(--orange);
-  background: #fff9ef;
+  background: var(--soft);
 }
 .pq-total {
   display: flex;
@@ -54,7 +54,7 @@
   gap: 10px;
   background: var(--bg);
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--radius);
   padding: 10px 14px;
   margin-bottom: 15px;
   align-self: end;
@@ -85,14 +85,14 @@
 }
 .pw-types {
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--radius);
   padding: 10px 14px 4px;
   margin: 0 0 15px;
 }
 .pw-types legend {
   font-size: 10px;
   font-weight: 700;
-  color: #596a7d;
+  color: var(--muted);
   padding: 0 4px;
 }
 .pw-types .check-row {
@@ -123,7 +123,7 @@
   flex-direction: column;
 }
 .pi-grid .panel-head svg {
-  color: #95a4b2;
+  color: var(--muted);
 }
 .pi-grid label {
   margin-bottom: 0;
@@ -137,7 +137,7 @@
   overflow: auto;
 }
 .pi-error td {
-  background: #fff6f5;
+  background: var(--soft);
 }
 
 @media (max-width: 1150px) {

@@ -201,7 +201,7 @@ export default function taxUI(h) {
     if (!TABS.some(([k]) => k === tab)) tab = "overview";
     const nav = `<div class="tabs" role="navigation" aria-label="Tax sections">${TABS.map(([k, l]) => `<a class="tab ${k === tab ? "active" : ""}" href="#/tax/${k}" ${k === tab ? 'aria-current="page"' : ""}>${E(l)}</a>`).join("")}</div>`;
     const body = { overview, sst: sstTab, einvoice: einvoiceTab, selfbilled: selfBilledTab, settings: settingsTab }[tab]();
-    return heading("Tax & e-Invoice", "SST working papers and LHDN MyInvois e-Invoices for your business.") + nav + body;
+    return heading("Tax", "SST working papers and LHDN MyInvois e-Invoices.") + nav + body;
   }
   function overview() {
     const t = T();
@@ -455,7 +455,7 @@ export default function taxUI(h) {
   });
 
   return {
-    nav: [{ key: "tax", label: "Tax & e-Invoice", icon: "receipt", group: "Books" }],
+    nav: [{ key: "tax", label: "Tax", icon: "receipt", group: "Books" }],
     pages: { tax: (id) => page(id) },
     icons: { receipt: '<path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6M9 16h3"/>' },
     action,
@@ -469,7 +469,7 @@ export default function taxUI(h) {
       clientDetails,
       settings: () =>
         T()
-          ? `<section class="panel mt22"><div class="panel-head"><div><h2>Tax & e-Invoice</h2><p>SST-02 worksheet, exemptions, MyInvois e-Invoice and threshold monitor. MyInvois keys are under Integration keys below.</p></div><a class="btn" href="#/tax/settings">Open tax settings</a></div></section>`
+          ? `<section class="panel mt22"><div class="panel-head"><div><h2>Tax</h2><p>SST-02 worksheet, exemptions, MyInvois e-Invoice and threshold monitor. MyInvois keys are under Integration keys below.</p></div><a class="btn" href="#/tax/settings">Open tax settings</a></div></section>`
           : "",
       publicPanels: (d) => {
         const x = d.ext?.tax;

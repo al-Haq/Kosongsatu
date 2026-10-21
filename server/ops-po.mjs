@@ -472,7 +472,7 @@ export function attachPO(Store) {
         .get(qid);
       check(
         !partial,
-        "This quotation is billed through partial customer POs. Create each invoice from its PO on Sales & POs.",
+        "This quotation is billed through partial customer POs. Create each invoice from its PO on Sales.",
         409,
       );
       return original.convert.call(this, qid);

@@ -84,7 +84,7 @@ export function automationUI(h) {
       pending = S.automation.proposals.filter((p) => p.state === "pending");
     return (
       heading(
-        "AI & automation",
+        "Automation",
         "Ask for help, review proposed actions and connect your own agents.",
         button("Run pending events", "automation-run"),
       ) +

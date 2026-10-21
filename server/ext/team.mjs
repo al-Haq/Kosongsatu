@@ -304,7 +304,7 @@ export default {
           entries: head.entries,
           exported: now(),
           exported_by: r.session.email,
-          how_to_check: "Keep this file. Later, Audit trail > Check a recorded head (or `node server/cli.mjs audit-verify <id> <hash>`) confirms that history up to this entry is unchanged.",
+          how_to_check: "Keep this file. Later, Audit > Check a recorded head (or `node server/cli.mjs audit-verify <id> <hash>`) confirms that history up to this entry is unchanged.",
         };
         if (r.url.searchParams.get("download") === "1")
           r.send(200, JSON.stringify(body, null, 2), {

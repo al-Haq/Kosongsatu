@@ -1,24 +1,32 @@
+/* Archivo (SIL OFL, see assets/fonts/LICENSE-Archivo.txt): one variable face, weights 400-700. */
 @font-face {
-  font-family: Nawlogic;
-  src: url("/assets/fonts/DejaVuSans.ttf") format("truetype");
+  font-family: Archivo;
+  src: url("/assets/fonts/Archivo-latin.woff2") format("woff2");
+  font-weight: 400 700;
   font-display: swap;
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 @font-face {
-  font-family: Nawlogic;
-  src: url("/assets/fonts/DejaVuSans-Bold.ttf") format("truetype");
-  font-weight: 700;
+  font-family: Archivo;
+  src: url("/assets/fonts/Archivo-latin-ext.woff2") format("woff2");
+  font-weight: 400 700;
   font-display: swap;
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF;
 }
 :root {
-  --ink: #0f172a;
-  --teal: #0ea5a4;
-  --action: #087f7e;
-  --orange: #f97316;
-  --bg: #f4f7fa;
-  --line: #e2e8f0;
-  --muted: #64748b;
-  --soft: #e8f8f6;
-  --red: #b42318;
+  /* Swiss Minimal: black ink on white, hairlines, one red for anything that needs attention. */
+  --ink: #000000;
+  --teal: #000000;
+  --action: #000000;
+  --orange: #e11d48;
+  --bg: #ffffff;
+  --line: #e0e0e0;
+  --muted: #666666;
+  --soft: #f2f2f2;
+  --red: #e11d48;
+  --radius: 0;
+  /* Secondary text on the black surfaces (login panel, banners, balance cards). */
+  --muted-on-dark: rgba(255, 255, 255, 0.72);
 }
 * {
   box-sizing: border-box;
@@ -28,9 +36,10 @@ body {
   color: var(--ink);
   background: var(--bg);
   font:
-    13px/1.6 Nawlogic,
+    13px/1.55 Archivo,
     system-ui,
     sans-serif;
+  -webkit-font-smoothing: antialiased;
 }
 button,
 input,
@@ -103,7 +112,7 @@ small,
   border: 1px solid var(--line);
   background: #fff;
   color: var(--ink);
-  border-radius: 8px;
+  border-radius: var(--radius);
   padding: 10px 15px;
   display: inline-flex;
   align-items: center;
@@ -115,8 +124,8 @@ small,
   line-height: 1.5;
 }
 .btn:hover {
-  background: #f0f5f7;
-  border-color: #c2d1d8;
+  background: var(--soft);
+  border-color: var(--ink);
 }
 .btn.primary {
   background: var(--action);
@@ -124,11 +133,11 @@ small,
   color: #fff;
 }
 .btn.primary:hover {
-  background: #066665;
+  background: #222222;
 }
 .btn.danger {
   color: var(--red);
-  border-color: #f3c9c5;
+  border-color: var(--red);
 }
 .btn.small {
   font-size: 11px;
@@ -156,29 +165,28 @@ small,
   align-items: center;
   gap: 5px;
   padding: 4px 9px;
-  border-radius: 20px;
+  border-radius: var(--radius);
   font-size: 10px;
   letter-spacing: 0.1px;
   font-weight: 700;
-  background: #edf2f6;
-  color: #556579;
+  background: #fff;
+  color: var(--ink);
+  border: 1px solid var(--ink);
   white-space: nowrap;
 }
 .badge.green {
-  color: #076c62;
-  background: #e2f6ee;
+  color: #fff;
+  background: var(--ink);
 }
-.badge.orange {
-  color: #934500;
-  background: #fff0e3;
-}
+.badge.orange,
 .badge.red {
-  background: #ffebe9;
-  color: #a2251b;
+  color: var(--red);
+  background: #fff;
+  border-color: var(--red);
 }
 .badge.blue {
-  color: #375a9e;
-  background: #eaf0ff;
+  color: var(--ink);
+  background: #fff;
 }
 .dot {
   width: 6px;
@@ -236,8 +244,8 @@ nav a {
   align-items: center;
   gap: 13px;
   padding: 11px 16px;
-  color: #5e6d80;
-  border-radius: 7px;
+  color: var(--muted);
+  border-radius: var(--radius);
   font-size: 12px;
 }
 nav a:hover {
@@ -252,8 +260,8 @@ nav a.active {
   margin-top: auto;
   border: 1px solid var(--line);
   padding: 13px;
-  border-radius: 9px;
-  background: #fafcfd;
+  border-radius: var(--radius);
+  background: var(--soft);
 }
 .owner-box strong {
   font-size: 10px;
@@ -327,10 +335,10 @@ nav a.active {
 }
 .notice {
   padding: 13px 16px;
-  border: 1px solid #eedcc3;
-  background: #fff9ef;
-  color: #875215;
-  border-radius: 8px;
+  border: 1px solid var(--red);
+  background: var(--soft);
+  color: var(--red);
+  border-radius: var(--radius);
   display: flex;
   align-items: center;
   gap: 13px;
@@ -342,7 +350,7 @@ nav a.active {
 }
 .notice.info {
   background: var(--soft);
-  border-color: #c7e9e5;
+  border-color: var(--line);
   color: var(--action);
 }
 .metrics {
@@ -354,7 +362,7 @@ nav a.active {
 .metric {
   background: white;
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: var(--radius);
   padding: 20px;
   position: relative;
 }
@@ -362,7 +370,7 @@ nav a.active {
   position: absolute;
   right: 18px;
   top: 18px;
-  color: #95a4b2;
+  color: var(--muted);
 }
 .metric .label {
   font-size: 11px;
@@ -387,7 +395,7 @@ nav a.active {
 .panel {
   background: white;
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: var(--radius);
   padding: 23px;
   min-width: 0;
 }
@@ -440,7 +448,7 @@ nav a.active {
 .bar {
   width: 48px;
   min-height: 3px;
-  border-radius: 5px 5px 0 0;
+  border-radius: var(--radius);
   background: var(--teal);
 }
 .attention {
@@ -472,7 +480,7 @@ nav a.active {
 .tab {
   background: white;
   border: 1px solid var(--line);
-  border-radius: 20px;
+  border-radius: var(--radius);
   padding: 7px 13px;
   font-size: 11px;
   color: var(--muted);
@@ -480,7 +488,7 @@ nav a.active {
 .tab.active {
   background: var(--soft);
   color: var(--action);
-  border-color: #c4e8e4;
+  border-color: var(--line);
   font-weight: 700;
 }
 .toolbar {
@@ -519,7 +527,7 @@ th {
   font-size: 9px;
   letter-spacing: 0.4px;
   text-transform: uppercase;
-  background: #f5f8fa;
+  background: var(--soft);
   color: var(--muted);
   padding: 12px;
   font-weight: 700;
@@ -572,7 +580,7 @@ label {
   display: block;
   font-size: 10px;
   font-weight: 700;
-  color: #596a7d;
+  color: var(--muted);
   margin-bottom: 15px;
 }
 input,
@@ -580,8 +588,8 @@ select,
 textarea {
   display: block;
   background: white;
-  border: 1px solid #d7e1e9;
-  border-radius: 6px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
   padding: 11px 12px;
   color: var(--ink);
   width: 100%;
@@ -626,14 +634,14 @@ textarea {
   width: 40px;
   padding: 0;
   font: inherit;
-  border: 1px solid #d7e1e9;
-  border-radius: 6px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
   background: white;
-  color: #0f8077;
+  color: var(--ink);
   cursor: pointer;
 }
 .date-pick:hover {
-  background: #f1f5f9;
+  background: var(--soft);
 }
 .date-pick svg {
   width: 16px;
@@ -642,7 +650,7 @@ textarea {
 input:focus,
 select:focus,
 textarea:focus {
-  outline: 2px solid #8ad6d0;
+  outline: 2px solid var(--ink);
   border-color: var(--action);
 }
 input[readonly] {
@@ -673,8 +681,8 @@ input[readonly] {
 }
 .form-error {
   padding: 11px;
-  background: #ffefec;
-  border-radius: 6px;
+  background: var(--soft);
+  border-radius: var(--radius);
   color: var(--red);
   font-size: 12px;
   margin-bottom: 15px;
@@ -685,8 +693,8 @@ input[readonly] {
 dialog {
   border: 1px solid var(--line);
   padding: 0;
-  border-radius: 14px;
-  box-shadow: 0 25px 100px #0f172a35;
+  border-radius: var(--radius);
+  box-shadow: none;
   width: min(650px, 94vw);
   max-height: 92vh;
   color: var(--ink);
@@ -765,7 +773,7 @@ dialog.wide {
 .preview {
   background: var(--bg);
   border: 1px solid var(--line);
-  border-radius: 9px;
+  border-radius: var(--radius);
   padding: 20px;
   align-self: start;
   position: sticky;
@@ -773,9 +781,9 @@ dialog.wide {
 }
 .preview-paper {
   background: #fff;
-  box-shadow: 0 3px 18px #0f172a08;
+  box-shadow: none;
   padding: 22px;
-  border-radius: 5px;
+  border-radius: var(--radius);
 }
 .preview .logo {
   width: 116px;
@@ -811,7 +819,7 @@ dialog.wide {
 .client-avatar {
   width: 52px;
   height: 52px;
-  border-radius: 12px;
+  border-radius: var(--radius);
   background: var(--soft);
   color: var(--action);
   display: grid;
@@ -939,7 +947,7 @@ dialog.wide {
   gap: 18px;
 }
 .timeline-item {
-  border-left: 2px solid #c1e4e1;
+  border-left: 2px solid var(--line);
   padding-left: 14px;
   font-size: 11px;
 }
@@ -959,7 +967,7 @@ dialog.wide {
 .step {
   padding: 20px;
   background: var(--bg);
-  border-radius: 8px;
+  border-radius: var(--radius);
 }
 .step strong {
   display: block;
@@ -981,17 +989,18 @@ dialog.wide {
 .swatch span {
   display: block;
   height: 36px;
-  border-radius: 6px;
+  border-radius: var(--radius);
   margin-bottom: 7px;
 }
+/* The brand colours printed on documents, not the workspace theme. */
 .swatch.teal-bg span {
-  background: var(--teal);
+  background: #0ea5a4;
 }
 .swatch.orange-bg span {
-  background: var(--orange);
+  background: #f97316;
 }
 .swatch.ink-bg span {
-  background: var(--ink);
+  background: #0f172a;
 }
 .setting-line {
   display: flex;
@@ -1025,12 +1034,12 @@ dialog.wide {
   width: 480px;
   height: 480px;
   border-radius: 50%;
-  border: 95px solid #0ea5a419;
+  border: 95px solid var(--soft);
   right: -180px;
   bottom: -180px;
 }
 .login-brand .eyebrow {
-  color: #6cd6d0;
+  color: var(--ink);
   margin-bottom: 25px;
 }
 .login-brand h1 {
@@ -1040,19 +1049,19 @@ dialog.wide {
   max-width: 520px;
 }
 .login-brand p {
-  color: #a7b5c9;
+  color: var(--muted);
   max-width: 430px;
   margin-top: 25px;
 }
 .login-brand .accent {
-  color: #4dd0c5;
+  color: var(--ink);
 }
 .login-points {
   display: flex;
   gap: 30px;
   margin-top: 55px;
   font-size: 11px;
-  color: #cbd5e1;
+  color: #cccccc;
 }
 .login-points svg {
   color: var(--teal);
@@ -1095,11 +1104,11 @@ dialog.wide {
   right: 25px;
   bottom: 25px;
   z-index: 100;
-  border-radius: 9px;
+  border-radius: var(--radius);
   background: var(--ink);
   color: white;
   padding: 13px 20px;
-  box-shadow: 0 10px 35px #0f172a25;
+  box-shadow: none;
   max-width: 420px;
   font-size: 12px;
   display: none;
@@ -1108,7 +1117,7 @@ dialog.wide {
   display: block;
 }
 #toast.error {
-  background: #922820;
+  background: var(--red);
 }
 .loading {
   min-height: 60vh;
@@ -1149,10 +1158,10 @@ dialog.wide {
   background: var(--ink);
   color: white;
   padding: 26px;
-  border-radius: 11px;
+  border-radius: var(--radius);
 }
 .balance-card p {
-  color: #aab9cc;
+  color: var(--muted-on-dark);
   font-size: 11px;
 }
 .balance-card .value {
@@ -1300,7 +1309,7 @@ dialog.wide {
     transform: translateX(-100%);
     transition: transform 0.2s;
     width: 235px;
-    box-shadow: 5px 0 30px #0f172a15;
+    box-shadow: none;
   }
   .sidebar.open {
     transform: translateX(0);
@@ -1594,7 +1603,7 @@ dialog.wide {
 }
 .csv-example {
   padding: 12px;
-  border-radius: 6px;
+  border-radius: var(--radius);
   background: var(--bg);
   font-size: 11px;
   overflow: auto;
@@ -1618,9 +1627,9 @@ select:disabled {
   display: grid;
   grid-template-columns: 1.5fr 1fr;
   gap: 32px;
-  background: var(--ink, #0f172a);
+  background: var(--ink);
   color: white;
-  border-radius: 14px;
+  border-radius: var(--radius);
   padding: 32px;
 }
 .automation-banner h2 {
@@ -1629,17 +1638,17 @@ select:disabled {
   margin: 12px 0;
 }
 .automation-banner p {
-  color: #cbd5e1;
+  color: var(--muted-on-dark);
   margin: 12px 0;
   line-height: 1.6;
 }
 .automation-banner .eyebrow {
-  color: #5eead4;
+  color: var(--muted-on-dark);
 }
 .proposal-card,
 .assistant-message {
   padding: 18px 0;
-  border-bottom: 1px solid #e2e8f0;
+  border-bottom: 1px solid var(--line);
 }
 .proposal-card p {
   font-size: 12px;
@@ -1658,7 +1667,7 @@ select:disabled {
   margin: 12px 0;
 }
 .assistant-message small {
-  color: #64748b;
+  color: var(--muted);
 }
 .assistant-history {
   margin-top: 20px;
@@ -1690,9 +1699,103 @@ select:disabled {
   gap: 12px;
   padding: 14px 18px;
   font-size: 13px;
-  color: var(--muted, #64748b);
+  color: var(--muted, var(--muted));
 }
 .pager .btn[disabled] {
   opacity: 0.45;
   cursor: default;
+}
+
+/* ---- Swiss Minimal: shape rules on top of the tokens above ---- */
+h1 {
+  letter-spacing: -0.02em;
+  font-weight: 700;
+}
+.eyebrow,
+.nav-group,
+.sidebar .eyebrow,
+.metric .label,
+th {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 10.5px;
+  font-weight: 600;
+}
+th {
+  background: transparent;
+  color: var(--ink);
+  border-bottom: 1px solid var(--ink);
+}
+nav a.active {
+  background: var(--soft);
+  color: var(--ink);
+  box-shadow: inset 3px 0 0 var(--ink);
+}
+.metric {
+  background: transparent;
+  border-width: 0 0 1px;
+  border-color: var(--line);
+}
+.metric .value,
+.num,
+.bar-col strong,
+.totals,
+.total-row,
+.preview-row,
+td.num {
+  font-variant-numeric: tabular-nums;
+}
+.panel,
+.invoice-paper,
+.sidebar,
+.topbar,
+dialog {
+  box-shadow: none;
+}
+dialog {
+  border: 1px solid var(--ink);
+}
+.avatar {
+  background: var(--soft);
+  color: var(--ink);
+}
+#toast {
+  background: var(--ink);
+  color: #fff;
+  border: 0;
+}
+#toast.error {
+  background: var(--red);
+}
+input:focus,
+select:focus,
+textarea:focus {
+  outline: 2px solid var(--ink);
+  border-color: var(--ink);
+}
+.bar {
+  background: var(--ink);
+}
+.login-brand:after {
+  border-color: rgba(255, 255, 255, 0.08);
+  background: transparent;
+  box-shadow: none;
+}
+.login-brand h1,
+.login-brand p,
+.login-points,
+.login-brand .eyebrow {
+  position: relative;
+  z-index: 1;
+}
+.login-brand .accent {
+  color: #fff;
+  font-weight: 400;
+}
+.login-brand p,
+.login-points {
+  color: var(--muted-on-dark);
+}
+.login-brand .eyebrow {
+  color: rgba(255, 255, 255, 0.6);
 }
