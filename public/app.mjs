@@ -226,7 +226,7 @@ function allNav() {
     .filter(([, items]) => items.length);
 }
 function renderShell(html, active) {
-  app.innerHTML = `<div class="shell"><aside class="sidebar">${logo()}<div class="eyebrow">Workspace</div><nav aria-label="Main navigation">${allNav()
+  app.innerHTML = `<div class="shell"><aside class="sidebar">${logo()}<nav aria-label="Main navigation">${allNav()
     .map(
       ([group, items]) =>
         `<span class="nav-group">${E(group)}</span>${items.map((n) => `<a href="#/${n.key}" class="${n.key === active ? "active" : ""}" ${n.key === active ? 'aria-current="page"' : ""}>${icon(n.icon)}${E(n.label)}</a>`).join("")}`,
