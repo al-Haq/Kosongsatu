@@ -114,6 +114,7 @@ test("several companies on one server: each install is its own compose project, 
     // A fresh install takes its project name from its folder, made safe for Compose.
     mkdirSync(join(dir, "nawlogic-Syarikat B"));
     const env = join(dir, "nawlogic-Syarikat B", ".env");
+    assert.equal(src("project_name", { ENV_FILE: env }).stdout.trim(), "nawlogic-syarikat-b", "known before .env exists, so the port check sees the right project");
     let r = src("write_env", { ENV_FILE: env, DOMAIN: "b.example.com", ACME_EMAIL: "ops@example.com" });
     assert.equal(r.status, 0, r.stderr);
     assert.equal(get(readFileSync(env, "utf8"), "COMPOSE_PROJECT_NAME"), "nawlogic-syarikat-b");

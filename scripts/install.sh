@@ -114,9 +114,12 @@ project_from_dir() {
   name="$(tr '[:upper:]' '[:lower:]' <<<"$name" | sed -E 's/[^a-z0-9_-]+/-/g; s/^[^a-z0-9]+//; s/-+$//')"
   printf '%s\n' "${name:-nawlogic}"
 }
+# Before .env exists (a fresh install) the name the installer is about to write
+# counts, so a second install on a Caddy server is refused before it builds.
 project_name() {
   local p
   p="$(env_get COMPOSE_PROJECT_NAME)"
+  if [[ -z "$p" && ! -f "$ENV_FILE" ]]; then p="$(project_from_dir)"; fi
   printf '%s\n' "${p:-nawlogic}"
 }
 # env_unset KEY: removes the line.
