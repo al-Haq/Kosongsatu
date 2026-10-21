@@ -176,6 +176,7 @@ test("companies.sh add: a clone next to this install, same remote, then its own 
     assert.ok(!existsSync(join(dir, "nawlogic-acme", ".env")), "no settings copied: the installer writes new keys");
     assert.equal(spawnSync("git", ["-C", join(dir, "nawlogic-acme"), "remote", "get-url", "origin"], { encoding: "utf8" }).stdout.trim(), "https://example.com/acme/nawlogic.git", "updates pull from the same remote");
     assert.notEqual(bash(`source "${join(first, "scripts/companies.sh")}"; cmd_add acme`).status, 0, "refuses an existing folder");
+    writeFileSync(join(dir, "nawlogic-acme", ".env"), "DOMAIN=acme.example.com\nCOMPOSE_PROJECT_NAME=nawlogic-acme\n", { mode: 0o600 });
     const list = bash(`"${join(first, "scripts/companies.sh")}" list`);
     assert.match(list.stdout, /nawlogic-acme\s+nawlogic-acme/, "listed once the installer has written its .env");
   } finally {
