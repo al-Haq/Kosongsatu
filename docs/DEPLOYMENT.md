@@ -93,7 +93,7 @@ cd /opt/nawlogic
 sudo ./scripts/update.sh
 ```
 
-The update script first makes an encrypted backup with the version that is running (and stops if that fails), then runs `git pull --ff-only`, keeps the running image as `nawlogic-invoice:previous`, rebuilds, restarts and waits for the health check. If the new version does not become healthy it prints the rollback commands. Database changes run forward only; each one first saves a private copy of the database next to it (`*.pre-*.sqlite`), and the backup from the first step is in the backup folder. Use `SKIP_PULL=1` when you copied the new code yourself.
+The update script first makes an encrypted backup with the version that is running (and stops if that fails), then runs `git pull --ff-only`, keeps the running image as `nawlogic-invoice:<project>-previous` (for the first install, `nawlogic-invoice:nawlogic-previous`), rebuilds, restarts and waits for the health check. If the new version does not become healthy it prints the rollback commands. Database changes run forward only; each one first saves a private copy of the database next to it (`*.pre-*.sqlite`), and the backup from the first step is in the backup folder. Use `SKIP_PULL=1` when you copied the new code yourself.
 
 ### Alternative: systemd and nginx
 
@@ -145,6 +145,32 @@ In Cloudflare **R2** create a private bucket (for example `nawlogic-backups`) an
 ### Proxied DNS without a tunnel
 
 Keeping the Caddy setup and only switching the A record to Cloudflare's proxy also works, but needs two more steps: Caddy must be told to trust Cloudflare's address ranges (`trusted_proxies` in the Caddyfile), and `.env` needs `TRUST_PROXY=2`. Without both, every visitor appears to come from Cloudflare and the login rate limit locks everyone out together. The tunnel avoids all of this and keeps the ports closed, so prefer it.
+
+## Several companies on one server
+
+One Nawlogic install is one company: one database with its clients, documents and payments, one owner and team. Accounts inside an install share that company's data (roles limit what they may do, not what they see), and each client sees only their own documents through their private link or portal login. For a second company with completely separate data, add a second install on the same server. The installs share nothing but the machine: each has its own folder, Docker Compose project, data volume, encryption keys, backup folder, owner login and domain.
+
+The first install may use Caddy or a tunnel. Every further company runs behind its own **Cloudflare Tunnel**, because ports 80 and 443 can belong to one install only; the installer refuses a second Caddy install on the same server.
+
+1. In Cloudflare **Zero Trust → Networks → Tunnels** create a tunnel for the company (for example `nawlogic-acme`), add its **Public hostname** (for example `acme.example.com`) with service `HTTP` and URL `app:3000`, and copy the token.
+2. On the server:
+
+   ```sh
+   sudo /opt/nawlogic/scripts/companies.sh add acme
+   ```
+
+   This clones the code into `/opt/nawlogic-acme` and runs the installer there. The installer asks for the company's domain, the tunnel token and the owner's sign-in email, writes a new `.env` with new keys, builds the app, creates the owner and prints the password once. The Compose project is `nawlogic-acme` (from the folder name), so its containers, data volume and image tag never touch the first install.
+3. Sign in at the new domain, change the password, turn on MFA and fill in that company's Settings.
+
+Day to day:
+
+- `sudo /opt/nawlogic/scripts/companies.sh list` shows every install with its project, domain, front (Caddy or tunnel) and container status.
+- `sudo /opt/nawlogic/scripts/companies.sh update` updates every install in turn, each with its own backup first; `update acme` updates one. `scripts/update.sh` inside a folder still updates that install alone.
+- Backups: each install writes to its own `backups` folder with its own key. For off-site copies give each company its own R2 bucket, or at least its own prefix, in that company's Settings → Integration keys.
+- Removing a company: `cd /opt/nawlogic-acme && sudo docker compose down` stops it and keeps its data volume; `sudo docker compose down -v` deletes the data as well, so take a final backup first.
+- Resources: each install is one Node.js container (about 150 MB of memory at rest) plus a small `cloudflared`; a 4 GB server runs several comfortably.
+
+An install made before this option has no `COMPOSE_PROJECT_NAME` in its `.env`. It keeps the project name `nawlogic` that `docker-compose.yml` declares, and with it its containers and data; the next `scripts/update.sh` adopts its existing image under the new tag before taking the backup.
 
 ## Before real use
 

@@ -16,6 +16,8 @@
 # firewall for SSH/HTTP/HTTPS, builds the app, creates the owner account, starts
 # the app behind Caddy (automatic HTTPS) and prints the next steps.
 # The server, the domain and its DNS record are yours to set up first.
+# Several companies on one server: scripts/companies.sh add <name> makes a
+# second, fully separate install (own folder, data, keys, owner, domain).
 set -euo pipefail
 
 APP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -101,6 +103,22 @@ tunnel_token_get() {
   [[ -f "$TUNNEL_ENV_FILE" ]] || return 0
   grep -E '^TUNNEL_TOKEN=' "$TUNNEL_ENV_FILE" | tail -n 1 | cut -d= -f2- || true
 }
+# Several companies on one server: each install is its own Compose project, so
+# containers, the data volume and the image tag never collide. A fresh install
+# takes the name from its folder (/opt/nawlogic-acme -> nawlogic-acme). An
+# install from before this option has no COMPOSE_PROJECT_NAME and keeps the
+# name docker-compose.yml declares, nawlogic, with its data.
+project_from_dir() {
+  local name
+  name="$(basename "$(cd "$(dirname "$ENV_FILE")" && pwd)")"
+  name="$(tr '[:upper:]' '[:lower:]' <<<"$name" | sed -E 's/[^a-z0-9_-]+/-/g; s/^[^a-z0-9]+//; s/-+$//')"
+  printf '%s\n' "${name:-nawlogic}"
+}
+project_name() {
+  local p
+  p="$(env_get COMPOSE_PROJECT_NAME)"
+  printf '%s\n' "${p:-nawlogic}"
+}
 # env_unset KEY: removes the line.
 env_unset() {
   [[ -f "$ENV_FILE" ]] || return 0
@@ -121,8 +139,13 @@ env_set() {
 }
 write_env() {
   umask 077
-  [[ -f "$ENV_FILE" ]] || printf '# Nawlogic Invoice production settings. Private: keep a copy in your password manager.\n' >"$ENV_FILE"
+  local fresh=""
+  if [[ ! -f "$ENV_FILE" ]]; then
+    fresh=1
+    printf '# Nawlogic Invoice production settings. Private: keep a copy in your password manager.\n' >"$ENV_FILE"
+  fi
   chmod 600 "$ENV_FILE"
+  if [[ -n "$fresh" ]]; then env_set COMPOSE_PROJECT_NAME "$(project_from_dir)"; fi
   env_set DOMAIN "$DOMAIN"
   env_set APP_URL "https://$DOMAIN"
   if [[ -n "$TUNNEL" ]]; then
@@ -215,7 +238,15 @@ compose() {
   files="${files:-docker-compose.yml}"
   IFS=: read -r -a parts <<<"$files"
   for f in "${parts[@]}"; do args+=(-f "$APP_DIR/$f"); done
-  docker compose --project-directory "$APP_DIR" "${args[@]}" --env-file "$ENV_FILE" "$@"
+  docker compose -p "$(project_name)" --project-directory "$APP_DIR" "${args[@]}" --env-file "$ENV_FILE" "$@"
+}
+
+# Ports 80 and 443 can belong to one install only. A second company on the
+# same server runs behind its own Cloudflare Tunnel instead of Caddy.
+check_ports_free() {
+  local other
+  other="$(docker ps --filter publish=443 --format '{{.Label "com.docker.compose.project"}}' 2>/dev/null | grep -vx "$(project_name)" | grep . | head -n 1 || true)"
+  [[ -z "$other" ]] || die "Port 443 is already used by the Docker project \"$other\" on this server. Give this install a Cloudflare Tunnel token instead (see \"Several companies on one server\" in docs/DEPLOYMENT.md)."
 }
 
 create_owner() {
@@ -288,6 +319,7 @@ main() {
     note "Cloudflare creates the DNS record for the tunnel's public hostname ($DOMAIN)."
     note "Its service must be http://app:3000 (Zero Trust > Networks > Tunnels > Public hostname)."
   else
+    check_ports_free
     check_dns
   fi
 
@@ -298,6 +330,7 @@ main() {
   chown "$NODE_UID:$NODE_UID" "$BACKUP_HOST_DIR"
   chmod 700 "$BACKUP_HOST_DIR"
   note "Settings: $ENV_FILE (readable by root only)"
+  note "Docker Compose project: $(project_name)"
   [[ -n "$TUNNEL" ]] && note "Cloudflare Tunnel token: $TUNNEL_ENV_FILE (readable by root only)"
   note "Encrypted backups: $BACKUP_HOST_DIR"
 
@@ -347,6 +380,10 @@ EOF
      docs/DEPLOYMENT.md, "Cloudflare in front").
 EOF
   fi
+  cat <<EOF
+  Another company on this server, with its own data, domain and login:
+     sudo $APP_DIR/scripts/companies.sh add <short-name>
+EOF
 }
 
 if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then main "$@"; fi
