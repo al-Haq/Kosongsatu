@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
-import { readFileSync, mkdtempSync, writeFileSync, statSync, rmSync } from "node:fs";
+import { readFileSync, mkdtempSync, writeFileSync, statSync, rmSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fixture } from "./helpers.mjs";
@@ -59,6 +59,57 @@ test("install.sh writes a private .env once and never replaces existing keys", (
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+test("install.sh keeps a Cloudflare Tunnel token out of .env and switches the compose files", () => {
+  const dir = mkdtempSync(join(tmpdir(), "nwl-tunnel-"));
+  try {
+    const env = join(dir, ".env"), tunnelEnv = join(dir, ".env.cloudflare");
+    const token = "eyJhIjoiZmFrZSIsInQiOiJmYWtlIiwicyI6ImZha2UifQ-abcdefghijklmnop";
+    const run = (vars) => bash(`source "${new URL("scripts/install.sh", root).pathname}"; write_env`, { ENV_FILE: env, TUNNEL_ENV_FILE: tunnelEnv, ...vars });
+    let r = run({ DOMAIN: "billing.example.com", OWNER_EMAIL: "owner@example.com", ACME_EMAIL: "", TUNNEL: "1", CLOUDFLARE_TUNNEL_TOKEN: token });
+    assert.equal(r.status, 0, r.stderr);
+    const first = readFileSync(env, "utf8");
+    const get = (text, k) => text.match(new RegExp(`^${k}=(.*)$`, "m"))?.[1];
+    assert.equal(get(first, "COMPOSE_FILE"), "docker-compose.yml:deploy/docker-compose.cloudflare.yml");
+    assert.equal(get(first, "ACME_EMAIL"), "owner@example.com", "docker-compose.yml still needs a value");
+    assert.equal(get(first, "TRUST_PROXY"), "1");
+    assert.ok(!first.includes(token), "the token is not in .env (the app container reads .env)");
+    assert.equal(readFileSync(tunnelEnv, "utf8"), `TUNNEL_TOKEN=${token}\n`);
+    assert.equal(statSync(tunnelEnv).mode & 0o777, 0o600, "token file readable by its owner only");
+    // The saved token is offered as the default on a re-run.
+    r = bash(`source "${new URL("scripts/install.sh", root).pathname}"; tunnel_token_get`, { ENV_FILE: env, TUNNEL_ENV_FILE: tunnelEnv });
+    assert.equal(r.stdout.trim(), token);
+    // Back to Caddy: the override and the token file go away, the keys stay.
+    r = run({ DOMAIN: "billing.example.com", ACME_EMAIL: "ops@example.com" });
+    assert.equal(r.status, 0, r.stderr);
+    const second = readFileSync(env, "utf8");
+    assert.equal(get(second, "COMPOSE_FILE"), undefined);
+    assert.equal(get(second, "ACME_EMAIL"), "ops@example.com");
+    assert.equal(get(second, "BACKUP_KEY"), get(first, "BACKUP_KEY"));
+    assert.ok(!existsSync(tunnelEnv), "token file removed");
+    assert.match(read("scripts/update.sh"), /env_get COMPOSE_FILE/, "update.sh follows the same compose file list");
+    assert.match(read("scripts/update.sh"), /compose pull --ignore-buildable/, "pulls whichever proxy image is in use");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("compose override for Cloudflare Tunnel: cloudflared instead of Caddy, token in its own file", () => {
+  const c = read("deploy/docker-compose.cloudflare.yml");
+  assert.match(c, /\n  caddy:\n    profiles: \["caddy"\]/, "Caddy is parked behind a profile nothing activates");
+  const cf = c.slice(c.indexOf("\n  cloudflared:"));
+  assert.match(cf, /image: cloudflare\/cloudflared:/);
+  assert.match(cf, /command: tunnel --no-autoupdate run/);
+  assert.match(cf, /env_file:\n\s+- \.env\.cloudflare/);
+  assert.ok(!/TUNNEL_TOKEN:|CLOUDFLARE_TUNNEL_TOKEN/.test(c), "the token is never interpolated from .env");
+  assert.match(cf, /restart: unless-stopped/);
+  assert.match(cf, /condition: service_healthy/);
+  assert.match(cf, /read_only: true/);
+  assert.match(cf, /no-new-privileges:true/);
+  assert.match(cf, /max-size: "10m"/);
+  assert.ok(!/\n\s+ports:/.test(c), "no port is published in tunnel mode");
+  assert.match(c.slice(c.indexOf("\n  app:"), c.indexOf("\n  cloudflared:")), /TRUST_PROXY: "1"/);
 });
 
 test("install.sh validates the domain and emails", () => {

@@ -21,6 +21,7 @@ set -euo pipefail
 APP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ENV_FILE="${ENV_FILE:-$APP_DIR/.env}"
 TUNNEL_ENV_FILE="${TUNNEL_ENV_FILE:-$APP_DIR/.env.cloudflare}" # TUNNEL_TOKEN for cloudflared only
+TUNNEL="${TUNNEL:-}" # 1 when a Cloudflare Tunnel token was given (set in main)
 BACKUP_HOST_DIR_DEFAULT="$APP_DIR/backups"
 NODE_UID=1000 # the "node" user inside the app container
 
