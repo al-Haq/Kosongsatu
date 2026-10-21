@@ -1,0 +1,46 @@
+# Cloudflare Tunnel in front of Nawlogic instead of Caddy.
+#
+# Use together with docker-compose.yml. scripts/install.sh sets this in .env
+# when you give it a tunnel token:
+#   COMPOSE_FILE=docker-compose.yml:deploy/docker-compose.cloudflare.yml
+#
+# Cloudflare terminates HTTPS at its edge and cloudflared opens an outbound
+# connection from this server, so ports 80 and 443 stay closed here. The
+# tunnel's public hostname must point at http://app:3000 (set in Cloudflare
+# Zero Trust > Networks > Tunnels). See "Cloudflare in front" in
+# docs/DEPLOYMENT.md.
+services:
+  # Not started in this mode: Cloudflare replaces the local certificate and
+  # the public ports. (A profile that nothing activates keeps it out of `up`.)
+  caddy:
+    profiles: ["caddy"]
+
+  app:
+    environment:
+      # cloudflared is the one proxy in front of the app; it sets
+      # X-Forwarded-For to the visitor's address, which the rate limits use.
+      TRUST_PROXY: "1"
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    # TUNNEL_TOKEN=... lives in .env.cloudflare (written by scripts/install.sh,
+    # root only). Only this service reads it; the app container never sees it.
+    env_file:
+      - .env.cloudflare
+    depends_on:
+      app:
+        condition: service_healthy
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"

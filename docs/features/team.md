@@ -61,6 +61,7 @@ After every backup, the encrypted `.nwlbackup` file is uploaded to S3-compatible
 | Cloudflare R2 | `https://<account-id>.r2.cloudflarestorage.com` | `auto` |
 | Backblaze B2 | `https://s3.<region>.backblazeb2.com` | e.g. `us-west-004` (as in the endpoint) |
 | Wasabi | `https://s3.<region>.wasabisys.com` | e.g. `ap-southeast-1` |
+| Cloudflare R2 | `https://<account-id>.r2.cloudflarestorage.com` | `auto` |
 | DigitalOcean Spaces | `https://<region>.digitaloceanspaces.com` | e.g. `sgp1` |
 
 Also: **bucket**, **access key ID**, **secret access key**, optional **folder** (default `nawlogic/`) and **copies to keep** (default 30, 1–365). The same names work as server environment variables (`BACKUP_S3_ENDPOINT`, `BACKUP_S3_REGION`, `BACKUP_S3_BUCKET`, `BACKUP_S3_PREFIX`, `BACKUP_S3_ACCESS_KEY_ID`, `BACKUP_S3_SECRET_ACCESS_KEY`, `BACKUP_S3_KEEP`), and the environment wins.
