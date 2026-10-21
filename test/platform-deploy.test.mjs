@@ -1,9 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
-import { readFileSync, mkdtempSync, writeFileSync, statSync, rmSync, existsSync } from "node:fs";
+import { readFileSync, mkdtempSync, mkdirSync, writeFileSync, statSync, rmSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { fixture } from "./helpers.mjs";
 
 const root = new URL("../", import.meta.url);
@@ -11,7 +11,7 @@ const read = (p) => readFileSync(new URL(p, root), "utf8");
 const bash = (script, env = {}) => spawnSync("bash", ["-c", script], { encoding: "utf8", env: { PATH: process.env.PATH, ...env } });
 
 test("shell scripts parse and use strict mode", () => {
-  for (const file of ["scripts/install.sh", "scripts/update.sh"]) {
+  for (const file of ["scripts/install.sh", "scripts/update.sh", "scripts/companies.sh"]) {
     const r = spawnSync("bash", ["-n", new URL(file, root).pathname], { encoding: "utf8" });
     assert.equal(r.status, 0, file + ": " + r.stderr);
     const src = read(file);
@@ -100,6 +100,86 @@ test("install.sh keeps a Cloudflare Tunnel token out of .env and switches the co
     assert.ok(!tokenOk("short"), "too short");
     assert.ok(!tokenOk("$(id)" + "a".repeat(40)), "shell characters");
     assert.match(read("scripts/update.sh"), /compose pull --ignore-buildable/, "pulls whichever proxy image is in use");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("several companies on one server: each install is its own compose project, image and folder", () => {
+  const dir = mkdtempSync(join(tmpdir(), "nwl-multi-"));
+  try {
+    const installSh = new URL("scripts/install.sh", root).pathname;
+    const src = (fn, vars = {}) => bash(`source "${installSh}"; ${fn}`, vars);
+    const get = (text, k) => text.match(new RegExp(`^${k}=(.*)$`, "m"))?.[1];
+    // A fresh install takes its project name from its folder, made safe for Compose.
+    mkdirSync(join(dir, "nawlogic-Syarikat B"));
+    const env = join(dir, "nawlogic-Syarikat B", ".env");
+    assert.equal(src("project_name", { ENV_FILE: env }).stdout.trim(), "nawlogic-syarikat-b", "known before .env exists, so the port check sees the right project");
+    let r = src("write_env", { ENV_FILE: env, DOMAIN: "b.example.com", ACME_EMAIL: "ops@example.com" });
+    assert.equal(r.status, 0, r.stderr);
+    assert.equal(get(readFileSync(env, "utf8"), "COMPOSE_PROJECT_NAME"), "nawlogic-syarikat-b");
+    assert.equal(src("project_name", { ENV_FILE: env }).stdout.trim(), "nawlogic-syarikat-b");
+    r = src("write_env", { ENV_FILE: env, DOMAIN: "c.example.com", ACME_EMAIL: "ops@example.com" });
+    assert.equal(r.status, 0, r.stderr);
+    assert.deepEqual(readFileSync(env, "utf8").match(/^COMPOSE_PROJECT_NAME=.*$/gm), ["COMPOSE_PROJECT_NAME=nawlogic-syarikat-b"], "kept on a re-run");
+    // An install from before this option keeps the name docker-compose.yml declares, and with it its data volume.
+    const legacy = join(dir, "legacy.env");
+    writeFileSync(legacy, "DOMAIN=a.example.com\nBACKUP_KEY=x\n", { mode: 0o600 });
+    r = src("write_env", { ENV_FILE: legacy, DOMAIN: "a.example.com", ACME_EMAIL: "ops@example.com" });
+    assert.equal(r.status, 0, r.stderr);
+    assert.equal(get(readFileSync(legacy, "utf8"), "COMPOSE_PROJECT_NAME"), undefined);
+    assert.equal(src("project_name", { ENV_FILE: legacy }).stdout.trim(), "nawlogic");
+    const compose = read("docker-compose.yml");
+    assert.match(compose, /^name: nawlogic$/m);
+    assert.match(compose, /image: nawlogic-invoice:\$\{COMPOSE_PROJECT_NAME:-nawlogic\}/, "one image tag per company");
+    assert.ok(!/container_name:/.test(compose + read("deploy/docker-compose.cloudflare.yml")), "no fixed container names");
+    for (const f of ["scripts/install.sh", "scripts/update.sh"]) assert.match(read(f), /docker compose -p "\$\(project_name\)"/, f + " pins the project");
+    const update = read("scripts/update.sh");
+    assert.match(update, /docker tag nawlogic-invoice:local "\$IMAGE"/, "an older install's :local image is adopted before the backup");
+    assert.match(update, /PREVIOUS="\$IMAGE-previous"/);
+    assert.match(read("scripts/install.sh"), /--filter publish=443/, "a second Caddy install on the same server is refused");
+    // companies.sh: names, folders and what "add" does.
+    const companies = new URL("scripts/companies.sh", root).pathname;
+    const c = (fn, vars = {}) => bash(`source "${companies}"; ${fn}`, vars);
+    for (const ok of ["acme", "syarikat-b", "a1"]) assert.equal(c('valid_slug "$V"', { V: ok }).status, 0, ok);
+    for (const bad of ["Syarikat B", "-x", "x", "a".repeat(40), "../etc", "a;b"]) assert.notEqual(c('valid_slug "$V"', { V: bad }).status, 0, bad);
+    assert.equal(c("target_dir acme").stdout.trim(), join(dirname(root.pathname.replace(/\/$/, "")), "nawlogic-acme"));
+    const src2 = read("scripts/companies.sh");
+    assert.match(src2, /git clone -q "\$APP_DIR" "\$target"/, "same code, new folder");
+    assert.match(src2, /exec "\$target\/scripts\/install\.sh"/, "then the ordinary installer");
+    assert.match(src2, /\[\[ ! -e "\$target" \]\] \|\| die/, "never over an existing folder");
+    assert.match(read("docs/DEPLOYMENT.md"), /## Several companies on one server/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// "add" clones the install next to itself and hands over to that copy's installer.
+// The clone needs root like the real run, so this only runs as root (the dev container, not CI).
+test("companies.sh add: a clone next to this install, same remote, then its own installer", { skip: process.getuid?.() !== 0 }, () => {
+  const dir = mkdtempSync(join(tmpdir(), "nwl-companies-"));
+  try {
+    const first = join(dir, "nawlogic");
+    mkdirSync(join(first, "scripts"), { recursive: true });
+    for (const f of ["companies.sh", "install.sh"]) writeFileSync(join(first, "scripts", f), read("scripts/" + f), { mode: 0o755 });
+    writeFileSync(join(first, ".env"), "DOMAIN=app.example.com\n", { mode: 0o600 });
+    writeFileSync(join(first, ".gitignore"), ".env\n.env.*\n"); // as in the real repository
+    const git = (...a) => spawnSync("git", ["-C", first, "-c", "user.name=t", "-c", "user.email=t@example.com", ...a], { encoding: "utf8" });
+    assert.equal(git("init", "-q").status, 0);
+    assert.equal(git("add", "-A").status, 0);
+    assert.equal(git("commit", "-qm", "init").status, 0);
+    assert.equal(git("remote", "add", "origin", "https://example.com/acme/nawlogic.git").status, 0);
+    // exec is shadowed so the installer (Docker, apt) does not run here.
+    const r = bash(`source "${join(first, "scripts/companies.sh")}"; exec() { echo "EXEC $*"; }; cmd_add acme`, { HOME: dir });
+    assert.equal(r.status, 0, r.stderr);
+    assert.match(r.stdout, new RegExp("EXEC " + join(dir, "nawlogic-acme", "scripts", "install.sh")));
+    assert.ok(existsSync(join(dir, "nawlogic-acme", "scripts", "install.sh")), "cloned next to the first install");
+    assert.ok(!existsSync(join(dir, "nawlogic-acme", ".env")), "no settings copied: the installer writes new keys");
+    assert.equal(spawnSync("git", ["-C", join(dir, "nawlogic-acme"), "remote", "get-url", "origin"], { encoding: "utf8" }).stdout.trim(), "https://example.com/acme/nawlogic.git", "updates pull from the same remote");
+    assert.notEqual(bash(`source "${join(first, "scripts/companies.sh")}"; cmd_add acme`).status, 0, "refuses an existing folder");
+    writeFileSync(join(dir, "nawlogic-acme", ".env"), "DOMAIN=acme.example.com\nCOMPOSE_PROJECT_NAME=nawlogic-acme\n", { mode: 0o600 });
+    const list = bash(`"${join(first, "scripts/companies.sh")}" list`);
+    assert.match(list.stdout, /nawlogic-acme\s+nawlogic-acme/, "listed once the installer has written its .env");
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

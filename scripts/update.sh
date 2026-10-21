@@ -5,8 +5,10 @@
 #
 # Order: encrypted backup with the current version first (the update stops if
 # it fails), then the new code, a fresh build and a restart. The image that was
-# running is kept as nawlogic-invoice:previous for a quick rollback.
+# running is kept as nawlogic-invoice:<project>-previous for a quick rollback.
 # Options: SKIP_PULL=1 (code already updated), SKIP_BACKUP=1 (not recommended).
+# With several companies on one server, scripts/companies.sh update runs this
+# in every install.
 set -euo pipefail
 
 APP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -20,6 +22,15 @@ die() {
   exit 1
 }
 env_get() { grep -E "^$1=" "$ENV_FILE" 2>/dev/null | tail -n 1 | cut -d= -f2- || true; }
+# The Compose project of this install (see "Several companies on one server"
+# in docs/DEPLOYMENT.md); installs from before that option are "nawlogic".
+project_name() {
+  local p
+  p="$(env_get COMPOSE_PROJECT_NAME)"
+  printf '%s\n' "${p:-nawlogic}"
+}
+IMAGE=""    # nawlogic-invoice:<project>, set in main
+PREVIOUS="" # the image that ran before this update
 # docker compose with the file list from .env (COMPOSE_FILE), so the Cloudflare
 # Tunnel override is picked up when it was chosen at install time.
 compose() {
@@ -28,7 +39,7 @@ compose() {
   files="${files:-docker-compose.yml}"
   IFS=: read -r -a parts <<<"$files"
   for f in "${parts[@]}"; do args+=(-f "$APP_DIR/$f"); done
-  docker compose --project-directory "$APP_DIR" "${args[@]}" --env-file "$ENV_FILE" "$@"
+  docker compose -p "$(project_name)" --project-directory "$APP_DIR" "${args[@]}" --env-file "$ENV_FILE" "$@"
 }
 
 app_health() {
@@ -42,11 +53,17 @@ main() {
   [[ $EUID -eq 0 ]] || die "Run as root, for example: sudo $0"
   [[ -f "$ENV_FILE" ]] || die "No .env found in $APP_DIR. Run scripts/install.sh first."
   command -v docker >/dev/null 2>&1 || die "Docker is not installed. Run scripts/install.sh first."
+  IMAGE="nawlogic-invoice:$(project_name)"
+  PREVIOUS="$IMAGE-previous"
+  # Installs from before one-image-per-company tagged their image :local.
+  if [[ "$(project_name)" == nawlogic ]] && ! docker image inspect "$IMAGE" >/dev/null 2>&1 && docker image inspect nawlogic-invoice:local >/dev/null 2>&1; then
+    docker tag nawlogic-invoice:local "$IMAGE"
+  fi
 
   say "1/5 Encrypted backup of the current data"
   if [[ "${SKIP_BACKUP:-}" == 1 ]]; then
     warn "Skipping the backup (SKIP_BACKUP=1)."
-  elif docker image inspect nawlogic-invoice:local >/dev/null 2>&1; then
+  elif docker image inspect "$IMAGE" >/dev/null 2>&1; then
     # Runs with the version that is installed now, before anything changes.
     compose run --rm --no-deps -T app node server/cli.mjs backup ||
       die "The backup failed, so nothing was changed. Check BACKUP_KEY and the backup folder, then try again."
@@ -66,9 +83,9 @@ main() {
   fi
 
   say "3/5 Keep the running version for rollback"
-  if docker image inspect nawlogic-invoice:local >/dev/null 2>&1; then
-    docker tag nawlogic-invoice:local nawlogic-invoice:previous
-    note "Saved as nawlogic-invoice:previous."
+  if docker image inspect "$IMAGE" >/dev/null 2>&1; then
+    docker tag "$IMAGE" "$PREVIOUS"
+    note "Saved as $PREVIOUS."
   fi
 
   say "4/5 Build and restart"
@@ -89,8 +106,8 @@ main() {
     warn "The app is not healthy yet (status: ${status:-unknown}). See: docker compose logs app"
     cat <<EOF
   To go back to the previous version:
-    docker tag nawlogic-invoice:previous nawlogic-invoice:local
-    docker compose --project-directory $APP_DIR up -d --no-build
+    docker tag $PREVIOUS $IMAGE
+    cd $APP_DIR && docker compose up -d --no-build
   Database changes are not undone by a rollback. Each schema change first
   saves a private copy next to the database (*.pre-*.sqlite) and the backup
   from step 1 is in the backup folder; see docs/DEPLOYMENT.md before restoring.

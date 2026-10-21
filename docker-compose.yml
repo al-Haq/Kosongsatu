@@ -7,6 +7,12 @@
 # .env must set DOMAIN and ACME_EMAIL, plus BACKUP_KEY and MFA_ENCRYPTION_KEY.
 # See docs/DEPLOYMENT.md. The server, domain and DNS are yours to choose; this
 # file does not create them.
+#
+# Several companies on one server: each install is its own Compose project
+# (COMPOSE_PROJECT_NAME in its .env, written by the installer from the folder
+# name), so containers, the data volume and the image tag never collide.
+# "nawlogic" below is the name of an install from before that option.
+#   sudo ./scripts/companies.sh add <name>
 name: nawlogic
 
 x-logging: &logging
@@ -18,7 +24,7 @@ x-logging: &logging
 services:
   app:
     build: .
-    image: nawlogic-invoice:local
+    image: nawlogic-invoice:${COMPOSE_PROJECT_NAME:-nawlogic}
     restart: unless-stopped
     init: true
     env_file: .env
