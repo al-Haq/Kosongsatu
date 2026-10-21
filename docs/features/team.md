@@ -18,7 +18,7 @@ The person who ran `npm run setup` is the first **owner**. Open **Team** (Worksp
 - **Last sign-in** is shown for each user.
 - **Reset password:** for a member who forgot theirs. With email it goes straight to them (you never see it); without email you get a 30-minute one-time link to pass on, and creating it is recorded in the audit trail.
 - **Reset MFA:** clears a member's authenticator and recovery codes (lost phone) and signs them out. Needs your password (and your code if you use MFA).
-- Staff and accountants use **My account** for their password and authenticator. The Settings and AI & automation pages are hidden for them, and so are buttons they can't use. The server checks every request independently of what the screen shows.
+- Staff and accountants use **My account** for their password and authenticator. The Settings and Automation pages are hidden for them, and so are buttons they can't use. The server checks every request independently of what the screen shows.
 - Audit entries record who did what as `owner:<email>` for every user (the prefix is historical; it is the signed-in person's email).
 
 **Security model.** Permissions are enforced on the server with an allow-list per role (`server/team-roles.mjs`). Any route that isn't on the list is refused for staff and accountants, so new features stay owner-only until someone classifies them.
@@ -99,7 +99,7 @@ Then follow the restore steps in docs/DEPLOYMENT.md (MFA key file, `DATABASE_PAT
 
 Every audit entry now carries `prev_hash` and `hash` = SHA-256 of the previous entry's hash and the entry itself (number, time, actor, action, record, detail, before/after data). Existing history was sealed into the chain when this module was installed. Entries still cannot be edited or deleted through the app (database guards).
 
-**Audit trail** page (owner and accountant):
+**Audit** page (owner and accountant):
 
 - **Verify audit chain** re-computes every hash and reports **OK**, or the first entry that was changed, removed, added or reordered.
 - **Download chain head** saves a small file with the latest entry number, its hash and time. Your accountant (or you) should keep these, for example at each month end, somewhere outside the server: their own files, an email, a printout.

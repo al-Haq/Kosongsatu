@@ -1,6 +1,6 @@
-# Tax & e-Invoice
+# Tax (SST and e-Invoice)
 
-The tax module adds Malaysian SST working papers and LHDN MyInvois e-Invoices to Kosongsatu. Open it from **Books > Tax & e-Invoice**. It has five tabs: Overview, SST-02 worksheet, e-Invoices, Self-billed and Settings.
+The tax module adds Malaysian SST working papers and LHDN MyInvois e-Invoices to Kosongsatu. Open it from **Books > Tax**. It has five tabs: Overview, SST-02 worksheet, e-Invoices, Self-billed and Settings.
 
 Nothing in this module files a return or pays tax for you. The SST-02 worksheet is a working aid you copy into MySST. e-Invoices are only sent to LHDN when you press **Submit e-Invoice**, or when you switch on automatic submission yourself.
 
@@ -13,14 +13,14 @@ Roadmap items covered: 18, 19, 20, 21, 22, 23, 24, 93 and 94.
 | What | Where | Needed for |
 |---|---|---|
 | SST registration number, TIN, registration number, phone, email | Settings > Brand & company | SST and e-Invoice |
-| MSIC code, business activity, structured address (lines, city, postcode, state) | Tax & e-Invoice > Settings | e-Invoice |
+| MSIC code, business activity, structured address (lines, city, postcode, state) | Tax > Settings | e-Invoice |
 | MyInvois client ID and client secret | Settings > Integration keys | Submitting e-Invoices |
 | MyInvois environment (`sandbox` or `production`) | Settings > Integration keys | Default is sandbox |
 | Signing private key and certificate (PEM), passphrase if any | Settings > Integration keys | Only for signed version 1.1 documents |
 
 Integration keys are stored encrypted and never shown again. A server environment variable with the same name (`MYINVOIS_CLIENT_ID`, `MYINVOIS_CLIENT_SECRET`, `MYINVOIS_ENV`, `MYINVOIS_SIGNING_KEY`, `MYINVOIS_SIGNING_CERT`, `MYINVOIS_KEY_PASSPHRASE`) takes precedence.
 
-**Getting MyInvois keys:** sign in to the MyInvois portal (start with the sandbox, `preprod.myinvois.hasil.gov.my`), open your taxpayer profile and register an ERP system. The portal shows a client ID and a client secret (the secret only once). Enter them in Settings > Integration keys and press **Test connection** on the Tax & e-Invoice overview.
+**Getting MyInvois keys:** sign in to the MyInvois portal (start with the sandbox, `preprod.myinvois.hasil.gov.my`), open your taxpayer profile and register an ERP system. The portal shows a client ID and a client secret (the secret only once). Enter them in Settings > Integration keys and press **Test connection** on the Tax overview.
 
 **Certificate (optional today):** LHDN still accepts unsigned version 1.0 documents. A signed version 1.1 needs a document-signing certificate from a Malaysian certificate authority. Authorities usually hand out a `.p12` file; convert it once with `openssl pkcs12 -in cert.p12 -nodes -out key.pem` and paste the private key and the certificate into Integration keys (pasting on one line is fine). When both are set, every document is signed and sent as version 1.1.
 
@@ -39,7 +39,7 @@ Integration keys are stored encrypted and never shown again. A server environmen
 
 Download it as **PDF** or **CSV**. Both say clearly that they are a working aid and not a submission.
 
-**Turn it on.** In Tax & e-Invoice > Settings choose the taxable period length (normally 2 months) and the month your first period starts, as given in your Customs registration. Choose how service tax is counted:
+**Turn it on.** In Tax > Settings choose the taxable period length (normally 2 months) and the month your first period starts, as given in your Customs registration. Choose how service tax is counted:
 
 - **When payment is received** (default). Service tax is due when you receive payment. If an invoice is not paid within 12 months, the remaining tax becomes due the day after those 12 months. Part payments count in proportion.
 - **On the invoice date** – only if Customs approved accrual accounting for you.
@@ -65,7 +65,7 @@ Notes created before this feature have no stored split; reports estimate theirs 
 - While the exemption is valid on a document's issue date, saving the document removes SST from every line. The editor shows a hint when you pick an exempt client.
 - Issuing is refused if a draft still charges SST to an exempt client, or if the exemption has expired since the draft was saved (save the draft again).
 - The PDF and the client page state "No SST is charged" with the exemption reference. On an e-Invoice those lines use tax type `E` (exempt) with the reference as the reason.
-- Expired exemptions, and ones expiring within 30 days, are listed on the overview and the Tax & e-Invoice page. The client profile marks an expired exemption.
+- Expired exemptions, and ones expiring within 30 days, are listed on the overview and the Tax page. The client profile marks an expired exemption.
 
 ## 21. LHDN MyInvois e-Invoice
 
@@ -75,7 +75,7 @@ Notes created before this feature have no stored split; reports estimate theirs 
 - **Submit e-Invoice** on an issued invoice builds a UBL 2.1 JSON document (type 01), signs it when a certificate is set (version 1.1, otherwise version 1.0) and submits it.
 - A background job (every minute) and the **Check status** button poll MyInvois. The document page shows the submission UID, document UUID, long ID, status and any validation errors.
 - Once valid, the invoice PDF prints the validation QR code and link, and its footer says it is a validated MyInvois e-Invoice. The client page shows the QR code and a **Check on MyInvois** link. Sandbox documents are marked as tests.
-- **Automatic submission (opt-in):** in Tax & e-Invoice > Settings you can submit each invoice when it is issued, and its notes once the invoice is valid. It is off by default. Each document is queued once (dedupe key) and sent once.
+- **Automatic submission (opt-in):** in Tax > Settings you can submit each invoice when it is issued, and its notes once the invoice is valid. It is off by default. Each document is queued once (dedupe key) and sent once.
 
 **Safety.** Only the official hosts are contacted (`api.myinvois.hasil.gov.my`, `preprod-api.myinvois.hasil.gov.my`). A document can have only one active e-Invoice. If MyInvois does not answer, the record is marked "Checking" and looked up in MyInvois before anything is sent again; after 15 minutes without a trace it can be submitted again. A restored backup never resends: queued work is re-checked and automatic submission is switched off. An invoice with a valid e-Invoice cannot be voided until the e-Invoice is cancelled.
 
@@ -84,7 +84,7 @@ Notes created before this feature have no stored split; reports estimate theirs 
 ## 22. Cancel within 72 hours, and e-Invoice notes
 
 - **Cancel e-Invoice** appears on a valid e-Invoice until 72 hours after validation. It asks for a reason, which is sent to LHDN. The invoice in Kosongsatu stays issued; void it or issue a credit note afterwards. After 72 hours, use a credit or debit note.
-- Credit and debit notes are submitted as types 02 and 03, refund notes (Cash & credits refunds) as type 04. Each refers to the original e-Invoice by its number and UUID, so the original must be valid first. A refund note asks which invoice it relates to. Note lines use the note's SST split.
+- Credit and debit notes are submitted as types 02 and 03, refund notes (Credits refunds) as type 04. Each refers to the original e-Invoice by its number and UUID, so the original must be valid first. A refund note asks which invoice it relates to. Note lines use the note's SST split.
 
 ## 23. Consolidated and self-billed e-Invoices
 
@@ -95,12 +95,12 @@ Notes created before this feature have no stored split; reports estimate theirs 
 ## 24. Classification codes and full buyer address
 
 - **Client form:** ID type (BRN, NRIC, passport or army; the registration / IC number field is the ID number), address lines (up to 3), city, postcode, state code (MyInvois list) and country code (ISO 3166 alpha-3). Values are checked against the official lists.
-- **Your business:** MSIC code (checked against the 1,166 MSIC codes in the MyInvois list), activity description and structured address in Tax & e-Invoice > Settings.
-- **Line classification:** each line needs a MyInvois classification code. The code comes from, in order: a code set on the line (**Classification > Change** on the document), the service's default (Tax & e-Invoice > Settings > Service classifications; matched by service or by the line text), the document default (in the editor), then the business default (`022 Others` unless you change it). Classifications lock once the e-Invoice is submitted.
+- **Your business:** MSIC code (checked against the 1,166 MSIC codes in the MyInvois list), activity description and structured address in Tax > Settings.
+- **Line classification:** each line needs a MyInvois classification code. The code comes from, in order: a code set on the line (**Classification > Change** on the document), the service's default (Tax > Settings > Service classifications; matched by service or by the line text), the document default (in the editor), then the business default (`022 Others` unless you change it). Classifications lock once the e-Invoice is submitted.
 
 ## 93. "MyInvois ready" mode
 
-Every invoice is checked for what an e-Invoice needs: your TIN, registration, MSIC, activity, address and phone; the buyer's TIN, ID, address, postcode, state and phone; a classification for each line; and an exchange rate for foreign currency. The document page lists what is missing with buttons to fix it. The overview shows how many issued invoices are not ready, and the Tax & e-Invoice overview lists them with links. You can use this long before you must comply, without connecting to LHDN.
+Every invoice is checked for what an e-Invoice needs: your TIN, registration, MSIC, activity, address and phone; the buyer's TIN, ID, address, postcode, state and phone; a classification for each line; and an exchange rate for foreign currency. The document page lists what is missing with buttons to fix it. The overview shows how many issued invoices are not ready, and the Tax overview lists them with links. You can use this long before you must comply, without connecting to LHDN.
 
 ## 94. Tax threshold monitor
 

@@ -51,7 +51,7 @@ The template applies to invoices, quotations, proforma invoices, sales and deliv
 - Choose the **Currency** in the editor (MYR, USD, SGD, EUR, GBP, AUD, CNY, HKD, THB, IDR, BND) and type the **Exchange rate** as MYR per 1 unit (for example 4.45 for USD). The rate is fixed when the document is issued. If you leave the rate empty, the last rate you used for that currency is used.
 - Each client can have a **Default currency** (client form); new documents in the editor start with it. Documents created without a currency (recurring schedules, AI proposals) stay in MYR because catalog prices are in MYR.
 - Amounts are kept in the document currency. Paper, PDF, client link and lists show that currency.
-- **Payments**: a payment on a USD invoice is recorded as a USD receipt, with the rate on the day (it defaults to the invoice rate). A receipt can only be applied to invoices in its own currency. When you record money received on **Cash & credits**, pick its currency.
+- **Payments**: a payment on a USD invoice is recorded as a USD receipt, with the rate on the day (it defaults to the invoice rate). A receipt can only be applied to invoices in its own currency. When you record money received on **Credits**, pick its currency.
 - **Reports and dashboards** convert to MYR at each document's or receipt's own rate: overview totals, client outstanding, the invoice CSV (MYR columns plus currency, rate and original amounts), and the SST report (SST figures in MYR).
 - **Statements** show one section per currency.
 - **Online payment (Billplz)** and **bank CSV import/matching** are MYR only. The Pay online button is hidden for other currencies, and a non-MYR receipt never matches a bank line.

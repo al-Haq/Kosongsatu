@@ -28,7 +28,7 @@ Optional runtime settings can be copied from `.env.example` to `.env`. Set `APP_
 
 ## Sales and automation
 
-Open **Sales & POs** to manage opportunities, prepare quotation proposals, record verified customer acceptance and register customer purchase orders. **AI & automation** provides the review queue, opt-in rules, connector tokens and optional built-in AI chat.
+Open **Sales** to manage opportunities, prepare quotation proposals, record verified customer acceptance and register customer purchase orders. **Automation** provides the review queue, opt-in rules, connector tokens and optional built-in AI chat.
 
 The MCP stdio server and scoped REST tools let your agents or n8n read permitted records and queue proposals. Owner approval is separate. An enabled deterministic PO rule can create an invoice draft automatically; it never issues, sends or charges. Configure your own tool-capable compatible model to use the natural-language assistant. No model or external account is connected by default.
 

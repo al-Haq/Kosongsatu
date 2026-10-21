@@ -18,7 +18,7 @@
   height: 176px;
   flex: none;
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: var(--radius);
   background: #fff;
   image-rendering: pixelated;
 }
@@ -34,8 +34,8 @@
   flex: none;
 }
 .team-broken {
-  border-color: #f3b4ad;
-  background: #fff4f2;
+  border-color: var(--red);
+  background: var(--soft);
 }
 .team-roles {
   display: grid;
@@ -44,7 +44,7 @@
 }
 .team-role {
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: var(--radius);
   padding: 14px 16px;
 }
 .team-role p {

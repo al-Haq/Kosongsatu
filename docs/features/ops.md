@@ -2,7 +2,7 @@
 
 The Operations module covers the work behind an invoice: customer purchase orders that arrive in parts, time you log, projects billed by milestone, stock for businesses that sell goods, and proof of the work you did. Everything is built in and needs no outside account or key.
 
-Screens: **Sales & POs** (customer POs), **Operations > Projects**, **Operations > Timesheets**, **Operations > Inventory** (only shown when inventory is on), plus panels on each quotation and invoice.
+Screens: **Sales** (customer POs), **Operations > Projects**, **Operations > Timesheets**, **Operations > Inventory** (only shown when inventory is on), plus panels on each quotation and invoice.
 
 ## Partial and amended customer POs (no. 67)
 
@@ -13,14 +13,14 @@ Screens: **Sales & POs** (customer POs), **Operations > Projects**, **Operations
   - Very rarely, SST rounding makes the exact amount impossible to reach with whole sen (for example a quotation with a single taxed line). The draft is then 1 sen below the PO, never above it.
   - A full-value PO works as before: the draft is the whole quotation with its original lines.
 - A draft billed from a PO can be edited, but its total can never go above the PO. Issuing is refused if it does.
-- **Amend** a PO from **Details** on Sales & POs: change the reference, amount, PO date or notes, with a reason. Each amendment is a new revision; the full history (who, when, what changed, why) stays visible and in the audit log.
+- **Amend** a PO from **Details** on Sales: change the reference, amount, PO date or notes, with a reason. Each amendment is a new revision; the full history (who, when, what changed, why) stays visible and in the audit log.
   - The amount can change only while no live invoice bills the PO. If the PO has a draft invoice, tick the box to remove that draft; a new one can then be made for the new amount. If the invoice is issued, use a credit or debit note instead.
 - **Cancel** a PO that is not invoiced (or whose invoice is void). Its amount is freed on the quotation; the PO stays in the history.
 - **PO files**: attach the customer's PO as a PDF or image (PNG, JPEG, WEBP), up to 5 MB each and 10 per PO, from the registration form or the PO details. Files are private to you.
 - If a partial PO's invoice is voided, the PO can be invoiced again.
 - A quotation billed through partial POs can no longer be converted as a whole ("Create / open invoice"); create each invoice from its PO. A quotation that already has a full invoice cannot take partial POs until that invoice is deleted or voided. A quotation with open POs cannot be voided; cancel the POs first.
 
-**Automation**: the rule "Customer PO → invoice draft" (AI & automation) now also runs when a PO is amended, and for partial POs it drafts the PO's own amount. It never issues or sends anything. AI and MCP proposals for customer POs follow the same limits.
+**Automation**: the rule "Customer PO → invoice draft" (Automation) now also runs when a PO is amended, and for partial POs it drafts the PO's own amount. It never issues or sends anything. AI and MCP proposals for customer POs follow the same limits.
 
 ## Timesheets → invoice (no. 68)
 

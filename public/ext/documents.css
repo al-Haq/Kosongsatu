@@ -33,7 +33,7 @@
 }
 .doc-options {
   border: 1px solid var(--line);
-  border-radius: 9px;
+  border-radius: var(--radius);
   padding: 14px 14px 4px;
   margin-bottom: 16px;
 }

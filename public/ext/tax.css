@@ -17,22 +17,22 @@
   width: 100%;
   height: 10px;
   border: 0;
-  border-radius: 6px;
+  border-radius: var(--radius);
   background: var(--line);
   overflow: hidden;
   appearance: none;
 }
 .tax-progress::-webkit-progress-bar {
   background: var(--line);
-  border-radius: 6px;
+  border-radius: var(--radius);
 }
 .tax-progress::-webkit-progress-value {
   background: var(--teal);
-  border-radius: 6px;
+  border-radius: var(--radius);
 }
 .tax-progress::-moz-progress-bar {
   background: var(--teal);
-  border-radius: 6px;
+  border-radius: var(--radius);
 }
 .tax-progress.near::-webkit-progress-value {
   background: var(--orange);
@@ -83,7 +83,7 @@
   height: 112px;
   flex: none;
   border: 1px solid var(--line);
-  border-radius: 6px;
+  border-radius: var(--radius);
   background: white;
 }
 .tax-inline {
@@ -122,7 +122,7 @@
 }
 .tax-lines {
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--radius);
   padding: 10px 14px 12px;
   margin: 12px 0;
 }

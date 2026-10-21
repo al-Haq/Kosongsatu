@@ -81,7 +81,7 @@ export default function recurringUI(h) {
       ) +
       tabs("Plans") +
       (attention.length
-        ? `<section class="panel mb22"><div class="panel-head"><div><h2>Needs your attention</h2><p>Automatic billing stopped for these plans until you look at them.</p></div>${tag("Needs attention", "red")}</div>${attention
+        ? `<section class="panel mb22"><div class="panel-head"><div><h2>Needs attention</h2><p>Automatic billing stopped for these plans until you look at them.</p></div>${tag("Needs attention", "red")}</div>${attention
             .map(
               (p) =>
                 `<div class="attention"><div><strong>${E(p.title)} / ${E(clientName(p.client_id))}</strong><small>${E(STEP[p.last_error_step] || "Automation")}: ${E(p.last_error)}</small><a class="link-button" href="#/plan/${E(p.id)}">Review plan →</a></div>${p.last_error_at ? `<small class="muted">${timeLabel(p.last_error_at)}</small>` : ""}</div>`,

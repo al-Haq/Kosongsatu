@@ -200,18 +200,18 @@ function renderLogin() {
 const NAV_GROUPS = ["Sell", "Get paid", "Records", "Books", "Operations", "Workspace"];
 const navItems = [
   ["overview", "Overview", "grid", "Sell"],
-  ["sales", "Sales & POs", "trend", "Sell"],
+  ["sales", "Sales", "trend", "Sell"],
   ["quotes", "Quotations", "doc", "Sell"],
   ["invoices", "Invoices", "doc", "Sell"],
   ["proformas", "Proforma", "doc", "Sell"],
   ["sales-orders", "Sales orders", "box", "Sell"],
   ["delivery-orders", "Delivery orders", "box", "Sell"],
   ["payments", "Payments", "wallet", "Get paid"],
-  ["ledger", "Cash & credits", "wallet", "Get paid"],
+  ["ledger", "Credits", "wallet", "Get paid"],
   ["bank", "Bank matching", "trend", "Get paid"],
   ["clients", "Clients", "users", "Records"],
   ["services", "Services", "box", "Records"],
-  ["automation", "AI & automation", "shield", "Workspace"],
+  ["automation", "Automation", "shield", "Workspace"],
   ["settings", "Settings", "settings", "Workspace"],
 ];
 // Modules add entries as { key, label, icon, group, hidden?() }.
@@ -226,15 +226,15 @@ function allNav() {
     .filter(([, items]) => items.length);
 }
 function renderShell(html, active) {
-  app.innerHTML = `<div class="shell"><aside class="sidebar">${logo()}<div class="eyebrow">Billing workspace</div><nav aria-label="Main navigation">${allNav()
+  app.innerHTML = `<div class="shell"><aside class="sidebar">${logo()}<div class="eyebrow">Workspace</div><nav aria-label="Main navigation">${allNav()
     .map(
       ([group, items]) =>
         `<span class="nav-group">${E(group)}</span>${items.map((n) => `<a href="#/${n.key}" class="${n.key === active ? "active" : ""}" ${n.key === active ? 'aria-current="page"' : ""}>${icon(n.icon)}${E(n.label)}</a>`).join("")}`,
     )
-    .join("")}</nav><div class="owner-box"><strong>NAWLOGIC</strong><small>${E(session.email)}</small></div></aside><div class="workspace"><header class="topbar"><div class="top-left"><button class="btn ghost mobile-toggle" data-action="toggle-nav" aria-label="Toggle navigation">${icon("menu")}</button><span class="muted top-label">Nawlogic workspace</span></div><div class="right">${slot("topbar")}${S.settings.demo ? '<span class="badge orange">DEMO DATA</span>' : '<span class="badge green">Owner workspace</span>'}<div class="avatar" aria-label="Owner account">WA</div><button class="btn ghost icon-only" data-action="logout" aria-label="Sign out">${icon("logout")}</button></div></header><main class="content">${S.settings.demo ? '<div class="notice"><p>Demo workspace. All clients, documents and payments are examples.</p></div>' : ""}${html}<p class="footer-note">Nawlogic Invoice · MYR · Kuala Lumpur time · ${S.ext?.tax?.status?.configured ? "MyInvois " + E(S.ext.tax.status.env) : "MyInvois is not connected"}${S.gateway?.configured ? "" : " · Online payment is not connected"}.</p></main></div></div>`;
+    .join("")}</nav><div class="owner-box"><strong>NAWLOGIC</strong><small>${E(session.email)}</small></div></aside><div class="workspace"><header class="topbar"><div class="top-left"><button class="btn ghost mobile-toggle" data-action="toggle-nav" aria-label="Toggle navigation">${icon("menu")}</button><span class="muted top-label">Nawlogic</span></div><div class="right">${slot("topbar")}${S.settings.demo ? '<span class="badge orange">DEMO DATA</span>' : '<span class="badge green">Owner workspace</span>'}<div class="avatar" aria-label="Owner account">WA</div><button class="btn ghost icon-only" data-action="logout" aria-label="Sign out">${icon("logout")}</button></div></header><main class="content">${S.settings.demo ? '<div class="notice"><p>Demo workspace. All clients, documents and payments are examples.</p></div>' : ""}${html}<p class="footer-note">Nawlogic Invoice · MYR · Kuala Lumpur time · ${S.ext?.tax?.status?.configured ? "MyInvois " + E(S.ext.tax.status.env) : "MyInvois is not connected"}${S.gateway?.configured ? "" : " · Online payment is not connected"}.</p></main></div></div>`;
 }
 const heading = (title, sub, actions = "") =>
-  `<div class="heading"><div><h1>${E(title)}</h1><p>${E(sub)}</p></div><div class="actions">${actions}</div></div>`;
+  `<div class="heading"><div><h1>${E(title)}</h1>${sub ? `<p>${E(sub)}</p>` : ""}</div><div class="actions">${actions}</div></div>`;
 const PAGE_SIZE = 50;
 // Long lists show 50 rows at a time; search and filters still cover every record.
 function paged(list) {
@@ -306,20 +306,20 @@ function overview() {
   const max = Math.max(1, ...weeks.map((w) => Math.abs(w.value)));
   return (
     heading(
-      "Your billing, at a glance.",
-      "A clear view of the work billed, money collected and what needs attention.",
+      "Overview",
+      "",
       button("New invoice", "new-invoice", "", true, "plus"),
     ) +
     (!S.settings.bankAccount
       ? `<div class="notice info">${icon("settings")}<p>Add your company details and payment instructions before sharing a real invoice.</p><a href="#/settings">Open settings →</a></div>`
       : "") +
-    `<div class="metrics">${["Net invoiced this month", "Net customer cash", "Outstanding", "Overdue"].map((label, i) => `<div class="metric"><span class="metric-icon">${icon(["doc", "wallet", "clock", "trend"][i])}</span><div class="label">${label}</div><div class="value ${i === 1 ? "teal" : i === 3 ? "red-text" : ""}">${money(sums[i])}</div><div class="hint">${["Invoices + debit notes - credit notes", "Receipts less refunds / this month", `${outstanding.length} unpaid invoices / all dates`, `${overdue.length} invoices need attention`][i]}</div></div>`).join("")}</div><div class="grid-2"><section class="panel"><div class="panel-head"><div><h2>Payment collection</h2><p>Net customer cash over the last four weeks</p></div>${badge("MYR")}</div><div class="chart">${weeks.map((w) => `<div class="bar-col"><strong>${money(w.value)}</strong><div class="bar ${w.value < 0 ? "outflow" : ""}" data-height="${Math.round((Math.abs(w.value) / max) * 150) + 3}"></div><span>${w.label}</span></div>`).join("")}</div></section><section class="panel"><div class="panel-head"><div><h2>Needs your attention</h2><p>Outstanding invoices, oldest due first</p></div><a href="#/invoices">View all →</a></div>${
+    `<div class="metrics">${["Invoiced this month", "Collected this month", "Outstanding", "Overdue"].map((label, i) => `<div class="metric"><span class="metric-icon">${icon(["doc", "wallet", "clock", "trend"][i])}</span><div class="label">${label}</div><div class="value ${i === 1 ? "teal" : i === 3 ? "red-text" : ""}">${money(sums[i])}</div><div class="hint">${["Invoices and notes", "Receipts minus refunds", `${outstanding.length} unpaid invoices`, `${overdue.length} overdue`][i]}</div></div>`).join("")}</div><div class="grid-2"><section class="panel"><div class="panel-head"><div><h2>Collections</h2><p>Last four weeks</p></div>${badge("MYR")}</div><div class="chart">${weeks.map((w) => `<div class="bar-col"><strong>${money(w.value)}</strong><div class="bar ${w.value < 0 ? "outflow" : ""}" data-height="${Math.round((Math.abs(w.value) / max) * 150) + 3}"></div><span>${w.label}</span></div>`).join("")}</div></section><section class="panel"><div class="panel-head"><div><h2>Needs attention</h2><p>Oldest due first</p></div><a href="#/invoices">View all →</a></div>${
       [...outstanding]
         .sort((a, b) => a.due_date.localeCompare(b.due_date))
         .slice(0, 4)
         .map(
           (d) =>
-            `<div class="attention"><div><strong>${E(d.number)}</strong><small>${E(d.client.name)} / ${money(d.balance, d.currency)}</small><button class="link-button" data-action="open-document" data-id="${d.id}">Review invoice →</button></div>${badge(d.status)}</div>`,
+            `<div class="attention"><div><strong>${E(d.number)}</strong><small>${E(d.client.name)} / ${money(d.balance, d.currency)}</small><button class="link-button" data-action="open-document" data-id="${d.id}">Open →</button></div>${badge(d.status)}</div>`,
         )
         .join("") || empty("All caught up", "No outstanding issued invoices.")
     }</section></div>${slot("overview")}<section class="panel mt22"><div class="panel-head"><h2>Recent documents</h2><a href="#/invoices">View invoices →</a></div>${invoiceTable(S.documents.slice(0, 5))}</section>`
@@ -464,11 +464,11 @@ function payments() {
   return (
     heading(
       "Payments",
-      "Amounts applied to invoices. Cash & credits shows money received once.",
+      "Amounts applied to invoices. Credits shows money received once.",
       button("Record payment", "choose-payment", "", true, "plus"),
     ) +
     (proofs.length
-      ? `<section class="panel mb22"><div class="panel-head"><h2>Awaiting review</h2>${badge("Pending review")}</div>${proofs.map((p) => `<div class="attention"><div><strong>${E(p.document.number)} / ${E(p.document.client.name)}</strong><small>Reference: ${E(p.reference)}${p.note ? " / " + E(p.note) : ""}</small>${slipLinks(p)}</div>${button("Review invoice", "open-document", p.document.id)}</div>`).join("")}</section>`
+      ? `<section class="panel mb22"><div class="panel-head"><h2>Awaiting review</h2>${badge("Pending review")}</div>${proofs.map((p) => `<div class="attention"><div><strong>${E(p.document.number)} / ${E(p.document.client.name)}</strong><small>Reference: ${E(p.reference)}${p.note ? " / " + E(p.note) : ""}</small>${slipLinks(p)}</div>${button("Open", "open-document", p.document.id)}</div>`).join("")}</section>`
       : "") +
     `<section class="panel">${all.length ? `<div class="table-wrap"><table><thead><tr><th>Payment / invoice</th><th>Received</th><th>Method</th><th>Reference</th><th class="num">Amount</th><th>Status</th><th>Receipt</th></tr></thead><tbody>${all.map((p) => `<tr><td><button class="link-button" data-action="open-document" data-id="${p.document.id}">${E(p.document.number)}</button><small>${E(p.document.client.name)}</small></td><td>${dateLabel(p.paid_date)}</td><td>${E(p.method)}</td><td>${E(p.reference)}</td><td class="num">${money(p.applied ?? p.amount, p.document.currency)}${p.released ? `<small>Released ${money(p.released, p.document.currency)}</small>` : ""}</td><td>${badge(p.reversed ? "Reversed" : "Confirmed")}</td><td>${p.reversed ? "—" : `<a class="btn small" href="/api/payments/${p.id}/receipt">${icon("download")} PDF</a>`}</td></tr>`).join("")}</tbody></table></div>` : empty("No payments recorded", "Record a payment only after checking it was received.")}</section>`
   );
@@ -480,7 +480,7 @@ function settings() {
       "Workspace settings",
       "Your company identity, document defaults and payment instructions.",
     ) +
-    `<div class="grid-equal"><section class="panel"><div class="panel-head"><h2>Brand & company</h2></div>${logo()}<div class="palette"><div class="swatch teal-bg"><span></span>Teal<br>#0EA5A4</div><div class="swatch orange-bg"><span></span>Orange<br>#F97316</div><div class="swatch ink-bg"><span></span>Ink<br>#0F172A</div></div><form data-form="settings"><div class="form-grid">${input("Registered business name", "company", b.company, "text", true, 'maxlength="180"')}${input("Registration number", "registration", b.registration, "text", false, 'maxlength="80"')}${input("Tax identification number (TIN)", "tin", b.tin || "", "text", false, 'maxlength="20"')}${input("SST registration number", "sstNumber", b.sstNumber || "", "text", false, 'maxlength="40"')}${input("Billing email", "email", b.email, "email", false, 'maxlength="160"')}${input("Phone", "phone", b.phone, "text", false, 'maxlength="60"')}<div class="span-2">${area("Business address", "address", b.address, 600)}</div>${input("Invoice prefix", "invoicePrefix", b.invoicePrefix, "text", true, 'pattern="[A-Z][A-Z0-9-]{0,11}" maxlength="12"')}${input("Quotation prefix", "quotePrefix", b.quotePrefix, "text", true, 'pattern="[A-Z][A-Z0-9-]{0,11}" maxlength="12"')}<div class="span-2">${area("Default terms", "paymentTerms", b.paymentTerms)}</div>${input("Bank name", "bankName", b.bankName, "text", false, 'maxlength="100"')}${input("Account number", "bankAccount", b.bankAccount, "text", false, 'maxlength="60"')}<div class="span-2">${input("Account holder", "bankHolder", b.bankHolder, "text", false, 'maxlength="180"')}</div></div>${errorBlock()}<p class="field-hint">Issued documents keep a snapshot of the company and client details. SST is charged only after you add your SST registration number.</p><div class="form-actions"><button class="btn primary" type="submit">Save settings</button></div></form></section><div class="stack"><section class="panel"><div class="panel-head"><h2>Access & integrations</h2></div><div class="setting-line"><div><h3>Owner access</h3><p>${E(session.email)}</p></div>${badge("Password protected")}</div><div class="setting-line"><div><h3>Client invoice links</h3><p>Document only / 1–90 days / revocable</p></div>${icon("shield")}</div><div class="setting-line"><div><h3>LHDN MyInvois</h3><p>${S.ext?.tax?.status?.configured ? `e-Invoice via MyInvois (${E(S.ext.tax.status.env)})` : "Add MyInvois keys under Integration keys"}</p></div>${badge(S.ext?.tax?.status?.configured ? "Connected" : "Not connected")}</div><div class="setting-line"><div><h3>Online payment</h3><p>${S.gateway?.configured ? E(S.gateway.label) + (S.gateway.sandbox ? " / test mode" : " / live") : "Choose a provider under Online payments below"}</p></div>${badge(S.gateway?.configured ? "Connected" : "Not connected")}</div><div class="setting-line"><div><h3>Email & scheduled reminders</h3><p>${S.mail?.configured ? "Sending from " + E(S.mail.from) : "Add SMTP settings under Integration keys"}</p></div>${badge(S.mail?.configured ? "Connected" : "Not connected")}</div></section><section class="panel"><div class="panel-head"><h2>Account password</h2></div><form data-form="password">${input("Current password", "current", "", "password", true, 'autocomplete="current-password"')}${input("New password (at least 12 characters)", "password", "", "password", true, 'minlength="12" maxlength="256" autocomplete="new-password"')}${S.security.enabled ? input("Authenticator or recovery code", "code", "", "text", true, 'autocomplete="one-time-code"') : ""}${errorBlock()}<button type="submit" class="btn">Change password & sign out</button></form></section><section class="panel"><div class="panel-head"><h2>Your business data</h2></div><p>Download a business data export, including documents, payments and audit history. Store it privately.</p><div class="actions mt22"><a class="btn" href="/api/backup">${icon("download")} Export JSON</a><a class="btn" href="/api/invoices.csv">Export CSV</a></div><p class="field-hint">For full disaster recovery, use the encrypted backup and restore procedure in the deployment guide.</p></section></div></div>`
+    `<div class="grid-equal"><section class="panel"><div class="panel-head"><h2>Brand & company</h2></div>${logo()}<p class="field-hint">Brand colours on your documents and logo.</p><div class="palette"><div class="swatch teal-bg"><span></span>Teal<br>#0EA5A4</div><div class="swatch orange-bg"><span></span>Orange<br>#F97316</div><div class="swatch ink-bg"><span></span>Ink<br>#0F172A</div></div><form data-form="settings"><div class="form-grid">${input("Registered business name", "company", b.company, "text", true, 'maxlength="180"')}${input("Registration number", "registration", b.registration, "text", false, 'maxlength="80"')}${input("Tax identification number (TIN)", "tin", b.tin || "", "text", false, 'maxlength="20"')}${input("SST registration number", "sstNumber", b.sstNumber || "", "text", false, 'maxlength="40"')}${input("Billing email", "email", b.email, "email", false, 'maxlength="160"')}${input("Phone", "phone", b.phone, "text", false, 'maxlength="60"')}<div class="span-2">${area("Business address", "address", b.address, 600)}</div>${input("Invoice prefix", "invoicePrefix", b.invoicePrefix, "text", true, 'pattern="[A-Z][A-Z0-9-]{0,11}" maxlength="12"')}${input("Quotation prefix", "quotePrefix", b.quotePrefix, "text", true, 'pattern="[A-Z][A-Z0-9-]{0,11}" maxlength="12"')}<div class="span-2">${area("Default terms", "paymentTerms", b.paymentTerms)}</div>${input("Bank name", "bankName", b.bankName, "text", false, 'maxlength="100"')}${input("Account number", "bankAccount", b.bankAccount, "text", false, 'maxlength="60"')}<div class="span-2">${input("Account holder", "bankHolder", b.bankHolder, "text", false, 'maxlength="180"')}</div></div>${errorBlock()}<p class="field-hint">Issued documents keep a snapshot of the company and client details. SST is charged only after you add your SST registration number.</p><div class="form-actions"><button class="btn primary" type="submit">Save settings</button></div></form></section><div class="stack"><section class="panel"><div class="panel-head"><h2>Access & integrations</h2></div><div class="setting-line"><div><h3>Owner access</h3><p>${E(session.email)}</p></div>${badge("Password protected")}</div><div class="setting-line"><div><h3>Client invoice links</h3><p>Document only / 1–90 days / revocable</p></div>${icon("shield")}</div><div class="setting-line"><div><h3>LHDN MyInvois</h3><p>${S.ext?.tax?.status?.configured ? `e-Invoice via MyInvois (${E(S.ext.tax.status.env)})` : "Add MyInvois keys under Integration keys"}</p></div>${badge(S.ext?.tax?.status?.configured ? "Connected" : "Not connected")}</div><div class="setting-line"><div><h3>Online payment</h3><p>${S.gateway?.configured ? E(S.gateway.label) + (S.gateway.sandbox ? " / test mode" : " / live") : "Choose a provider under Online payments below"}</p></div>${badge(S.gateway?.configured ? "Connected" : "Not connected")}</div><div class="setting-line"><div><h3>Email & scheduled reminders</h3><p>${S.mail?.configured ? "Sending from " + E(S.mail.from) : "Add SMTP settings under Integration keys"}</p></div>${badge(S.mail?.configured ? "Connected" : "Not connected")}</div></section><section class="panel"><div class="panel-head"><h2>Account password</h2></div><form data-form="password">${input("Current password", "current", "", "password", true, 'autocomplete="current-password"')}${input("New password (at least 12 characters)", "password", "", "password", true, 'minlength="12" maxlength="256" autocomplete="new-password"')}${S.security.enabled ? input("Authenticator or recovery code", "code", "", "text", true, 'autocomplete="one-time-code"') : ""}${errorBlock()}<button type="submit" class="btn">Change password & sign out</button></form></section><section class="panel"><div class="panel-head"><h2>Your business data</h2></div><p>Download a business data export, including documents, payments and audit history. Store it privately.</p><div class="actions mt22"><a class="btn" href="/api/backup">${icon("download")} Export JSON</a><a class="btn" href="/api/invoices.csv">Export CSV</a></div><p class="field-hint">For full disaster recovery, use the encrypted backup and restore procedure in the deployment guide.</p></section></div></div>`
   );
 }
 // Labels, columns and money on the paper follow the document's language and currency.
@@ -596,7 +596,7 @@ function taxRows(items, cur = "MYR", t = labels("en")) {
 }
 function sstPanel() {
   const from = addDays(S.today, -60);
-  return `<section class="panel mt22"><div class="panel-head"><div><h2>SST summary</h2><p>${S.settings.sstNumber ? "SST No. " + E(S.settings.sstNumber) : "Add your SST registration number above to charge SST."}</p></div>${badge(S.settings.sstNumber ? "Active" : "Not connected")}</div><form data-form="sst-report"><div class="form-grid">${input("From", "from", from, "date", true)}${input("To", "to", S.today, "date", true)}</div><p class="field-hint">Taxable value and SST by rate for issued invoices, by issue date. Credit and debit notes carry their SST share. The full SST-02 worksheet is under Books > Tax & e-Invoice.</p><div class="form-actions"><button class="btn primary" type="submit">Download CSV</button></div></form></section>`;
+  return `<section class="panel mt22"><div class="panel-head"><div><h2>SST summary</h2><p>${S.settings.sstNumber ? "SST No. " + E(S.settings.sstNumber) : "Add your SST registration number above to charge SST."}</p></div>${badge(S.settings.sstNumber ? "Active" : "Not connected")}</div><form data-form="sst-report"><div class="form-grid">${input("From", "from", from, "date", true)}${input("To", "to", S.today, "date", true)}</div><p class="field-hint">Taxable value and SST by rate for issued invoices, by issue date. Credit and debit notes carry their SST share. The full SST-02 worksheet is under Books > Tax.</p><div class="form-actions"><button class="btn primary" type="submit">Download CSV</button></div></form></section>`;
 }
 function emailHistory(list) {
   if (!list.length) return "";
@@ -655,7 +655,7 @@ function documentView(id) {
         button("Issue document", "issue-document", id, true)
       : d.state === "void"
         ? ""
-        : button("Client link", "share-document", id, true, "copy") +
+        : button("Share", "share-document", id, true, "copy") +
           button("Email", "email-document", id)) +
     button("Duplicate", "duplicate-document", id) +
     slot("documentActions", d) +

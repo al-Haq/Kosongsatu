@@ -29,7 +29,7 @@
 .portal-card {
   background: white;
   border: 1px solid var(--line);
-  border-radius: 11px;
+  border-radius: var(--radius);
   padding: 20px 22px;
 }
 .portal-card p {
@@ -53,7 +53,7 @@
 }
 .portal-card.dark p,
 .portal-card.dark small {
-  color: #aab9cc;
+  color: var(--muted);
 }
 .portal-card.alert .value {
   color: var(--red);
@@ -99,8 +99,8 @@
   height: auto;
   aspect-ratio: 3 / 1;
   background: white;
-  border: 1px dashed #94a3b8;
-  border-radius: 9px;
+  border: 1px dashed var(--muted);
+  border-radius: var(--radius);
   touch-action: none;
   cursor: crosshair;
 }
@@ -124,7 +124,7 @@
   max-height: 110px;
   background: white;
   border: 1px solid var(--line);
-  border-radius: 9px;
+  border-radius: var(--radius);
   padding: 6px;
 }
 .portal-signature p {
@@ -148,10 +148,10 @@
 .portal-stars label {
   font-size: 30px;
   line-height: 1;
-  color: #cbd5e1;
+  color: #cccccc;
   cursor: pointer;
   padding: 2px;
-  border-radius: 6px;
+  border-radius: var(--radius);
 }
 .portal-stars input:checked ~ label,
 .portal-stars label:hover,
@@ -168,7 +168,7 @@
   white-space: nowrap;
 }
 .portal-rating span {
-  color: #cbd5e1;
+  color: #cccccc;
 }
 .portal-dist {
   display: flex;
@@ -185,7 +185,7 @@
 .portal-bar-track {
   height: 7px;
   background: var(--line);
-  border-radius: 4px;
+  border-radius: var(--radius);
   overflow: hidden;
 }
 .portal-bar-fill {

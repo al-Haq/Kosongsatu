@@ -116,9 +116,9 @@ export default function documentsUI(h) {
     if (d.kind === "proforma") out.push(linkButton("Convert to invoice", "doc-convert", d.id, "invoice", true));
     if (d.kind === "sales_order") {
       out.push(linkButton("Create invoice", "doc-convert", d.id, "invoice", true));
-      out.push(linkButton("Delivery order", "doc-convert", d.id, "delivery_order"));
+      out.push(linkButton("Delivery", "doc-convert", d.id, "delivery_order"));
     }
-    if (d.kind === "invoice") out.push(linkButton("Delivery order", "doc-convert", d.id, "delivery_order"));
+    if (d.kind === "invoice") out.push(linkButton("Delivery", "doc-convert", d.id, "delivery_order"));
     return out.join("");
   }
   function linkedPanel(d) {
@@ -158,7 +158,7 @@ export default function documentsUI(h) {
       )
       .join("")}${
       d.state !== "void" && files.length < 10
-        ? `<form data-form="doc-attachment" data-id="${E(d.id)}" class="mt22"><label>Add a file (PDF or image, 5 MB)<input type="file" name="file" accept="application/pdf,image/png,image/jpeg,image/webp,image/gif" required></label><label class="check-row"><input type="checkbox" name="client"> Client can download it from the document link</label>${h.errorBlock()}<div class="form-actions"><button class="btn" type="submit">Upload</button></div></form>`
+        ? `<form data-form="doc-attachment" data-id="${E(d.id)}" class="mt22"><label>PDF or image, up to 5 MB<input type="file" name="file" accept="application/pdf,image/png,image/jpeg,image/webp,image/gif" required></label><label class="check-row"><input type="checkbox" name="client"> Visible to the client</label>${h.errorBlock()}<div class="form-actions"><button class="btn" type="submit">Upload</button></div></form>`
         : ""
     }</section>`;
   }

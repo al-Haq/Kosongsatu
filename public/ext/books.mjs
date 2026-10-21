@@ -640,7 +640,7 @@ export default function booksUI(h) {
         ? x.critical
             .map(
               (i) =>
-                `<div class="attention"><div><strong>${E(i.number)}</strong><small>${E(i.client)} · ${money(i.balance)} · ${i.overdue} day${i.overdue === 1 ? "" : "s"} overdue · expected ${dateLabel(i.predicted)}</small><button class="link-button" data-action="open-document" data-id="${E(i.id)}">Review invoice →</button></div>${riskTag(i.risk)}</div>`,
+                `<div class="attention"><div><strong>${E(i.number)}</strong><small>${E(i.client)} · ${money(i.balance)} · ${i.overdue} day${i.overdue === 1 ? "" : "s"} overdue · expected ${dateLabel(i.predicted)}</small><button class="link-button" data-action="open-document" data-id="${E(i.id)}">Open →</button></div>${riskTag(i.risk)}</div>`,
             )
             .join("")
         : '<p class="field-hint">No overdue invoices.</p>'
@@ -987,7 +987,7 @@ export default function booksUI(h) {
   return {
     nav: [
       { key: "expenses", label: "Expenses", icon: "receipt", group: "Books" },
-      { key: "bills", label: "Bills & POs", icon: "cart", group: "Books" },
+      { key: "bills", label: "Bills", icon: "cart", group: "Books" },
       { key: "reports", label: "Reports", icon: "chart", group: "Books" },
     ],
     pages: {

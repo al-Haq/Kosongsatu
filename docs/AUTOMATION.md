@@ -5,8 +5,8 @@ This release adds an operational automation layer to the existing single-owner N
 ## Sales flow
 
 1. Add the customer and catalog services.
-2. In **Sales & POs**, create an opportunity, choose **Prepare quote**, then queue a quotation proposal. The quick form provides one line; edit the resulting draft for additional lines.
-3. In **AI & automation**, review the customer, scope, dates, prices and terms, then approve. Approval creates a draft quotation and links it to the opportunity.
+2. In **Sales**, create an opportunity, choose **Prepare quote**, then queue a quotation proposal. The quick form provides one line; edit the resulting draft for additional lines.
+3. In **Automation**, review the customer, scope, dates, prices and terms, then approve. Approval creates a draft quotation and links it to the opportunity.
 4. Review and issue the quotation through the existing document workflow. Share through the existing client link when ready.
 5. Customer acceptance can come through the portal. For verified acceptance received elsewhere, **Record acceptance** requires the signatory name and communication/evidence reference and records a distinct owner audit action.
 6. Register the **customer's PO to Nawlogic** against the accepted quotation. This release supports one full-value MYR PO per quotation. Supplier purchasing, partial orders, multi-currency POs, PO file uploads/OCR, amendments and cancellation are not implemented.
@@ -47,7 +47,7 @@ The assistant can **read and propose**. It has no approval, issuing, sharing, se
 
 This is a real **stdio MCP server**, built with the official TypeScript SDK. A compatible local MCP host launches it; it connects to the running Nawlogic application through a scoped REST token. It does not open the SQLite database directly. It is not a public Streamable HTTP/OAuth MCP endpoint, and it is not automatically installed in ChatGPT/Claude or any other host.
 
-1. In **AI & automation → Create connector**, choose a label, scopes and 1–90 day expiry. Confirm the current owner password and MFA code if enabled.
+1. In **Automation → Create connector**, choose a label, scopes and 1–90 day expiry. Confirm the current owner password and MFA code if enabled.
 2. Store the token shown once in the host's private environment/credential store. Only its hash is stored by the app. Do not put the token in Git, a prompt, a screenshot or shell history.
 3. Configure your MCP host to launch Node directly (not an npm script that prints to stdout):
 

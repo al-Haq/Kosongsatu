@@ -7,7 +7,7 @@ form[data-form^="books-"] [hidden],
   text-decoration: none;
 }
 .books-tabs a.tab:focus-visible {
-  outline: 2px solid #8ad6d0;
+  outline: 2px solid var(--ink);
 }
 .books-loading {
   padding: 20px 0;
@@ -147,7 +147,7 @@ details summary {
 /* Report tables and bars */
 .books-total td {
   font-weight: 700;
-  background: #f9fbfc;
+  background: var(--soft);
 }
 .books-sub-row td:first-child {
   padding-left: 28px;
@@ -166,14 +166,14 @@ details summary {
   display: block;
   height: 7px;
   min-width: 2px;
-  border-radius: 4px;
+  border-radius: var(--radius);
   background: var(--teal);
 }
 .books-bar.col {
   background: var(--orange);
 }
 .books-bar.out {
-  background: #94a3b8;
+  background: var(--muted);
 }
 .books-bar.neg {
   background: var(--red);
@@ -190,7 +190,7 @@ details summary {
   display: inline-block;
   width: 12px;
   height: 7px;
-  border-radius: 3px;
+  border-radius: var(--radius);
   background: var(--teal);
   margin-left: 8px;
 }
@@ -198,7 +198,7 @@ details summary {
   background: var(--orange);
 }
 .books-key.out {
-  background: #94a3b8;
+  background: var(--muted);
 }
 .books-compare {
   display: grid;
@@ -233,7 +233,7 @@ details summary {
 .books-flow-up {
   height: 114px;
   align-items: flex-end;
-  border-bottom: 1px solid #94a3b8;
+  border-bottom: 1px solid var(--muted);
 }
 .books-flow-down {
   height: 64px;
@@ -245,11 +245,11 @@ details summary {
   width: 70%;
   max-width: 34px;
   background: var(--teal);
-  border-radius: 4px 4px 0 0;
+  border-radius: var(--radius);
 }
 .books-flow-down span {
   background: var(--red);
-  border-radius: 0 0 4px 4px;
+  border-radius: var(--radius);
 }
 .books-flow-col small {
   font-size: 9px;
@@ -260,7 +260,7 @@ details summary {
   font-weight: 700;
 }
 .books-neg td {
-  background: #fff5f4;
+  background: var(--soft);
 }
 
 /* Purchase lines */
@@ -296,7 +296,7 @@ details summary {
   object-fit: contain;
   background: var(--bg);
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--radius);
 }
 
 /* Exports */

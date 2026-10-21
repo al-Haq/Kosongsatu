@@ -186,7 +186,7 @@ export function financeUI(h) {
   function documentExtras(d) {
     if (d.kind !== "invoice" || d.state !== "issued") return "";
     const m = (v) => money(v, d.currency);
-    return `<section class="panel"><div class="panel-head"><h2>Invoice adjustments</h2></div><div class="total-row"><span>Original</span><strong>${m(d.total)}</strong></div><div class="total-row"><span>Credits / debits</span><strong>−${m(d.credit)} / +${m(d.debit)}</strong></div><div class="total-row emphasis"><span>Adjusted value</span><span>${m(d.adjusted_total)}</span></div><div class="actions mt22">${button("Credit / debit note", "invoice-adjust", d.id)}</div>${d.adjustments.map((a) => `<div class="payment"><strong>${E(a.number)} / ${m(a.amount)}</strong><p>${E(a.kind)} / ${E(a.reason)}</p><a href="/api/adjustments/${a.id}/pdf">Note PDF</a></div>`).join("")}<div class="mt22"><a href="#/ledger">Manage customer funds →</a></div></section>`;
+    return `<section class="panel"><div class="panel-head"><h2>Adjustments</h2></div><div class="total-row"><span>Original</span><strong>${m(d.total)}</strong></div><div class="total-row"><span>Credits and debits</span><strong>−${m(d.credit)} / +${m(d.debit)}</strong></div><div class="total-row emphasis"><span>Adjusted total</span><span>${m(d.adjusted_total)}</span></div><div class="actions mt22">${button("Credit / debit note", "invoice-adjust", d.id)}</div>${d.adjustments.map((a) => `<div class="payment"><strong>${E(a.number)} / ${m(a.amount)}</strong><p>${E(a.kind)} / ${E(a.reason)}</p><a href="/api/adjustments/${a.id}/pdf">Note PDF</a></div>`).join("")}<div class="mt22"><a href="#/ledger">Customer funds →</a></div></section>`;
   }
   // Encrypted backups (local and off-site) are shown by the team module.
   function security() {
