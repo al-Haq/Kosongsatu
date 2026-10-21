@@ -207,13 +207,14 @@ small,
   position: fixed;
   inset: 0 auto 0 0;
   width: 222px;
-  padding: 24px 15px;
+  padding: 22px 14px;
   display: flex;
   flex-direction: column;
   z-index: 5;
 }
 .sidebar .logo {
-  margin: 5px 17px 22px;
+  width: 128px;
+  margin: 6px 12px 26px;
 }
 .eyebrow {
   font-size: 9px;
@@ -222,19 +223,16 @@ small,
   color: var(--muted);
   text-transform: uppercase;
 }
-.sidebar .eyebrow {
-  margin: 0 18px 18px;
-}
 nav {
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 2px;
 }
 .nav-group {
-  margin: 12px 16px 2px;
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: 1.2px;
+  margin: 20px 12px 6px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
   color: var(--muted);
   text-transform: uppercase;
 }
@@ -244,36 +242,50 @@ nav {
 nav a {
   display: flex;
   align-items: center;
-  gap: 13px;
-  padding: 11px 16px;
-  color: var(--muted);
+  gap: 11px;
+  padding: 9px 12px;
+  color: #3d3d3d;
   border-radius: var(--radius);
-  font-size: 12px;
+  font-size: 12.5px;
+  font-weight: 500;
+  line-height: 1.4;
+}
+nav a svg {
+  width: 17px;
+  height: 17px;
+  color: var(--muted);
 }
 nav a:hover {
-  background: var(--bg);
+  background: var(--soft);
+  color: var(--ink);
 }
 nav a.active {
-  color: var(--action);
+  color: var(--ink);
   background: var(--soft);
   font-weight: 700;
 }
+nav a:hover svg,
+nav a.active svg {
+  color: var(--ink);
+}
 .owner-box {
   margin-top: auto;
-  border: 1px solid var(--line);
-  padding: 13px;
-  border-radius: var(--radius);
-  background: var(--soft);
+  padding: 16px 12px 4px;
+  border-top: 1px solid var(--line);
 }
 .owner-box strong {
+  display: block;
+  margin-bottom: 3px;
   font-size: 10px;
-  letter-spacing: 1px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 .owner-box small {
   display: block;
   overflow: hidden;
   text-overflow: ellipsis;
-  font-size: 10px;
+  font-size: 10.5px;
+  color: var(--muted);
 }
 .workspace {
   grid-column: 2;
@@ -1714,8 +1726,6 @@ h1 {
   font-weight: 700;
 }
 .eyebrow,
-.nav-group,
-.sidebar .eyebrow,
 .metric .label,
 th {
   text-transform: uppercase;
@@ -1727,11 +1737,6 @@ th {
   background: transparent;
   color: var(--ink);
   border-bottom: 1px solid var(--ink);
-}
-nav a.active {
-  background: var(--soft);
-  color: var(--ink);
-  box-shadow: inset 3px 0 0 var(--ink);
 }
 .metric {
   background: transparent;
