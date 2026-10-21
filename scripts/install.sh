@@ -59,6 +59,12 @@ ask_optional() {
   printf -v "$var" '%s' "${answer:-$default}"
 }
 
+# A Cloudflare Tunnel token is base64 (standard or URL-safe) and long.
+valid_tunnel_token() {
+  local re='^[A-Za-z0-9+/=_-]{40,}$'
+  [[ "$1" =~ $re ]]
+}
+
 valid_domain() {
   local re='^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$'
   [[ "$1" =~ $re ]]
@@ -251,10 +257,18 @@ main() {
   ask DOMAIN "Domain for the app, e.g. billing.example.com"
   DOMAIN="$(tr '[:upper:]' '[:lower:]' <<<"$DOMAIN")"
   valid_domain "$DOMAIN" || die "\"$DOMAIN\" is not a valid domain name."
-  ask_optional CLOUDFLARE_TUNNEL_TOKEN "Cloudflare Tunnel token (Enter to use Caddy with Let's Encrypt instead)" "$(tunnel_token_get)"
+  local saved_token
+  saved_token="$(tunnel_token_get)"
+  if [[ -n "$saved_token" ]]; then
+    ask_optional CLOUDFLARE_TUNNEL_TOKEN "Cloudflare Tunnel token (Enter keeps the saved one, 'none' switches back to Caddy)" "$saved_token"
+  else
+    ask_optional CLOUDFLARE_TUNNEL_TOKEN "Cloudflare Tunnel token (Enter to use Caddy with Let's Encrypt instead)"
+  fi
+  # "none" (typed, or CLOUDFLARE_TUNNEL_TOKEN=none unattended) removes a saved token.
+  [[ "${CLOUDFLARE_TUNNEL_TOKEN:-}" == "none" ]] && CLOUDFLARE_TUNNEL_TOKEN=""
   TUNNEL=""
   if [[ -n "${CLOUDFLARE_TUNNEL_TOKEN:-}" ]]; then
-    [[ "$CLOUDFLARE_TUNNEL_TOKEN" =~ ^[A-Za-z0-9_=-]{40,}$ ]] || die "That does not look like a Cloudflare Tunnel token (copy it from Zero Trust > Networks > Tunnels)."
+    valid_tunnel_token "$CLOUDFLARE_TUNNEL_TOKEN" || die "That does not look like a Cloudflare Tunnel token (copy it from Zero Trust > Networks > Tunnels)."
     TUNNEL=1
     ACME_EMAIL=""
     note "Cloudflare Tunnel: Cloudflare serves HTTPS for $DOMAIN; no certificate email is needed."
@@ -295,7 +309,13 @@ main() {
   create_owner
 
   say "7/7 Start"
-  compose up -d
+  if [[ -n "$TUNNEL" ]]; then
+    # An earlier Caddy install keeps serving 80/443 unless it is stopped: Caddy
+    # is only parked behind a profile, which `up` does not stop.
+    compose --profile caddy rm -sf caddy >/dev/null 2>&1 || true
+  fi
+  # --remove-orphans also removes a cloudflared container left from tunnel mode.
+  compose up -d --remove-orphans
   note "Waiting for https://$DOMAIN (the first certificate can take a minute)..."
   if wait_for_https; then
     note "https://$DOMAIN is up."

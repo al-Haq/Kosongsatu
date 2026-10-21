@@ -89,6 +89,16 @@ test("install.sh keeps a Cloudflare Tunnel token out of .env and switches the co
     assert.equal(get(second, "BACKUP_KEY"), get(first, "BACKUP_KEY"));
     assert.ok(!existsSync(tunnelEnv), "token file removed");
     assert.match(read("scripts/update.sh"), /env_get COMPOSE_FILE/, "update.sh follows the same compose file list");
+    const install = read("scripts/install.sh");
+    assert.match(install, /compose --profile caddy rm -sf caddy/, "a Caddy install is stopped when switching to the tunnel");
+    assert.match(install, /compose up -d --remove-orphans/, "a leftover cloudflared container is removed when switching back");
+    assert.match(read("scripts/update.sh"), /compose up -d --remove-orphans/);
+    assert.match(install, /== "none" \]\] && CLOUDFLARE_TUNNEL_TOKEN=""/, "'none' clears a saved token");
+    const tokenOk = (v) => bash(`source "${new URL("scripts/install.sh", root).pathname}"; valid_tunnel_token "$V"`, { V: v }).status === 0;
+    assert.ok(tokenOk("eyJhIjoiMTIzIiwidCI6IjQ1NiIsInMiOiJhYmMrLz09In0=" + "A".repeat(20)), "standard base64 with + / =");
+    assert.ok(tokenOk("eyJhIjoiMTIzIn0-_" + "b".repeat(40)), "URL-safe base64");
+    assert.ok(!tokenOk("short"), "too short");
+    assert.ok(!tokenOk("$(id)" + "a".repeat(40)), "shell characters");
     assert.match(read("scripts/update.sh"), /compose pull --ignore-buildable/, "pulls whichever proxy image is in use");
   } finally {
     rmSync(dir, { recursive: true, force: true });

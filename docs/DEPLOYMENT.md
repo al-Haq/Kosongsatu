@@ -136,7 +136,7 @@ Good to know:
 - Leave the hostname **proxied** (it is, for tunnels). Do not put Cloudflare Access in front of the whole hostname: clients open private links and the portal without a Cloudflare login.
 - Email still goes out from the server over SMTP; Cloudflare is not involved.
 - `sudo docker compose logs cloudflared` shows the tunnel; `sudo docker compose restart cloudflared` reconnects it. Rotating the token: paste the new one into `/opt/nawlogic/.env.cloudflare` and restart that service.
-- To go back to Caddy later, run the installer again and press Enter at the token question. The DNS record must then be an A record to the server and ports 80 and 443 must be open.
+- To go back to Caddy later, run the installer again and answer `none` at the token question (or `CLOUDFLARE_TUNNEL_TOKEN=none` unattended). The installer stops the tunnel container; the DNS record must then be an A record to the server and ports 80 and 443 must be open. Switching the other way stops Caddy, so nothing keeps answering on 80 and 443 behind Cloudflare's back.
 
 ### Backups to Cloudflare R2
 

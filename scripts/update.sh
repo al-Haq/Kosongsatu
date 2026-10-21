@@ -74,7 +74,7 @@ main() {
   say "4/5 Build and restart"
   compose build --pull app
   compose pull --ignore-buildable
-  compose up -d
+  compose up -d --remove-orphans
 
   say "5/5 Health check"
   local i status=""
