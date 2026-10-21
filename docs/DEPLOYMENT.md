@@ -107,6 +107,45 @@ Without Docker, run Node.js 24 directly behind nginx:
 6. Adapt `deploy/nginx.conf.example` to your domain in `/etc/nginx/sites-available/`, enable it, run `sudo certbot --nginx -d your-domain` and reload nginx. The example overwrites `X-Forwarded-For` with the real client address, which `TRUST_PROXY=1` expects.
 7. Allow only 22, 80 and 443 in the firewall, and set up off-server backup copies as above.
 
+## Cloudflare in front
+
+Cloudflare Pages and Workers cannot host this app: it is a Node.js server with a SQLite file, uploaded files on disk and background jobs, none of which exist on Workers. Cloudflare Containers run Docker images, but their disk is not persistent, so the database would be lost on every restart. What works well is your own small server (the setup above) with Cloudflare in front of it:
+
+- **Cloudflare Tunnel** (recommended). A small `cloudflared` container on your server opens an outbound connection to Cloudflare. Cloudflare serves HTTPS for your domain and forwards visitors through the tunnel. Ports 80 and 443 stay closed on the server, no certificate is issued locally, and Cloudflare's DDoS protection and firewall apply. The free plan is enough.
+- **Cloudflare R2** as the off-site backup bucket (S3-compatible, no egress fees).
+
+### Tunnel setup
+
+1. Add your domain to Cloudflare and move its nameservers, or use a sub-domain of a zone that is already on Cloudflare. Nothing else on the domain changes.
+2. In the Cloudflare dashboard open **Zero Trust → Networks → Tunnels → Create a tunnel**, choose **Cloudflared**, give it a name (for example `nawlogic`) and copy the **token** (the long string after `--token` in the install command Cloudflare shows). Treat it like a password.
+3. Under **Public hostname** add your name, for example `billing.example.com`, with **Service** type `HTTP` and URL `app:3000` (the app container as seen by cloudflared). Cloudflare creates the DNS record for it.
+4. On the server, run the installer with the token (or run it without and paste the token when asked):
+
+   ```sh
+   cd /opt/nawlogic
+   sudo CLOUDFLARE_TUNNEL_TOKEN='<token>' ./scripts/install.sh
+   ```
+
+   The installer then asks no certificate email and skips the DNS check, opens only SSH in `ufw`, saves the token in `/opt/nawlogic/.env.cloudflare` (root only; the app container never sees it) and sets `COMPOSE_FILE` in `.env` so every `docker compose` command, `scripts/update.sh` included, uses `deploy/docker-compose.cloudflare.yml`: the `cloudflared` service runs instead of Caddy.
+5. In Cloudflare **SSL/TLS → Edge Certificates** turn on **Always Use HTTPS**. The SSL mode setting does not matter for a tunnel; traffic to the server travels inside the tunnel.
+6. Open `https://billing.example.com/api/health`, then sign in.
+
+Good to know:
+
+- `TRUST_PROXY=1` stays correct: cloudflared sets `X-Forwarded-For` to the visitor's address, so login and link rate limits see real addresses. Do not put another proxy between cloudflared and the app.
+- Leave the hostname **proxied** (it is, for tunnels). Do not put Cloudflare Access in front of the whole hostname: clients open private links and the portal without a Cloudflare login.
+- Email still goes out from the server over SMTP; Cloudflare is not involved.
+- `sudo docker compose logs cloudflared` shows the tunnel; `sudo docker compose restart cloudflared` reconnects it. Rotating the token: paste the new one into `/opt/nawlogic/.env.cloudflare` and restart that service.
+- To go back to Caddy later, run the installer again and answer `none` at the token question (or `CLOUDFLARE_TUNNEL_TOKEN=none` unattended). The installer stops the tunnel container; the DNS record must then be an A record to the server and ports 80 and 443 must be open. Switching the other way stops Caddy, so nothing keeps answering on 80 and 443 behind Cloudflare's back.
+
+### Backups to Cloudflare R2
+
+In Cloudflare **R2** create a private bucket (for example `nawlogic-backups`) and an **R2 API token** with *Object Read & Write* limited to that bucket; note your **account ID**. In the app, under **Settings → Integration keys** (off-site backup), enter endpoint `https://<account-id>.r2.cloudflarestorage.com`, region `auto`, the bucket name, and the token's access key ID and secret. Click **Test connection**. From then on every encrypted backup is uploaded as well; the keys that decrypt it stay in your password manager, never in R2. The same values work as server environment variables (see [docs/features/team.md](features/team.md)).
+
+### Proxied DNS without a tunnel
+
+Keeping the Caddy setup and only switching the A record to Cloudflare's proxy also works, but needs two more steps: Caddy must be told to trust Cloudflare's address ranges (`trusted_proxies` in the Caddyfile), and `.env` needs `TRUST_PROXY=2`. Without both, every visitor appears to come from Cloudflare and the login rate limit locks everyone out together. The tunnel avoids all of this and keeps the ports closed, so prefer it.
+
 ## Before real use
 
 1. Run `npm run setup`, save the generated password privately, change it in Settings and enable MFA. Save the ten recovery codes in your password manager.

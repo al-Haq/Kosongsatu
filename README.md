@@ -68,7 +68,7 @@ These are built and tested with simulated providers, and switch on when you add 
 - LHDN MyInvois: client ID and secret (sandbox or production) and, for signed documents, your certificate. Not yet exercised against the live sandbox; see [docs/features/tax.md](docs/features/tax.md).
 - An OpenAI-compatible model: receipt scanning, AI wording for follow-ups and plain-language invoices. Everything has a non-AI path.
 - S3-compatible storage for off-site backups.
-- A server and domain for production hosting ([docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)).
+- A server and domain for production hosting ([docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)); Cloudflare Tunnel and R2 are supported in front of it.
 
 Still outside this release: automatic bank feeds or direct debit, multi-company tenancy, self-registration, partial deliveries, and fetched exchange rates (rates are typed by the owner). The SST-02 worksheet, Form B/P summary and accounting exports are working aids: check them with your accountant, and test the exports against a real import before relying on them. Do not treat a client-submitted reference as bank verification.
 

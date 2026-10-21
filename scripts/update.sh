@@ -19,7 +19,17 @@ die() {
   printf '\033[31mError: %s\033[0m\n' "$*" >&2
   exit 1
 }
-compose() { docker compose --project-directory "$APP_DIR" -f "$APP_DIR/docker-compose.yml" --env-file "$ENV_FILE" "$@"; }
+env_get() { grep -E "^$1=" "$ENV_FILE" 2>/dev/null | tail -n 1 | cut -d= -f2- || true; }
+# docker compose with the file list from .env (COMPOSE_FILE), so the Cloudflare
+# Tunnel override is picked up when it was chosen at install time.
+compose() {
+  local files f args=()
+  files="$(env_get COMPOSE_FILE)"
+  files="${files:-docker-compose.yml}"
+  IFS=: read -r -a parts <<<"$files"
+  for f in "${parts[@]}"; do args+=(-f "$APP_DIR/$f"); done
+  docker compose --project-directory "$APP_DIR" "${args[@]}" --env-file "$ENV_FILE" "$@"
+}
 
 app_health() {
   local id
@@ -63,8 +73,8 @@ main() {
 
   say "4/5 Build and restart"
   compose build --pull app
-  compose pull caddy
-  compose up -d
+  compose pull --ignore-buildable
+  compose up -d --remove-orphans
 
   say "5/5 Health check"
   local i status=""
