@@ -306,6 +306,61 @@ nav a.active svg {
   align-items: center;
   gap: 12px;
 }
+.top-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.avatar-menu {
+  position: relative;
+}
+.avatar-menu summary {
+  list-style: none;
+  cursor: pointer;
+}
+.avatar-menu summary::-webkit-details-marker {
+  display: none;
+}
+.avatar-menu .menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+  min-width: 220px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  padding: 8px;
+  z-index: 20;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+}
+.avatar-menu .menu small {
+  display: block;
+  padding: 8px 10px 10px;
+  color: var(--muted);
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.avatar-menu .menu a,
+.avatar-menu .menu button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 9px 10px;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 12.5px;
+  color: var(--ink);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+.avatar-menu .menu a:hover,
+.avatar-menu .menu button:hover {
+  background: var(--soft);
+}
 .topbar .right {
   display: flex;
   align-items: center;
@@ -348,24 +403,37 @@ nav a.active svg {
   align-items: center;
 }
 .notice {
-  padding: 13px 16px;
-  border: 1px solid var(--red);
+  padding: 12px 16px;
+  border: 1px solid var(--line);
   background: var(--soft);
-  color: var(--red);
+  color: var(--ink);
   border-radius: var(--radius);
   display: flex;
   align-items: center;
-  gap: 13px;
-  margin-bottom: 22px;
+  gap: 12px;
+  margin-bottom: 24px;
   font-size: 12px;
 }
 .notice p {
   color: inherit;
 }
-.notice.info {
-  background: var(--soft);
-  border-color: var(--line);
-  color: var(--action);
+.notice svg {
+  color: var(--muted);
+}
+/* Warning: something to act on, in black text with a red hairline. */
+.notice.warn {
+  background: #fff;
+  border-color: var(--red);
+}
+/* Error: the operation failed. */
+.notice.error {
+  background: #fff;
+  border-color: var(--red);
+  color: var(--red);
+}
+.notice.error svg,
+.notice.warn svg {
+  color: var(--red);
 }
 .metrics {
   display: grid;
@@ -439,30 +507,58 @@ nav a.active svg {
   flex-direction: column;
   gap: 20px;
 }
-.chart {
-  height: 235px;
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  align-items: end;
-  gap: 28px;
-  padding: 28px 25px 20px;
-}
-.bar-col {
+.grid-2 > .panel {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: end;
+}
+.chart {
+  flex: 1;
+  min-height: 180px;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 24px;
+  padding: 8px 8px 0;
+  position: relative;
+}
+.chart::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 28px;
+  border-top: 1px solid var(--line);
+}
+.bar-col {
+  display: grid;
+  grid-template-rows: 18px minmax(0, 1fr) 28px;
+  align-items: end;
+  justify-items: center;
   height: 100%;
-  gap: 8px;
-  font-size: 10px;
+  font-size: 11px;
 }
 .bar-col strong {
-  font-size: 10px;
+  grid-row: 1;
+  padding-bottom: 4px;
+}
+.bar-col .bar {
+  grid-row: 2;
+}
+.bar-col > span {
+  grid-row: 3;
+}
+.bar-col strong {
+  font-size: 11px;
+}
+.bar-col > span {
+  height: 28px;
+  line-height: 28px;
+  color: var(--muted);
 }
 .bar {
-  width: 48px;
-  min-height: 3px;
-  border-radius: var(--radius);
+  width: 40px;
+  min-height: 0;
+  align-self: end;
+  border-radius: 4px 4px 0 0;
   background: var(--teal);
 }
 .attention {
@@ -471,6 +567,36 @@ nav a.active svg {
   display: flex;
   justify-content: space-between;
   gap: 10px;
+}
+button.attention {
+  width: 100%;
+  border-width: 0 0 1px;
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  align-items: center;
+  cursor: pointer;
+  padding: 12px 0;
+}
+button.attention:last-child {
+  border: 0;
+}
+button.attention:hover strong {
+  text-decoration: underline;
+}
+button.attention small {
+  margin: 2px 0 0;
+}
+.attention-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  white-space: nowrap;
+}
+.attention-right strong {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
 }
 .attention:first-of-type {
   padding-top: 0;
@@ -490,6 +616,35 @@ nav a.active svg {
   gap: 8px;
   margin-bottom: 22px;
   flex-wrap: wrap;
+}
+.list-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+.list-toolbar .tabs {
+  margin-bottom: 0;
+}
+.list-toolbar .toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+.list-toolbar .search {
+  flex: 0 1 280px;
+  min-width: 200px;
+}
+.list-toolbar .search input,
+.list-toolbar .btn {
+  height: 40px;
+  margin-top: 0;
+}
+.list-toolbar .search svg {
+  top: 10px;
 }
 .tab {
   background: white;
@@ -547,9 +702,30 @@ th {
   font-weight: 700;
 }
 td {
-  padding: 16px 12px;
-  font-size: 11px;
+  padding: 14px 12px;
+  font-size: 12px;
   border-bottom: 1px solid var(--line);
+}
+th.status,
+td.status {
+  text-align: right;
+  width: 120px;
+}
+/* A row that opens a record: the whole row is the target. */
+tr.row-link {
+  cursor: pointer;
+}
+tr.row-link:hover td {
+  background: var(--soft);
+}
+tr.row-link .link-button {
+  pointer-events: none;
+}
+.table-link {
+  font-weight: 700;
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 tbody tr:last-child td {
   border-bottom: 0;
@@ -1072,15 +1248,44 @@ dialog.wide {
 }
 .login-points {
   display: flex;
-  gap: 30px;
-  margin-top: 55px;
-  font-size: 11px;
-  color: #cccccc;
+  gap: 24px;
+  margin-top: 48px;
+  font-size: 12px;
+  flex-wrap: wrap;
+}
+.login-points span {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
 }
 .login-points svg {
-  color: var(--teal);
-  display: block;
-  margin-bottom: 10px;
+  width: 16px;
+  height: 16px;
+  color: var(--muted-on-dark);
+}
+.login-inner details.mfa {
+  margin-top: 14px;
+}
+.login-inner details.mfa summary {
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted);
+  list-style: none;
+}
+.login-inner details.mfa summary::-webkit-details-marker {
+  display: none;
+}
+.login-inner details.mfa[open] summary {
+  color: var(--ink);
+}
+.login-inner .team-forgot {
+  text-align: right;
+}
+.login-inner .team-forgot .link-button {
+  font-weight: 500;
+  color: var(--muted);
+  font-size: 12px;
 }
 .login-form {
   display: flex;
@@ -1093,8 +1298,8 @@ dialog.wide {
   width: 360px;
 }
 .login-inner .logo {
-  width: 190px;
-  margin-bottom: 45px;
+  width: 170px;
+  margin-bottom: 32px;
 }
 .login-inner h2 {
   font-size: 24px;
@@ -1138,11 +1343,6 @@ dialog.wide {
   display: grid;
   place-items: center;
   color: var(--muted);
-}
-.footer-note {
-  font-size: 10px;
-  color: var(--muted);
-  margin-top: 25px;
 }
 .public-wrap {
   max-width: 1100px;
@@ -1340,8 +1540,8 @@ dialog.wide {
   .topbar .right {
     gap: 9px;
   }
-  .topbar .top-label {
-    display: none;
+  .topbar .top-title {
+    font-size: 12.5px;
   }
   .content {
     padding: 22px 16px;
@@ -1480,9 +1680,6 @@ dialog.wide {
     bottom: 16px;
     max-width: none;
   }
-  .footer-note {
-    line-height: 1.8;
-  }
 }
 @media print {
   .sidebar,
@@ -1490,7 +1687,6 @@ dialog.wide {
   .heading,
   .actions,
   .stack,
-  .footer-note,
   .public-header,
   .public-top,
   .public-footer,
@@ -1738,9 +1934,7 @@ th {
   border-bottom: 1px solid var(--ink);
 }
 .metric {
-  background: transparent;
-  border-width: 0 0 1px;
-  border-color: var(--line);
+  border-radius: var(--radius-lg);
 }
 .metric .value,
 .num,

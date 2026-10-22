@@ -132,7 +132,7 @@ export default function platformUI(h) {
     const off = webhooks.filter(autoOff);
     const byId = Object.fromEntries(webhooks.map((w) => [w.id, w]));
     return (
-      heading("Webhooks", "Send business events to n8n, Zapier, Make or your own server as they happen, without polling.", webhooks.length < 10 ? button("Add endpoint", "platform-webhook-new", "", true, "plus") : "") +
+      heading("Webhooks", "", webhooks.length < 10 ? button("Add endpoint", "platform-webhook-new", "", true, "plus") : "") +
       off.map((w) => `<div class="notice">${icon("hook")}<p><strong>${E(w.url)}</strong> was turned off${w.disabled_at ? " on " + E(timeLabel(w.disabled_at)) : ""}. ${E(w.disabled_reason)} Fix the receiver, then turn it on again.</p></div>`).join("") +
       `<section class="panel pw-section"><div class="panel-head"><div><h2>Endpoints</h2><p>Each delivery is signed. Failed deliveries are retried for up to 24 hours.</p></div></div>${
         webhooks.length
@@ -209,7 +209,7 @@ const valid = fresh && /^[0-9a-f]{64}$/.test(v1) &&
   function importPage() {
     const { imports } = ext();
     return (
-      heading("Import", "Clients, services and past invoices from a spreadsheet or your previous system.") +
+      heading("Import", "") +
       `<div class="notice info">${icon("shield")}<p>Imports never email, share or issue anything. Each file is checked row by row first and imported only if every row is valid. Import clients first, then services, then invoices.</p></div><div class="pi-grid">${Object.entries(IMPORTS)
         .map(
           ([kind, [title, text, cols]]) =>
@@ -437,7 +437,7 @@ const valid = fresh && /^[0-9a-f]{64}$/.test(v1) &&
     action,
     submit,
     slots: {
-      topbar: () => `<button type="button" class="btn ghost pq-top" data-action="platform-quick" aria-label="Quick invoice">${icon("bolt")}<span>Quick invoice</span></button>`,
+      topbar: () => `<button type="button" class="btn pq-top" data-action="platform-quick" aria-label="Quick invoice">${icon("bolt")}<span>Quick invoice</span></button>`,
       overview: () => overviewNotices() + quickPanel(),
       settings: installPanel,
     },

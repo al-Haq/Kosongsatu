@@ -74,7 +74,7 @@ export default function teamUI(h) {
     const users = t.users || [];
     const owners = users.filter((u) => u.role === "owner" && u.status === "Active").length;
     return (
-      heading("Team", "Who can sign in to this workspace, and what they can do.", button("Invite user", "team-invite", "", true, "plus")) +
+      heading("Team", "", button("Invite user", "team-invite", "", true, "plus")) +
       (!t.mail
         ? `<div class="notice">${icon("shield")}<p>Email is not configured. Invitation links are shown for you to copy, and members who forget their password need you to create a reset link for them.</p></div>`
         : "") +
@@ -117,15 +117,13 @@ export default function teamUI(h) {
   function verifyResult(r) {
     if (r.ok)
       return `<div class="notice info team-result">${icon("check")}<p><strong>Audit chain OK.</strong> ${r.checked} entries verified ${timeLabel(r.verified)}.${r.recorded ? ` The recorded head (entry ${E(r.recorded.id)}) still matches.` : ""}${r.unsealed ? ` ${r.unsealed} newest entries are waiting to be sealed.` : ""}<br>Head: entry ${E(r.head.id)} · <span class="team-hash">${E(r.head.hash)}</span></p></div>`;
-    return `<div class="notice team-result team-broken">${icon("shield")}<p><strong>Audit chain broken.</strong> ${E(r.reason)}${r.broken ? `<br>First bad entry: ${E(r.broken.id)} (${E(r.broken.action)}, ${timeLabel(r.broken.created)}). ${r.checked} entries before it verified.` : ""}</p></div>`;
+    return `<div class="notice error team-result team-broken">${icon("shield")}<p><strong>Audit chain broken.</strong> ${E(r.reason)}${r.broken ? `<br>First bad entry: ${E(r.broken.id)} (${E(r.broken.action)}, ${timeLabel(r.broken.created)}). ${r.checked} entries before it verified.` : ""}</p></div>`;
   }
   function auditPage() {
     const S = h.get();
     const head = team().audit || {};
     return (
-      heading(
-        "Audit trail",
-        "Every change is recorded, cannot be edited or deleted in the app, and is chained so later tampering can be detected.",
+      heading("Audit trail", "",
         button("Verify audit chain", "team-verify", "", true, "shield"),
       ) +
       `<div id="team-verify-result"></div><div class="grid-equal mt22"><section class="panel"><div class="panel-head"><div><h2>Chain head</h2><p>Record this from time to time (for example at month end). It is your proof of what the history looked like.</p></div></div><dl class="detail"><dt>Latest entry</dt><dd>${E(head.id ?? "—")}</dd><dt>Hash</dt><dd class="team-hash">${E(head.hash || "—")}</dd><dt>Written</dt><dd>${head.created ? timeLabel(head.created) : "—"}</dd><dt>Entries</dt><dd>${E(head.entries ?? 0)}</dd></dl><div class="actions mt22"><a class="btn" href="/api/team/audit/head?download=1">${icon("download")} Download chain head</a></div></section><section class="panel"><div class="panel-head"><div><h2>Check a recorded head</h2><p>Confirms that history up to that entry is unchanged.</p></div></div><form data-form="team-check-head"><div class="form-grid">${input("Entry number", "id", "", "number", true, 'min="1" step="1"')}<div class="span-2">${input("Hash (64 characters)", "hash", "", "text", true, 'pattern="[0-9a-fA-F]{64}" maxlength="64" autocomplete="off"')}</div></div>${errorBlock()}<div class="form-actions"><button class="btn primary" type="submit">Check</button></div></form><div id="team-head-result"></div></section></div><section class="panel mt22"><div class="panel-head"><h2>What this proves</h2></div><p>Each entry's hash covers its content and the hash of the entry before it. If anyone later changes, removes or reorders an entry, verification shows the first entry that no longer fits, <strong>provided you can compare against a chain head recorded earlier</strong>. Someone with full access to the server could rewrite the whole history and recompute every hash, so the chain alone only proves internal consistency. A head kept outside the server (your accountant's files, an email, a printout) is what makes rewriting detectable.</p><p class="field-hint">It does not prove that an entry was true when written, and it cannot show changes made before the chain began; existing history was sealed when this feature was installed.</p></section><section class="panel mt22"><div class="panel-head"><h2>Recent entries</h2><p class="muted">Latest ${S.audit.length}</p></div><div class="table-wrap"><table class="team-audit"><thead><tr><th>#</th><th>When</th><th>Who</th><th>What</th><th>Hash</th></tr></thead><tbody>${S.audit
@@ -142,7 +140,7 @@ export default function teamUI(h) {
     const S = h.get(),
       me = team().me || {};
     return (
-      heading("My account", "Your sign-in details, password and authenticator.") +
+      heading("My account", "") +
       `<div class="grid-equal"><section class="panel"><div class="panel-head"><h2>${E(me.name || me.email)}</h2>${badge(roleLabel(me.role))}</div><dl class="detail"><dt>Email</dt><dd>${E(me.email)}</dd><dt>Access</dt><dd>${E(team().roles?.[me.role]?.summary || "")}</dd></dl><p class="field-hint">Your actions are recorded in the audit trail under your email. Ask the workspace owner to change your role.</p></section><section class="panel"><div class="panel-head"><h2>Authenticator & recovery</h2>${badge(S.security.enabled ? "Enabled" : "Not enabled")}</div><p>${S.security.enabled ? `${S.security.recoveryRemaining} unused recovery codes.` : "Add an authenticator app for a second sign-in step."}</p><div class="actions mt22">${button(S.security.enabled ? "Manage MFA" : "Enable MFA", "mfa-setup")}</div><p class="field-hint">Lost your authenticator and recovery codes? Ask the workspace owner to reset it.</p></section></div><section class="panel mt22"><div class="panel-head"><h2>Change password</h2></div><form data-form="team-password">${input("Current password", "current", "", "password", true, 'autocomplete="current-password"')}${input("New password (at least 12 characters)", "password", "", "password", true, 'minlength="12" maxlength="256" autocomplete="new-password"')}${S.security.enabled ? input("Authenticator or recovery code", "code", "", "text", true, 'autocomplete="one-time-code"') : ""}${errorBlock()}<button type="submit" class="btn">Change password & sign out</button></form></section>`
     );
   }
@@ -438,7 +436,7 @@ export default function teamUI(h) {
         modal.close();
         showModal(
           "Save your backup key",
-          `<div class="notice"><p><strong>This is the only time the key is shown.</strong> Save it in your password manager now. Without it, no backup (local or off-site) can be restored.</p></div>${input("Backup key", "teamkey", r.key, "text", false, 'readonly autocomplete="off"')}<div class="actions mt22">${button("Copy key", "team-copy", "teamkey", true, "copy")}</div><form data-form="team-key-saved"><label class="check-row mt22"><input type="checkbox" name="saved" required> I saved the backup key somewhere safe, away from this server.</label><div class="form-actions"><button class="btn primary" type="submit">Done</button></div></form>`,
+          `<div class="notice warn"><p><strong>This is the only time the key is shown.</strong> Save it in your password manager now. Without it, no backup (local or off-site) can be restored.</p></div>${input("Backup key", "teamkey", r.key, "text", false, 'readonly autocomplete="off"')}<div class="actions mt22">${button("Copy key", "team-copy", "teamkey", true, "copy")}</div><form data-form="team-key-saved"><label class="check-row mt22"><input type="checkbox" name="saved" required> I saved the backup key somewhere safe, away from this server.</label><div class="form-actions"><button class="btn primary" type="submit">Done</button></div></form>`,
         );
         return true;
       }

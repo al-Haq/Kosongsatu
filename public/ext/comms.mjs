@@ -81,7 +81,7 @@ export default function commsUI(h) {
   // ---- Email form (documents) and statement form --------------------------
   const bouncedNotice = (list) =>
     list?.length
-      ? `<div class="notice comms-warn"><p>${list
+      ? `<div class="notice warn comms-warn"><p>${list
           .map((b) => `Email to ${E(b.email)} ${b.type === "complaint" ? "was marked as spam" : "bounced"} on ${timeLabel(b.created)}${b.detail ? ` (${E(b.detail)})` : ""}.`)
           .join(" ")} Check the address before sending.</p></div>`
       : "";
@@ -148,7 +148,7 @@ export default function commsUI(h) {
         : "Not set up. Add the SMTP server, port, username, password and From address under Integration keys below.";
     return `<section class="panel mt22"><div class="panel-head"><div><h2>Email delivery</h2><p>${status}</p></div><div class="actions">${badge(m.configured ? "Connected" : "Not connected")}${m.configured ? button("Send test email", "comms-test-email") : ""}</div></div><form data-form="comms-mail"><div class="form-grid">${select("Default language for client messages", "language", LANGS, s.language)}<div></div></div>${checkbox("trackOpens", "Track when clients open emails", s.trackOpens)}<p class="field-hint">Adds a tiny image to each email. Opens are approximate: many mail apps block images (no open is recorded) or load them automatically (an open is recorded without the client reading it).</p>${checkbox("reminderLinks", "Include a fresh private link in reminders", s.reminderLinks)}<p class="field-hint">Each reminder then carries a new 30-day link and the previous link stops working.</p>${checkbox("autoReceipts", "Email the official receipt to the client when a payment is recorded", s.autoReceipts)}${h.errorBlock()}<div class="form-actions"><button class="btn primary" type="submit">Save email settings</button></div></form><h3 class="mt22">Bounces and spam complaints</h3><p class="field-hint">Ask your mail provider (Amazon SES through SNS, Postmark, Mailgun, SendGrid or any service that can post JSON) to send bounce and complaint events to this address. Rejections by your SMTP server already show as Failed.</p><input class="comms-code" readonly value="${E(c.mail?.eventsUrl || "")}?token=YOUR_BOUNCE_WEBHOOK_TOKEN" aria-label="Bounce webhook address"><p class="field-hint">${c.mail?.eventsReady ? "The bounce webhook token is set." : "Set the bounce webhook token under Integration keys first."}</p>${
       c.sns
-        ? `<div class="notice mt22"><p>Amazon SNS asked to confirm the subscription for ${E(c.sns.topic || "your topic")}. Open the link once, then mark it as done.</p><div class="actions"><a class="btn" href="${E(c.sns.url)}" target="_blank" rel="noopener noreferrer">Confirm subscription</a>${button("Done", "comms-sns-done")}</div></div>`
+        ? `<div class="notice warn mt22"><p>Amazon SNS asked to confirm the subscription for ${E(c.sns.topic || "your topic")}. Open the link once, then mark it as done.</p><div class="actions"><a class="btn" href="${E(c.sns.url)}" target="_blank" rel="noopener noreferrer">Confirm subscription</a>${button("Done", "comms-sns-done")}</div></div>`
         : ""
     }${addressList()}</section>`;
   }

@@ -87,7 +87,7 @@ export default function booksUI(h) {
           if (el.isConnected) el.innerHTML = html;
         })
         .catch((e) => {
-          if (el.isConnected) el.innerHTML = `<div class="notice"><p>${E(e.message)}</p></div>`;
+          if (el.isConnected) el.innerHTML = `<div class="notice error"><p>${E(e.message)}</p></div>`;
         });
     }
   }
@@ -116,19 +116,17 @@ export default function booksUI(h) {
       ],
       sub || "list",
     );
-    if (sub === "vendors") return heading("Vendors", "Suppliers you buy from, with their registration and default category.", button("Add vendor", "books-new-vendor", "", true, "plus")) + t + vendorsTable();
+    if (sub === "vendors") return heading("Vendors", "", button("Add vendor", "books-new-vendor", "", true, "plus")) + t + vendorsTable();
     if (sub === "categories")
       return (
-        heading("Expense categories", "Rename, add or retire categories, and say how each one is treated for tax.", button("Add category", "books-new-category", "", true, "plus")) +
+        heading("Expense categories", "", button("Add category", "books-new-category", "", true, "plus")) +
         t +
         categoriesTable()
       );
     const f = filters();
     const q = qs({ ...f, limit: 50 });
     return (
-      heading(
-        "Expenses",
-        "Money going out: receipts, costs you owe and bill payments.",
+      heading("Expenses", "",
         button("Scan receipt", "books-scan", "", false, "receipt") + button("New expense", "books-new-expense", "", true, "plus"),
       ) +
       t +
@@ -333,7 +331,7 @@ export default function booksUI(h) {
     if (sub === "pos") {
       const list = b.pos;
       return (
-        heading("Purchase orders", "Orders to your suppliers. A received order becomes one supplier bill.", button("New purchase order", "books-new-po", "", true, "plus")) +
+        heading("Purchase orders", "", button("New purchase order", "books-new-po", "", true, "plus")) +
         t +
         `<section class="panel">${
           list.length
@@ -346,7 +344,7 @@ export default function booksUI(h) {
       const list = b.recurring;
       const every = { week: "Weekly", month: "Monthly", quarter: "Quarterly", year: "Yearly" };
       return (
-        heading("Recurring costs", "Regular costs such as rent or subscriptions, used only in the cash flow forecast.", button("Add recurring cost", "books-new-recurring", "", true, "plus")) +
+        heading("Recurring costs", "", button("Add recurring cost", "books-new-recurring", "", true, "plus")) +
         t +
         `<section class="panel">${
           list.length
@@ -358,7 +356,7 @@ export default function booksUI(h) {
     const list = b.bills;
     const open = list.filter((x) => x.state === "open" && x.balance > 0);
     return (
-      heading("Supplier bills", "Invoices from your suppliers, their due dates and what you have paid.", button("New bill", "books-new-bill", "", true, "plus")) +
+      heading("Supplier bills", "", button("New bill", "books-new-bill", "", true, "plus")) +
       t +
       `<div class="books-tiles books-tiles-3"><div class="metric"><div class="label">Unpaid bills</div><div class="value">${money(open.reduce((s, x) => s + x.balance, 0))}</div><div class="hint">${open.length} open</div></div><div class="metric"><div class="label">Overdue</div><div class="value red-text">${money(open.filter((x) => x.due_date < T()).reduce((s, x) => s + x.balance, 0))}</div><div class="hint">Past their due date</div></div><div class="metric"><div class="label">Due in 30 days</div><div class="value">${money(open.filter((x) => x.due_date >= T() && x.due_date <= addDays(T(), 30)).reduce((s, x) => s + x.balance, 0))}</div><div class="hint">Included in the cash flow forecast</div></div></div><section class="panel">${
         list.length
@@ -496,7 +494,7 @@ export default function booksUI(h) {
     if (!B()) return empty("Books are unavailable", "Refresh the page.");
     const active = sub || "sales";
     const r = period();
-    const head = heading("Reports", "Sales, profit, cash and tax, worked out from your invoices, receipts and expenses.");
+    const head = heading("Reports", "");
     if (active === "sales")
       return (
         head +
@@ -635,7 +633,7 @@ export default function booksUI(h) {
       x.cash === null
         ? `<form data-form="books-cash" class="books-inline-cash"><div class="books-range-grid">${input("Bank balance (MYR)", "balance", "", "number", true, 'step="0.01" min="-99999999.99" max="99999999.99"')}${input("On date", "date", T(), "date", true, `max="${T()}"`)}<div class="books-range-go"><button class="btn primary" type="submit">Save balance</button></div></div>${h.errorBlock()}</form>`
         : ""
-    }${x.negativeWeeks?.length ? `<div class="notice mt22"><p>Cash is forecast to go below zero in week ${x.negativeWeeks.join(", ")} of the next 13. <a href="#/reports/cashflow">See the forecast</a>.</p></div>` : ""}<h3 class="books-sub mt22">Most critical invoices</h3>${
+    }${x.negativeWeeks?.length ? `<div class="notice warn mt22"><p>Cash is forecast to go below zero in week ${x.negativeWeeks.join(", ")} of the next 13. <a href="#/reports/cashflow">See the forecast</a>.</p></div>` : ""}<h3 class="books-sub mt22">Most critical invoices</h3>${
       x.critical.length
         ? x.critical
             .map(
@@ -698,7 +696,7 @@ export default function booksUI(h) {
           toast("Receipt read. Check the details before saving.");
         } catch (e) {
           const w = modal.querySelector(".books-warnings");
-          if (w) w.innerHTML = `<div class="notice mt22"><p>${E(e.message)}</p></div>`;
+          if (w) w.innerHTML = `<div class="notice error mt22"><p>${E(e.message)}</p></div>`;
           else throw e;
         } finally {
           if (el.isConnected) el.textContent = "Read again";
