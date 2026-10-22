@@ -2,10 +2,10 @@
 import PDFDocument from "pdfkit";
 import { fileURLToPath } from "node:url";
 import { currency } from "./domain.mjs";
+import { registerTextFonts, textFont } from "./documents-fonts.mjs";
 import { drawQr } from "./qr.mjs";
 import { STATE_CODES, EINVOICE_TYPES } from "./tax-codes.mjs";
 
-const font = (name) => fileURLToPath(new URL(`../public/assets/fonts/${name}`, import.meta.url));
 const logo = fileURLToPath(new URL("../public/assets/nawlogic-logo.png", import.meta.url));
 const ink = "#0F172A",
   teal = "#087F7E",
@@ -14,8 +14,7 @@ const ink = "#0F172A",
 
 function page(title, subtitle, footer) {
   const pdf = new PDFDocument({ size: "A4", margin: 42, bufferPages: true, info: { Title: title } });
-  pdf.registerFont("Body", font("Archivo-Regular.ttf"));
-  pdf.registerFont("Bold", font("Archivo-Bold.ttf"));
+  registerTextFonts(pdf);
   const chunks = [];
   pdf.on("data", (c) => chunks.push(c));
   const done = new Promise((ok, fail) => {
@@ -26,7 +25,7 @@ function page(title, subtitle, footer) {
     pdf,
     y: 42,
     text(value, x, y, size = 10, f = "Body", color = ink, width = 511, align = "left") {
-      pdf.font(f).fontSize(size).fillColor(color).text(String(value ?? ""), x, y, { width, lineGap: 2, align });
+      pdf.font(textFont(f, value)).fontSize(size).fillColor(color).text(String(value ?? ""), x, y, { width, lineGap: 2, align });
       return pdf.y;
     },
     rule(y) {
@@ -61,7 +60,7 @@ function table(t, head, rows, widths) {
   const x0 = 42;
   const draw = (cells, f, color, fill) => {
     const heights = cells.map((c, i) => {
-      t.pdf.font(f).fontSize(9);
+      t.pdf.font(textFont(f, c)).fontSize(9);
       return t.pdf.heightOfString(String(c ?? ""), { width: widths[i] - 8 });
     });
     const h = Math.max(...heights) + 10;

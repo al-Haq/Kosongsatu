@@ -5,9 +5,9 @@ import PDFDocument from "pdfkit";
 import { crc32 } from "node:zlib";
 import { fileURLToPath } from "node:url";
 import { currency, now } from "./domain.mjs";
+import { registerTextFonts, textFont } from "./documents-fonts.mjs";
 import { monthRange, daysBetween, dayLabel } from "./recurring-dates.mjs";
 
-const font = (name) => fileURLToPath(new URL(`../public/assets/fonts/${name}`, import.meta.url));
 const logo = fileURLToPath(new URL("../public/assets/nawlogic-logo.png", import.meta.url));
 const name = (snapshot) => {
   try {
@@ -175,13 +175,12 @@ export function renderPackPdf(p) {
     pdf.on("data", (c) => chunks.push(c));
     pdf.on("end", () => resolve(Buffer.concat(chunks)));
     pdf.on("error", reject);
-    pdf.registerFont("Body", font("Archivo-Regular.ttf"));
-    pdf.registerFont("Bold", font("Archivo-Bold.ttf"));
+    registerTextFonts(pdf);
     const ink = "#0F172A",
       muted = "#64748B",
       teal = "#087F7E";
     const put = (v, x, y, size = 9, f = "Body", color = ink, width = 510, align = "left", extra = {}) =>
-      pdf.font(f).fontSize(size).fillColor(color).text(String(v ?? ""), x, y, { width, align, lineGap: 2, ...extra });
+      pdf.font(textFont(f, v)).fontSize(size).fillColor(color).text(String(v ?? ""), x, y, { width, align, lineGap: 2, ...extra });
     // Table cells stay on one line; long text is cut with an ellipsis.
     const cell = { height: 11, ellipsis: true };
     const rule = (y) => pdf.strokeColor("#E2E8F0").lineWidth(0.7).moveTo(42, y).lineTo(553, y).stroke();

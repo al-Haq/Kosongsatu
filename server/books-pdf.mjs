@@ -3,7 +3,7 @@
 import PDFDocument from "pdfkit";
 import { fileURLToPath } from "node:url";
 import { currency } from "./domain.mjs";
-const font = (name) => fileURLToPath(new URL(`../public/assets/fonts/${name}`, import.meta.url));
+import { registerTextFonts, textFont } from "./documents-fonts.mjs";
 const logo = fileURLToPath(new URL("../public/assets/nawlogic-logo.png", import.meta.url));
 const ink = "#0F172A",
   muted = "#64748B",
@@ -21,10 +21,9 @@ function start(title, author) {
     pdf.on("end", () => resolve(Buffer.concat(chunks)));
     pdf.on("error", reject);
   });
-  pdf.registerFont("Body", font("Archivo-Regular.ttf"));
-  pdf.registerFont("Bold", font("Archivo-Bold.ttf"));
+  registerTextFonts(pdf);
   const put = (v, x, y, size = 9, f = "Body", color = ink, width = 510, align = "left") =>
-    pdf.font(f).fontSize(size).fillColor(color).text(String(v ?? ""), x, y, { width, align, lineGap: 2 });
+    pdf.font(textFont(f, v)).fontSize(size).fillColor(color).text(String(v ?? ""), x, y, { width, align, lineGap: 2 });
   const rule = (y) => pdf.strokeColor("#E2E8F0").lineWidth(0.7).moveTo(42, y).lineTo(553, y).stroke();
   return { pdf, done, put, rule };
 }

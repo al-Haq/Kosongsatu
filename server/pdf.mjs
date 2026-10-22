@@ -5,14 +5,7 @@ import { drawQr } from "./qr.mjs";
 import { labels, titleFor, statusLabel, formatDate } from "../public/ext/documents-i18n.mjs";
 import { pdfStore } from "./documents-assets.mjs";
 import { documentSettings, fieldApplies } from "./documents-store.mjs";
-import { hasCjk, cjkFontPath, loadFontFace, boldSibling, CJK_MESSAGE } from "./documents-fonts.mjs";
-// Archivo, the interface typeface, so documents look like the app that made them (OFL, see LICENSE-Archivo.txt).
-const regular = fileURLToPath(
-  new URL("../public/assets/fonts/Archivo-Regular.ttf", import.meta.url),
-);
-const bold = fileURLToPath(
-  new URL("../public/assets/fonts/Archivo-Bold.ttf", import.meta.url),
-);
+import { hasCjk, cjkFontPath, loadFontFace, boldSibling, CJK_MESSAGE, registerTextFonts, textFont } from "./documents-fonts.mjs";
 const logo = fileURLToPath(
   new URL("../public/assets/nawlogic-logo.png", import.meta.url),
 );
@@ -29,8 +22,7 @@ function tint(accent) {
 }
 // Fonts, template and labels shared by every PDF of a document, receipt or statement.
 export function pdfContext(pdf, doc, requiredText = []) {
-  pdf.registerFont("Body", regular);
-  pdf.registerFont("Bold", bold);
+  registerTextFonts(pdf);
   const store = pdfStore(doc.business);
   const language = doc.language || documentSettings(doc.business).documentLanguage || "en";
   const fontPath = store?.cjkFont ? store.cjkFont() : cjkFontPath(process.env.PDF_CJK_FONT);
@@ -50,8 +42,9 @@ export function pdfContext(pdf, doc, requiredText = []) {
     layout: LAYOUT[s.pdfLayout] || LAYOUT.classic,
     accent: /^#[0-9A-Fa-f]{6}$/.test(s.pdfAccent || "") ? s.pdfAccent : "#087F7E",
     logo: custom?.data || null,
-    // CJK text uses the CJK font (it also has Latin glyphs), everything else Archivo.
-    font: (name, value) => (face && hasCjk(value) ? (name === "Bold" ? "CJKBold" : "CJK") : name),
+    // CJK text uses the CJK font (it also has Latin glyphs); other scripts Archivo
+    // lacks use DejaVu; everything else Archivo, so documents look like the app.
+    font: (name, value) => (face && hasCjk(value) ? (name === "Bold" ? "CJKBold" : "CJK") : textFont(name, value)),
     money: (v) => formatMoney(v, doc.currency || "MYR"),
     // A light tint of the accent for panels; the default keeps the original teal tint.
     tint: tint(s.pdfAccent),
