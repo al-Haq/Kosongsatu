@@ -26,6 +26,22 @@
 .pq-top svg {
   color: var(--ink);
 }
+@media (max-width: 640px) {
+  .pq-top {
+    position: fixed;
+    right: 16px;
+    bottom: 16px;
+    z-index: 20;
+    border-radius: var(--radius-pill);
+    background: var(--ink);
+    color: #fff;
+    border-color: var(--ink);
+    padding: 12px 18px;
+  }
+  .pq-top svg {
+    color: #fff;
+  }
+}
 .pq-source {
   margin: 0 0 15px;
   overflow-wrap: anywhere;

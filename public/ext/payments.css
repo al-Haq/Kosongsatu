@@ -55,15 +55,20 @@
 .bank-table td {
   vertical-align: top;
 }
+.bank-table th,
+.bank-table td {
+  padding-left: 8px;
+  padding-right: 8px;
+}
 .bank-ref {
-  min-width: 160px;
-  max-width: 260px;
+  min-width: 120px;
+  max-width: 200px;
   white-space: normal;
   overflow-wrap: anywhere;
 }
 .bank-suggest {
-  min-width: 220px;
-  max-width: 300px;
+  min-width: 180px;
+  max-width: 240px;
   white-space: normal;
 }
 .bank-suggest .actions {
@@ -73,6 +78,25 @@
 .bank-suggest .btn {
   font-size: 11px;
   padding: 7px 10px;
+}
+.match-why {
+  display: block;
+  max-width: 220px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.bank-actions .actions {
+  flex-wrap: nowrap;
+  justify-content: flex-end;
+}
+.bank-actions .dropdown summary.more {
+  font-size: 18px;
+  line-height: 1;
+  padding: 8px 10px;
+}
+.bank-actions .dropdown summary.more::after {
+  display: none;
 }
 .match-top strong {
   font-size: 12px;
@@ -127,41 +151,8 @@
   align-items: end;
 }
 @media (max-width: 640px) {
-  /* The bank table becomes one card per transaction on phones. */
-  .bank-table thead {
-    display: none;
-  }
-  .bank-table,
-  .bank-table tbody,
-  .bank-table tr,
-  .bank-table td {
-    display: block;
-    width: 100%;
-  }
-  .bank-table tr {
-    border-bottom: 1px solid var(--line);
-    padding: 12px 0;
-  }
-  .bank-table td {
-    padding: 4px 0;
-    border: 0;
-    max-width: none;
-    min-width: 0;
-    white-space: normal;
-    text-align: left;
-  }
-  .bank-table td[data-label]::before {
-    content: attr(data-label);
-    display: block;
-    font-size: 9px;
-    font-weight: 700;
-    letter-spacing: 0.5px;
-    text-transform: uppercase;
-    color: var(--muted);
-    margin-bottom: 2px;
-  }
-  .bank-table .bank-actions {
-    padding-top: 8px;
+  .bank-table .bank-actions .actions {
+    justify-content: flex-start;
   }
   .bank-metrics {
     grid-template-columns: 1fr;

@@ -88,7 +88,7 @@ The Docker image installs `fonts-noto-cjk`. On another server run `sudo apt inst
 - On an issued invoice, **Set up instalments** splits it into 2 to 24 instalments with dates and amounts that add up to the invoice total.
 - The paper, PDF and client link show the plan and the next amount due.
 - Payments cover the earliest instalments first. **Overdue** means an instalment date has passed unpaid, not the invoice due date.
-- Payment reminders (Settings > Email & payment reminders) follow the instalment dates: each instalment gets its own before/after reminders, once each.
+- Payment reminders (Settings > Messages > Email reminders) follow the instalment dates: each instalment gets its own before/after reminders, once each.
 - Credit notes reduce the last instalments; debit notes add to the last one. Edit or remove the plan at any time; changes are kept in the audit history.
 
 ## Limits and notes

@@ -26,7 +26,7 @@ Emailing invoices, quotations, statements, receipts and reminders needs an SMTP 
 - Keys are stored encrypted and never shown again. If the same name is set as a server environment variable, the server value wins (the panel says where the settings come from).
 - Changes apply to the next email: the mail connection is rebuilt when the settings change. No restart.
 - **Settings > Email delivery > Send test email** sends a test to you. If it fails you see a plain reason (wrong password, cannot connect, sender refused) without the server's raw reply.
-- Automatic payment reminders (Settings > Email & payment reminders) start working as soon as email is set up and you tick the option.
+- Automatic payment reminders (Settings > Messages > Email reminders) start working as soon as email is set up and you tick the option.
 
 ## 2. Email templates — item 40
 
@@ -157,7 +157,7 @@ For overdue invoices, the app prepares a polite follow-up in the client's langua
 - **Tone** gets firmer with time and with unanswered reminders: *gentle* (under 14 days), *firm* (14–29 days, or after two reminders), *final* (30 days or more). The final tone asks for payment or a payment plan within 7 days and may mention pausing further work; it never threatens legal action.
 - **Drafts** come from well-written built-in English and Malay texts, or from your AI model if one is configured (Settings > Automation shows the model) and you tick *Draft with the AI model*. The model only receives the tone, language, days overdue, number of earlier reminders and whether part was paid. It writes with placeholders; names, amounts, invoice numbers, bank details and links are filled in by the app when sending. A model answer with links, email addresses, invented facts or broken placeholders is discarded and the template is used.
 - **Where drafts appear:** overview (*Follow-ups awaiting approval*), the invoice page, and Automation > Review queue. *Prepare follow-up* on an overdue invoice makes one on demand; *Prepare drafts now* or the automatic option (every 6 hours, after the number of days you choose) covers all overdue invoices. One draft per invoice waits at a time, and each stage is drafted once.
-- **Review & send:** edit the subject and message, choose email and/or WhatsApp, optionally include a new private link, then *Approve & send*. It is sent once and logged (email log, WhatsApp log, audit). Approving from the AI review queue also sends it right away. If the invoice is paid before sending, nothing goes out.
+- **Review and send:** edit the subject and message, choose email and/or WhatsApp, optionally include a new private link, then *Approve & send*. It is sent once and logged (email log, WhatsApp log, audit). Approving from the AI review queue also sends it right away. If the invoice is paid before sending, nothing goes out.
 - **WhatsApp** sends your *Payment reminder* template, or your approved text itself when the client wrote to you in the last 24 hours.
 
 ## 7. WhatsApp link previews — item 96

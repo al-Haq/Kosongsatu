@@ -99,21 +99,52 @@ export default function paymentsUI(h) {
   }
 
   // ---------- Bank matching page ----------
-  function suggestionCell(t, list, hint) {
-    const S = get(),
-      x = ext();
-    const top = list[0];
+  // Amounts out of the account carry a real minus sign.
+  const signed = (v) => money(v).replace(/^-/, "−");
+  // What the best suggestion is and, in one line, why.
+  function matchCell(top, hint) {
     let html = "";
     if (top) {
       const what = top.kind === "receipt" ? `Receipt ${E(top.receipt_number)}` : top.invoices.map((i) => E(i.number)).join(" + ");
-      html += `<div class="match-top"><strong>${what}</strong> ${level(top.confidence, top.score)}<small>${E(top.client_name)}${top.ambiguous ? " · several close matches" : ""}</small><small>${E(top.reasons[0] || "")}</small></div><div class="actions">${button(top.kind === "receipt" ? "Match receipt" : "Record & allocate", "bank-apply", `${t.id}:0`, top.confidence === "High")}${button(list.length > 1 ? `Review (${list.length})` : "Why?", "bank-review", t.id)}</div>`;
+      const why = [top.client_name, top.ambiguous ? "several close matches" : "", top.reasons[0] || ""].filter(Boolean).join(" · ");
+      html += `<div class="match-top"><strong>${what}</strong><small class="match-why" title="${E(why)}">${E(why)}</small></div>`;
     } else html += '<small class="muted">No likely invoice found.</small>';
     if (hint?.ranking?.length) {
       const pick = hint.ranking[0];
-      const open = S.documents.find((d) => d.id === pick.invoice_id && d.state === "issued" && d.balance > 0);
-      html += `<div class="match-ai"><small>AI (${E(hint.model)}): ${E(pick.number)} · ${pick.confidence}%${pick.reason ? " · " + E(pick.reason) : ""}</small>${open ? button("Use AI pick", "bank-apply-ai", `${t.id}:${pick.invoice_id}`) : ""}</div>`;
-    } else if (x.ai && (!top || top.ambiguous || top.confidence !== "High")) html += `<div class="actions">${button("Ask AI", "bank-ai", t.id)}</div>`;
+      const ai = `AI (${hint.model}): ${pick.number} · ${pick.confidence}%${pick.reason ? " · " + pick.reason : ""}`;
+      html += `<small class="match-why" title="${E(ai)}">${E(ai)}</small>`;
+    }
     return html;
+  }
+  // The row's status: matched, excluded, or how sure the best suggestion is.
+  function rowStatus(t, top) {
+    if (t.receipt_id || t.refund_id) return badge("Matched");
+    if (t.ignored_reason) return badge("Excluded") + `<small>${E(t.ignored_reason)}</small>`;
+    if (!top) return badge("Unmatched");
+    return `<span class="badge ${top.confidence === "High" ? "green" : top.confidence === "Medium" ? "orange" : ""}"><span class="dot"></span>Suggested ${top.score}%</span>`;
+  }
+  // One primary action per row; everything else waits in "More".
+  function rowActions(t, list, hint, open) {
+    if (!open) return button("Reset match", "bank-reset", t.id);
+    const S = get(),
+      x = ext();
+    const top = t.amount > 0 ? list[0] : null;
+    const pick = hint?.ranking?.[0];
+    const aiOpen = pick && S.documents.some((d) => d.id === pick.invoice_id && d.state === "issued" && d.balance > 0);
+    const primary = top
+      ? button(top.kind === "receipt" ? "Match receipt" : "Record and allocate", "bank-apply", `${t.id}:0`, top.confidence === "High")
+      : t.amount > 0
+        ? button("Record receipt", "bank-receive", t.id)
+        : button("Match existing", "bank-match", t.id);
+    const more = [
+      top ? button(list.length > 1 ? `Review ${list.length} matches` : "Why this match?", "bank-review", t.id) : "",
+      aiOpen ? button(`Use AI pick ${pick.number}`, "bank-apply-ai", `${t.id}:${pick.invoice_id}`) : "",
+      x.ai && t.amount > 0 && !hint?.ranking?.length && (!top || top.ambiguous || top.confidence !== "High") ? button("Ask AI", "bank-ai", t.id) : "",
+      t.amount > 0 || top ? button("Match existing", "bank-match", t.id) : "",
+      top ? button("Record receipt", "bank-receive", t.id) : "",
+      button("Exclude", "bank-exclude", t.id),
+    ].join("");
+    return `${primary}<details class="dropdown"><summary class="btn icon-only more" aria-label="More actions" title="More actions">⋯</summary><div class="menu">${more}</div></details>`;
   }
   function bankPage() {
     const S = get(),
@@ -127,10 +158,11 @@ export default function paymentsUI(h) {
     const metrics = `<div class="metrics bank-metrics"><div class="metric"><div class="label">Unmatched credits</div><div class="value">${credits.length}</div><div class="hint">${money(credits.reduce((s, t) => s + t.amount, 0))} not yet recorded</div></div><div class="metric"><div class="label">Strong suggestions</div><div class="value teal">${strong}</div><div class="hint">High confidence, ready to confirm</div></div><div class="metric"><div class="label">Unmatched debits</div><div class="value">${unmatched.length - credits.length}</div><div class="hint">Match refunds or exclude</div></div></div>`;
     const rows = paged(txns);
     const table = txns.length
-      ? `<div class="table-wrap"><table class="bank-table"><thead><tr><th>Bank date / account</th><th>Reference</th><th class="num">Amount</th><th>Status</th><th>Suggested match</th><th>Action</th></tr></thead><tbody>${rows.rows
+      ? `<div class="table-wrap"><table class="bank-table table-cards"><thead><tr><th>Bank date / account</th><th>Reference</th><th class="num">Amount</th><th>Status</th><th>Suggested match</th><th><span class="sr-only">Actions</span></th></tr></thead><tbody>${rows.rows
           .map((t) => {
             const open = !t.receipt_id && !t.refund_id && !t.ignored_reason;
-            return `<tr><td data-label="Bank date / account">${dateLabel(t.txn_date)}<small>${E(t.account)}</small></td><td class="bank-ref" data-label="Reference">${E(t.reference)}<small>${E(t.description)}</small></td><td class="num" data-label="Amount">${money(t.amount)}</td><td data-label="Status">${badge(t.receipt_id || t.refund_id ? "Matched" : t.ignored_reason ? "Excluded" : "Unmatched")}${t.ignored_reason ? `<small>${E(t.ignored_reason)}</small>` : ""}</td><td class="bank-suggest" ${open && t.amount > 0 ? 'data-label="Suggested match"' : ""}>${open && t.amount > 0 ? suggestionCell(t, sugg[t.id] || [], hints[t.id]) : ""}</td><td class="bank-actions"><div class="actions">${open ? button("Match existing", "bank-match", t.id) + (t.amount > 0 ? button("Record receipt", "bank-receive", t.id) : "") + button("Exclude", "bank-exclude", t.id) : button("Reset match", "bank-reset", t.id)}</div></td></tr>`;
+            const list = open && t.amount > 0 ? sugg[t.id] || [] : [];
+            return `<tr><td class="card-title">${dateLabel(t.txn_date)}<small>${E(t.account)}</small></td><td class="bank-ref" data-label="Reference">${E(t.reference)}<small>${E(t.description)}</small></td><td class="num" data-label="Amount">${signed(t.amount)}</td><td data-label="Status">${rowStatus(t, list[0])}</td><td class="bank-suggest" ${list.length ? 'data-label="Suggested"' : ""}>${open && t.amount > 0 ? matchCell(list[0], hints[t.id]) : ""}</td><td class="bank-actions"><div class="actions">${rowActions(t, list, hints[t.id], open)}</div></td></tr>`;
           })
           .join("")}</tbody></table></div>${rows.nav}`
       : empty("No bank transactions", "Import a statement CSV from your bank. Duplicate rows are skipped and importing never records income.");
@@ -148,11 +180,11 @@ export default function paymentsUI(h) {
       list = ext().suggestions?.[tid] || [];
     showModal(
       "Suggested matches",
-      `<div class="notice info"><p>${dateLabel(t.txn_date)} / ${E(t.reference)}${t.description ? " / " + E(t.description) : ""}<br><strong>${money(t.amount)}</strong> into ${E(t.account)}</p></div>${
+      `<div class="notice info"><p>${dateLabel(t.txn_date)} / ${E(t.reference)}${t.description ? " / " + E(t.description) : ""}<br><strong>${signed(t.amount)}</strong> into ${E(t.account)}</p></div>${
         list
           .map(
             (s, i) =>
-              `<div class="payment"><div class="payment-top"><strong>${s.kind === "receipt" ? "Receipt " + E(s.receipt_number) : s.invoices.map((x) => `${E(x.number)} (${money(x.allocate)})`).join(" + ")}</strong>${level(s.confidence, s.score)}</div><p>${E(s.client_name)}</p><ul class="match-reasons">${s.reasons.map((r) => `<li>${E(r)}</li>`).join("")}</ul>${button(s.kind === "receipt" ? "Match this receipt" : "Record receipt & allocate", "bank-apply", `${tid}:${i}`, i === 0)}</div>`,
+              `<div class="payment"><div class="payment-top"><strong>${s.kind === "receipt" ? "Receipt " + E(s.receipt_number) : s.invoices.map((x) => `${E(x.number)} (${money(x.allocate)})`).join(" + ")}</strong>${level(s.confidence, s.score)}</div><p>${E(s.client_name)}</p><ul class="match-reasons">${s.reasons.map((r) => `<li>${E(r)}</li>`).join("")}</ul>${button(s.kind === "receipt" ? "Match this receipt" : "Record receipt and allocate", "bank-apply", `${tid}:${i}`, i === 0)}</div>`,
           )
           .join("") || "<p>No likely invoice found. Use Record receipt to choose the client yourself.</p>"
       }<p class="field-hint">Recording uses the bank date, amount and reference. Any amount left over stays as customer funds.</p>`,
@@ -456,7 +488,7 @@ export default function paymentsUI(h) {
         const S = get();
         showModal(
           "AI ranking",
-          `${r.ranking.length ? r.ranking.map((x) => `<div class="payment"><div class="payment-top"><strong>${E(x.number)} / ${E(x.client_name)}</strong>${level(x.confidence >= 70 ? "High" : x.confidence >= 40 ? "Medium" : "Low", x.confidence)}</div><p>${E(x.reason)}</p>${S.documents.some((d) => d.id === x.invoice_id && d.balance > 0) ? button("Record receipt & allocate", "bank-apply-ai", `${id}:${x.invoice_id}`) : ""}</div>`).join("") : "<p>The model did not find a likely invoice.</p>"}<p class="field-hint">Suggested by ${E(r.model)}. Check the bank line before you confirm.</p>`,
+          `${r.ranking.length ? r.ranking.map((x) => `<div class="payment"><div class="payment-top"><strong>${E(x.number)} / ${E(x.client_name)}</strong>${level(x.confidence >= 70 ? "High" : x.confidence >= 40 ? "Medium" : "Low", x.confidence)}</div><p>${E(x.reason)}</p>${S.documents.some((d) => d.id === x.invoice_id && d.balance > 0) ? button("Record receipt and allocate", "bank-apply-ai", `${id}:${x.invoice_id}`) : ""}</div>`).join("") : "<p>The model did not find a likely invoice.</p>"}<p class="field-hint">Suggested by ${E(r.model)}. Check the bank line before you confirm.</p>`,
         );
         return true;
       }

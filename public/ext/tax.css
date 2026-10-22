@@ -56,6 +56,12 @@
   margin-top: 12px;
   margin-bottom: 0;
 }
+.tax-help summary {
+  cursor: pointer;
+  font-size: 10px;
+  color: var(--muted);
+  margin-top: 4px;
+}
 .tax-missing {
   margin: 6px 0 10px;
   padding-left: 18px;
