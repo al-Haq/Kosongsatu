@@ -198,6 +198,22 @@ test("copies expire after 30 days, internal replacements are not kept, and vendo
   }
 });
 
+test("an expense deleted with a reason (POST …/delete) also offers Undo", async () => {
+  const f = await fixture();
+  try {
+    const e = f.store.saveExpense({ date: today(), vendor_name: "Kedai Alat Tulis", category_id: "office", amount: "85.00", status: "paid", payment_method: "Cash" });
+    const res = await f.auth(`/api/books/expenses/${e.id}/delete`, "POST", { reason: "Entered twice" });
+    assert.equal(res.status, 200);
+    const bin = res.headers.get("x-bin-entry");
+    assert.ok(bin);
+    const r = await f.json(`/api/trash/${bin}/restore`, "POST");
+    assert.equal(r.what, "Expense");
+    assert.equal(f.store.expense(e.id).amount, 8500);
+  } finally {
+    await f.close();
+  }
+});
+
 test("an issued invoice can still only be voided, never deleted", async () => {
   const f = await fixture();
   try {

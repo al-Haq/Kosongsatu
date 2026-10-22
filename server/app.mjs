@@ -201,7 +201,12 @@ export function createApp({
       if (secure) headers["Strict-Transport-Security"] = "max-age=31536000";
       res.setTimeout(20000);
       const send = (status, data, extra = {}) => {
-        const bin = req.method === "DELETE" && status < 300 ? requestContext.getStore()?.binId : null;
+        // Only for a request that is itself a delete (DELETE, or POST …/delete when
+        // a reason is sent). A draft removed as a side effect of another change (a
+        // customer PO amended) is in Recently deleted, but Undo there would not undo
+        // the change the person made.
+        const deleting = req.method === "DELETE" || (req.method === "POST" && /\/delete(\?|$)/.test(req.url));
+        const bin = deleting && status < 300 ? requestContext.getStore()?.binId : null;
         res.writeHead(status, {
           ...headers,
           "Content-Type": "application/json; charset=utf-8",

@@ -879,7 +879,7 @@ export default function booksUI(h) {
         return true;
       case "books-delete-expense":
         await h.api(`/books/expenses/${id}/delete`, "POST", { reason: b.reason });
-        await reload("Expense deleted. The audit history keeps a record.");
+        await reload("Expense deleted.");
         return true;
       case "books-vendor":
         if (id) await h.api("/books/vendors/" + id, "PUT", b);
