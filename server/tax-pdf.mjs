@@ -14,8 +14,8 @@ const ink = "#0F172A",
 
 function page(title, subtitle, footer) {
   const pdf = new PDFDocument({ size: "A4", margin: 42, bufferPages: true, info: { Title: title } });
-  pdf.registerFont("Body", font("DejaVuSans.ttf"));
-  pdf.registerFont("Bold", font("DejaVuSans-Bold.ttf"));
+  pdf.registerFont("Body", font("Archivo-Regular.ttf"));
+  pdf.registerFont("Bold", font("Archivo-Bold.ttf"));
   const chunks = [];
   pdf.on("data", (c) => chunks.push(c));
   const done = new Promise((ok, fail) => {

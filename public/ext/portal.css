@@ -133,6 +133,10 @@
 }
 
 /* Ratings */
+/* Comment, consent and name appear once a star is chosen. */
+.portal-feedback form:not(:has(input[name="rating"]:checked)) .portal-more {
+  display: none;
+}
 .portal-stars {
   display: inline-flex;
   flex-direction: row-reverse;

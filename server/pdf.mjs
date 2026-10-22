@@ -2,15 +2,16 @@ import PDFDocument from "pdfkit";
 import { fileURLToPath } from "node:url";
 import { currency as formatMoney, taxSummary, AppError } from "./domain.mjs";
 import { drawQr } from "./qr.mjs";
-import { labels, titleFor, statusLabel } from "../public/ext/documents-i18n.mjs";
+import { labels, titleFor, statusLabel, formatDate } from "../public/ext/documents-i18n.mjs";
 import { pdfStore } from "./documents-assets.mjs";
 import { documentSettings, fieldApplies } from "./documents-store.mjs";
 import { hasCjk, cjkFontPath, loadFontFace, boldSibling, CJK_MESSAGE } from "./documents-fonts.mjs";
+// Archivo, the interface typeface, so documents look like the app that made them (OFL, see LICENSE-Archivo.txt).
 const regular = fileURLToPath(
-  new URL("../public/assets/fonts/DejaVuSans.ttf", import.meta.url),
+  new URL("../public/assets/fonts/Archivo-Regular.ttf", import.meta.url),
 );
 const bold = fileURLToPath(
-  new URL("../public/assets/fonts/DejaVuSans-Bold.ttf", import.meta.url),
+  new URL("../public/assets/fonts/Archivo-Bold.ttf", import.meta.url),
 );
 const logo = fileURLToPath(
   new URL("../public/assets/nawlogic-logo.png", import.meta.url),
@@ -49,7 +50,7 @@ export function pdfContext(pdf, doc, requiredText = []) {
     layout: LAYOUT[s.pdfLayout] || LAYOUT.classic,
     accent: /^#[0-9A-Fa-f]{6}$/.test(s.pdfAccent || "") ? s.pdfAccent : "#087F7E",
     logo: custom?.data || null,
-    // CJK text uses the CJK font (it also has Latin glyphs), everything else DejaVu.
+    // CJK text uses the CJK font (it also has Latin glyphs), everything else Archivo.
     font: (name, value) => (face && hasCjk(value) ? (name === "Bold" ? "CJKBold" : "CJK") : name),
     money: (v) => formatMoney(v, doc.currency || "MYR"),
     // A light tint of the accent for panels; the default keeps the original teal tint.
@@ -138,14 +139,18 @@ export function renderPdf(invoice, payment = null, blocks = []) {
       font = "Body",
       color = ink,
       width = 510,
+      align = "left",
     ) => {
       pdf
         .font(ctx.font(font, value))
         .fontSize(size)
         .fillColor(color)
-        .text(String(value || ""), x, yy, { width, lineGap: 3 });
+        .text(String(value || ""), x, yy, { width, lineGap: 3, align });
       return pdf.y;
     };
+    const fmt = (s) => formatDate(ctx.language, s);
+    // Amounts in table cells: thousands separators, two decimals, no currency (the header carries it).
+    const num = (cents) => (cents / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     const rule = (yy) =>
       pdf
         .strokeColor("#E2E8F0")
@@ -259,10 +264,10 @@ export function renderPdf(invoice, payment = null, blocks = []) {
             ? t("deliveryDate")
             : t("due");
     const details = payment
-      ? `${payment.receiptMode ? t("receipt") : t("invoiceRef")}: ${invoice.number}\n${t("received")}: ${payment.paid_date}\n${t("method")}: ${payment.method}\n${t("reference")}: ${payment.reference}`
+      ? `${payment.receiptMode ? t("receipt") : t("invoiceRef")}: ${invoice.number}\n${t("received")}: ${fmt(payment.paid_date)}\n${t("method")}: ${payment.method}\n${t("reference")}: ${payment.reference}`
       : [
-          `${t("issued")}: ${invoice.issue_date}`,
-          `${dueLabel}: ${invoice.due_date}`,
+          `${t("issued")}: ${fmt(invoice.issue_date)}`,
+          `${dueLabel}: ${fmt(invoice.due_date)}`,
           `${t("currency")}: ${currencyCode}`,
           currencyCode !== "MYR" && invoice.fx_rate
             ? `${t("exchangeRate")}: 1 ${currencyCode} = ${invoice.fx_rate} MYR`
@@ -277,7 +282,7 @@ export function renderPdf(invoice, payment = null, blocks = []) {
           .filter(Boolean)
           .join("\n");
     const detailEnd = line(details, 337, y, L.small, "Body", muted, 216);
-    y = Math.max(clientEnd, detailEnd) + 26;
+    y = Math.max(clientEnd, detailEnd) + 20;
     if (invoice.business.demo) {
       line(t("demo"), 42, y, 10, "Bold", "#9A4600");
       y = pdf.y + 17;
@@ -311,7 +316,7 @@ export function renderPdf(invoice, payment = null, blocks = []) {
           { key: "description", x: 52, w: 269, head: head("description") },
           { key: "qty", x: 333, w: 50, head: head("qty") },
           { key: "rate", x: 389, w: 78, head: `${head("rate")} (${currencyCode === "MYR" ? "RM" : currencyCode})` },
-          { key: "amount", x: 477, w: 78, head: head("amount") },
+          { key: "amount", x: 477, w: 76, head: head("amount") },
         ];
       else {
         const right = [
@@ -337,6 +342,9 @@ export function renderPdf(invoice, payment = null, blocks = []) {
         cols = [...left, { key: "description", x: descX, w: x - descX, head: head("description") }, ...right];
       }
       const desc = cols.find((c) => c.key === "description");
+      // Numbers sit against the right edge of their column, headers included.
+      const numeric = new Set(["qty", "rate", "discount", "amount"]);
+      const alignOf = (key) => (numeric.has(key) ? "right" : "left");
       const tableHead = () => {
         pdf.rect(42, y, 511, L.head).fill(T.pdfLayout === "modern" ? ctx.tint : "#F4F7FA");
         for (const c of cols) {
@@ -344,7 +352,7 @@ export function renderPdf(invoice, payment = null, blocks = []) {
           let size = L.small;
           pdf.font(ctx.font("Bold", c.head));
           while (size > 6.5 && pdf.fontSize(size).widthOfString(c.head) > c.w + 5) size -= 0.5;
-          line(c.head, c.x, y + (L.head - 11) / 2, size, "Bold", muted, c.w + 6);
+          line(c.head, c.x, y + (L.head - 11) / 2, size, "Bold", muted, c.w, alignOf(c.key));
         }
         y += L.head + 8;
       };
@@ -353,9 +361,9 @@ export function renderPdf(invoice, payment = null, blocks = []) {
           code: i.sku || "",
           qty: String(i.quantity),
           unit: i.unit || "",
-          rate: (i.rate / 100).toFixed(2),
-          discount: i.discount ? (i.discount / 100).toFixed(2) + (i.discount_percent ? `\n${i.discount_percent}%` : "") : "",
-          amount: (i.amount / 100).toFixed(2),
+          rate: num(i.rate),
+          discount: i.discount ? num(i.discount) + (i.discount_percent ? `\n${i.discount_percent}%` : "") : "",
+          amount: num(i.amount),
         })[key];
       room(90);
       tableHead();
@@ -376,7 +384,7 @@ export function renderPdf(invoice, payment = null, blocks = []) {
         }
         for (const c of cols)
           if (c.key === "description") line(description, c.x, y, L.body, "Body", ink, c.w);
-          else line(cell(item, c.key), c.x, y, L.small, "Body", ink, c.w);
+          else line(cell(item, c.key), c.x, y, L.small, "Body", ink, c.w, alignOf(c.key));
         y += height;
         rule(y - 6);
       }
@@ -402,33 +410,49 @@ export function renderPdf(invoice, payment = null, blocks = []) {
             : []),
         ];
         // Reserve the whole totals block (SST rows included) so it never splits across a page.
-        const step = T.pdfLayout === "compact" ? 18 : 24;
-        room(Math.max(215, totals.length * step + 23));
-        y += 10;
+        const step = T.pdfLayout === "compact" ? 17 : 21;
+        room(totals.length * step + 40);
+        y += 8;
         for (const [label, value, strong] of totals) {
-          line(
-            label,
-            330,
-            y,
-            strong ? 11 : 10,
-            strong ? "Bold" : "Body",
-            strong ? ink : muted,
-            110,
-          );
-          line(
-            money(value),
-            449,
-            y,
-            strong ? 11 : 10,
-            strong ? "Bold" : "Body",
-            strong ? teal : ink,
-            104,
-          );
+          // The figure that matters sits under a rule, in bold black; amounts end on the table's right edge.
+          if (strong) {
+            rule(y - 3);
+            y += 5;
+          }
+          line(label, 330, y, strong ? 11 : 10, strong ? "Bold" : "Body", strong ? ink : muted, 110);
+          line(money(value), 443, y, strong ? 11 : 10, strong ? "Bold" : "Body", ink, 110, "right");
           y += step;
         }
       }
     }
-    const instalments = invoice.instalments || [];
+    // Instalments as a small table: number, due date, amount, status.
+    const instalments = payment ? [] : invoice.instalments || [];
+    if (instalments.length) {
+      room(48 + instalments.length * 16);
+      y += 10;
+      line(t("instalmentPlan"), 42, y, 10, "Bold");
+      y += 18;
+      const col = [
+        [42, 24, "#", "left"],
+        [70, 150, t("due"), "left"],
+        [330, 110, t("amount"), "right"],
+        [449, 104, t("status"), "right"],
+      ];
+      for (const [x, w, text, align] of col) line(text.toUpperCase(), x, y, 7.5, "Bold", muted, w, align);
+      y += 14;
+      rule(y - 3);
+      for (const i of instalments) {
+        room(18);
+        const row = [String(i.seq), fmt(i.due_date), money(i.amount), t("ins_" + i.status)];
+        col.forEach(([x, w, , align], n) => line(row[n], x, y, 9, "Body", ink, w, align));
+        y += 16;
+      }
+      if (invoice.next_due_date) {
+        y += 2;
+        line(t("nextPaymentDue", { amount: money(invoice.next_due_amount), date: fmt(invoice.next_due_date) }), 42, y, 9, "Body", muted);
+        y = pdf.y + 4;
+      }
+    }
     const deposit = kind === "quote" ? invoice.deposit : null;
     const visibleFiles = invoice.meta?.list_attachments
       ? (invoice.attachments || []).filter((f) => f.visibility === "client")
@@ -453,21 +477,8 @@ export function renderPdf(invoice, payment = null, blocks = []) {
           : "",
       ],
       [
-        t("instalmentPlan"),
-        instalments.length
-          ? [
-              ...instalments.map(
-                (i) => `${i.seq}. ${i.due_date}   ${money(i.amount)}   ${t("ins_" + i.status)}`,
-              ),
-              ...(invoice.next_due_date
-                ? ["", t("nextPaymentDue", { amount: money(invoice.next_due_amount), date: invoice.next_due_date })]
-                : []),
-            ].join("\n")
-          : "",
-      ],
-      [
         t("paymentInformation"),
-        payment || T.pdfShowBank === false
+        payment || T.pdfShowBank === false || (kind === "invoice" && invoice.balance <= 0)
           ? ""
           : kind === "invoice" || kind === "proforma"
             ? [
@@ -487,10 +498,10 @@ export function renderPdf(invoice, payment = null, blocks = []) {
       [t("attachments"), visibleFiles.map((f) => `${f.name} (${Math.max(1, Math.round(f.size / 1024))} KB)`).join("\n")],
     ]) {
       if (!value) continue;
-      room(55);
-      y += 13;
+      room(40);
+      y += 10;
       line(heading, 42, y, 10, "Bold");
-      y += 19;
+      y += 16;
       // Wrap long audit/note blocks explicitly so every page retains its footer margin.
       pdf.font(ctx.font("Body", value)).fontSize(9);
       const lines = [];
@@ -515,11 +526,11 @@ export function renderPdf(invoice, payment = null, blocks = []) {
         lines.push(current);
       }
       for (const text of lines) {
-        room(18);
+        room(16);
         line(text || " ", 42, y, 9, "Body", muted);
-        y += 16;
+        y += 14;
       }
-      y += 8;
+      y += 6;
     }
     // Delivery orders end with signature boxes for both sides.
     if (kind === "delivery_order" && !payment) {

@@ -70,6 +70,8 @@ test("multiple long adjustment reasons paginate within the content margin", asyn
     reason: "Reduced scope and agreed handover. ".repeat(25),
   }));
   const pdf = await renderPdf(d);
-  assert.ok(pageCount(pdf) >= 4);
+  // 12 reasons of ~900 characters each cannot fit on the first page: the block paginates
+  // (3 pages with Archivo at the tighter section spacing) without running into the footer.
+  assert.ok(pageCount(pdf) >= 3);
   assert.ok(pageCount(pdf) <= 12);
 });

@@ -175,8 +175,8 @@ export function renderPackPdf(p) {
     pdf.on("data", (c) => chunks.push(c));
     pdf.on("end", () => resolve(Buffer.concat(chunks)));
     pdf.on("error", reject);
-    pdf.registerFont("Body", font("DejaVuSans.ttf"));
-    pdf.registerFont("Bold", font("DejaVuSans-Bold.ttf"));
+    pdf.registerFont("Body", font("Archivo-Regular.ttf"));
+    pdf.registerFont("Bold", font("Archivo-Bold.ttf"));
     const ink = "#0F172A",
       muted = "#64748B",
       teal = "#087F7E";

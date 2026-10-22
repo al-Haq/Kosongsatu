@@ -21,8 +21,8 @@ function start(title, author) {
     pdf.on("end", () => resolve(Buffer.concat(chunks)));
     pdf.on("error", reject);
   });
-  pdf.registerFont("Body", font("DejaVuSans.ttf"));
-  pdf.registerFont("Bold", font("DejaVuSans-Bold.ttf"));
+  pdf.registerFont("Body", font("Archivo-Regular.ttf"));
+  pdf.registerFont("Bold", font("Archivo-Bold.ttf"));
   const put = (v, x, y, size = 9, f = "Body", color = ink, width = 510, align = "left") =>
     pdf.font(f).fontSize(size).fillColor(color).text(String(v ?? ""), x, y, { width, align, lineGap: 2 });
   const rule = (y) => pdf.strokeColor("#E2E8F0").lineWidth(0.7).moveTo(42, y).lineTo(553, y).stroke();

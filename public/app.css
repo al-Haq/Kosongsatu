@@ -311,17 +311,39 @@ nav a.active svg {
   font-weight: 600;
   color: var(--ink);
 }
-.avatar-menu {
+.dropdown {
   position: relative;
 }
-.avatar-menu summary {
+.dropdown summary {
   list-style: none;
   cursor: pointer;
 }
-.avatar-menu summary::-webkit-details-marker {
+.dropdown summary::-webkit-details-marker {
   display: none;
 }
-.avatar-menu .menu {
+.dropdown summary.btn::after {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(45deg) translateY(-2px);
+  margin-left: 2px;
+}
+.dropdown .menu .btn {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: 0;
+  background: none;
+  padding: 9px 10px;
+  font-weight: 500;
+  border-radius: var(--radius);
+}
+.dropdown .menu .btn:hover {
+  background: var(--soft);
+}
+.dropdown .menu {
   position: absolute;
   right: 0;
   top: calc(100% + 8px);
@@ -721,6 +743,27 @@ tr.row-link:hover td {
 tr.row-link .link-button {
   pointer-events: none;
 }
+.file-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.file-row .file-name {
+  flex: 1;
+  min-width: 120px;
+  font-size: 12px;
+}
+.file-pick {
+  position: relative;
+  overflow: hidden;
+}
+.file-pick input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
 .table-link {
   font-weight: 700;
   color: var(--ink);
@@ -1090,13 +1133,20 @@ dialog.wide {
   gap: 20px;
   font-size: 12px;
 }
+.total-row strong {
+  font-weight: 500;
+}
+.total-row.strong,
+.total-row.strong strong {
+  font-weight: 700;
+}
 .total-row.emphasis {
-  font-size: 18px;
+  font-size: 14px;
   font-weight: 700;
   border-top: 1px solid var(--line);
-  padding-top: 15px;
-  margin-top: 8px;
-  color: var(--action);
+  padding-top: 12px;
+  margin-top: 6px;
+  color: var(--ink);
 }
 .paper-notes {
   border-top: 1px solid var(--line);
@@ -1361,8 +1411,20 @@ dialog.wide {
 .public-top {
   display: flex;
   justify-content: space-between;
-  align-items: start;
-  margin: 25px 0;
+  align-items: center;
+  gap: 16px;
+  margin: 8px 0 25px;
+  flex-wrap: wrap;
+}
+.public-top .actions {
+  gap: 12px;
+}
+.balance-card.paid {
+  background: var(--soft);
+  color: var(--ink);
+}
+.balance-card.paid p {
+  color: var(--muted);
 }
 .public-top p {
   margin-top: 5px;
