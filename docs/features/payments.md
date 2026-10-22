@@ -91,7 +91,7 @@ For each unmatched bank credit, the Bank matching page suggests the most likely 
 - the date is close to the due date, or the payment came before the invoice was issued,
 - a part payment, or several invoices of one client paid together.
 
-When two suggestions are equally good, both are marked as a hard case. **Record & allocate** records the bank credit as a receipt (bank date, amount and reference) and allocates it to the suggested invoices in one step; anything left over stays as customer funds. If you already recorded the receipt by hand, the suggestion is **Match receipt**, so the money is never recorded twice. **Review** shows every suggestion and its reasons.
+When two suggestions are equally good, both are marked as a hard case. **Record and allocate** records the bank credit as a receipt (bank date, amount and reference) and allocates it to the suggested invoices in one step; anything left over stays as customer funds. If you already recorded the receipt by hand, the suggestion is **Match receipt**, so the money is never recorded twice. **Review** shows every suggestion and its reasons.
 
 ### Asking your AI model (optional)
 

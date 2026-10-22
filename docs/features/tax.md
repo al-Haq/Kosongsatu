@@ -12,7 +12,7 @@ Roadmap items covered: 18, 19, 20, 21, 22, 23, 24, 93 and 94.
 
 | What | Where | Needed for |
 |---|---|---|
-| SST registration number, TIN, registration number, phone, email | Settings > Brand & company | SST and e-Invoice |
+| SST registration number, TIN, registration number, phone, email | Settings > Company | SST and e-Invoice |
 | MSIC code, business activity, structured address (lines, city, postcode, state) | Tax > Settings | e-Invoice |
 | MyInvois client ID and client secret | Settings > Integration keys | Submitting e-Invoices |
 | MyInvois environment (`sandbox` or `production`) | Settings > Integration keys | Default is sandbox |

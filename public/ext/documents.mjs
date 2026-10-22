@@ -53,7 +53,7 @@ export default function documentsUI(h) {
     const meta = value.meta || {};
     const deposit = meta.deposit || null;
     const fields = customFields().filter((f) => applies(f, kind));
-    return `<section class="doc-options"><div class="form-grid">${select("Currency", "currency", currencyOptions(), cur)}<div class="fx-field ${cur === "MYR" ? "is-hidden" : ""}">${input(
+    return `<section class="doc-options"><h3 class="form-section">Document options</h3><div class="form-grid">${select("Currency", "currency", currencyOptions(), cur)}<div class="fx-field ${cur === "MYR" ? "is-hidden" : ""}">${input(
       `Exchange rate (MYR per 1 ${cur === "MYR" ? "unit" : cur})`,
       "fx_rate",
       cur === "MYR" ? "" : value.fx_rate || "",

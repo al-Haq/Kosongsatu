@@ -439,6 +439,18 @@ nav a.active svg {
 .notice p {
   color: inherit;
 }
+.notice > div {
+  flex: 1;
+  min-width: 0;
+}
+.notice ul {
+  margin: 6px 0 10px;
+  padding-left: 18px;
+  line-height: 1.6;
+}
+.notice .btn.small {
+  margin-top: 2px;
+}
 .notice svg {
   color: var(--muted);
 }
@@ -513,6 +525,9 @@ nav a.active svg {
 .panel-head p {
   font-size: 11px;
   margin-top: 4px;
+}
+.panel-head:has(p) {
+  align-items: flex-start;
 }
 .grid-2 {
   display: grid;
@@ -708,6 +723,9 @@ button.attention small {
 .table-wrap {
   overflow: auto;
 }
+.table-wrap:has(.dropdown[open]) {
+  overflow: visible;
+}
 table {
   border-collapse: collapse;
   width: 100%;
@@ -840,12 +858,23 @@ textarea {
   position: relative;
   display: flex;
   align-items: stretch;
-  gap: 6px;
   margin-top: 7px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #fff;
+}
+.date-field:focus-within {
+  outline: 2px solid var(--ink);
+  outline-offset: -1px;
 }
 .date-field input[data-date] {
   margin-top: 0;
   flex: 1;
+  border: 0;
+  background: transparent;
+}
+.date-field input[data-date]:focus {
+  outline: none;
 }
 .date-field .date-picker {
   position: absolute;
@@ -864,13 +893,14 @@ textarea {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 40px;
+  width: 38px;
   padding: 0;
   font: inherit;
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  background: white;
-  color: var(--ink);
+  border: 0;
+  border-left: 1px solid var(--line);
+  border-radius: 0 var(--radius) var(--radius) 0;
+  background: transparent;
+  color: var(--muted);
   cursor: pointer;
 }
 .date-pick:hover {
@@ -879,12 +909,6 @@ textarea {
 .date-pick svg {
   width: 16px;
   height: 16px;
-}
-input:focus,
-select:focus,
-textarea:focus {
-  outline: 2px solid var(--ink);
-  border-color: var(--action);
 }
 input[readonly] {
   background: var(--bg);
@@ -904,6 +928,25 @@ input[readonly] {
   font-size: 10px;
   margin-top: 6px;
 }
+input[type="number"] {
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  appearance: none;
+  margin: 0;
+}
+.form-section {
+  margin: 24px 0 4px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+  font-size: 10.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
 .form-actions {
   display: flex;
   justify-content: flex-end;
@@ -911,6 +954,20 @@ input[readonly] {
   border-top: 1px solid var(--line);
   padding-top: 20px;
   margin-top: 14px;
+}
+.form-actions .actions-hint {
+  margin-right: auto;
+  align-self: center;
+  font-size: 10px;
+  color: var(--muted);
+}
+.modal-body .form-actions {
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
+  background: #fff;
+  margin: 14px -25px -25px;
+  padding: 14px 25px 20px;
 }
 .form-error {
   padding: 11px;
@@ -964,8 +1021,8 @@ dialog.wide {
 }
 .editor-grid {
   display: grid;
-  grid-template-columns: 1.5fr 1fr;
-  gap: 24px;
+  grid-template-columns: minmax(0, 1.6fr) minmax(300px, 1fr);
+  gap: 28px;
 }
 .line-item {
   display: grid;
@@ -1002,6 +1059,28 @@ dialog.wide {
   font-size: 9px;
   font-weight: 700;
   color: var(--muted);
+}
+.line-item .line-more {
+  grid-column: 1 / -1;
+}
+.line-more summary {
+  list-style: none;
+  cursor: pointer;
+  font-size: 10px;
+  color: var(--muted);
+  padding: 2px 0;
+}
+.line-more summary::-webkit-details-marker {
+  display: none;
+}
+.line-more summary::before {
+  content: "+ ";
+}
+.line-more[open] summary::before {
+  content: "− ";
+}
+.line-more[open] summary {
+  margin-bottom: 8px;
 }
 .preview {
   background: var(--bg);
@@ -1219,18 +1298,29 @@ dialog.wide {
 }
 .palette {
   display: flex;
-  gap: 15px;
-  margin: 20px 0;
+  flex-wrap: wrap;
+  gap: 22px;
+  margin: 18px 0 22px;
 }
 .swatch {
-  flex: 1;
-  font-size: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
 }
 .swatch span {
-  display: block;
-  height: 36px;
-  border-radius: var(--radius);
-  margin-bottom: 7px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+}
+.panel > .logo {
+  width: 140px;
+}
+.settings-tabs {
+  margin-bottom: 0;
+}
+.panel[hidden] {
+  display: none;
 }
 /* The brand colours printed on documents, not the workspace theme. */
 .swatch.teal-bg span {
@@ -1521,7 +1611,7 @@ dialog.wide {
     grid-template-columns: 240px 1fr;
   }
   .editor-grid {
-    grid-template-columns: 1.4fr 1fr;
+    grid-template-columns: minmax(0, 1.4fr) minmax(280px, 1fr);
   }
   .public-wrap .doc-grid {
     grid-template-columns: 1.6fr 1fr;
@@ -1615,9 +1705,64 @@ dialog.wide {
   }
   .heading .actions {
     width: 100%;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    scrollbar-width: none;
+  }
+  .heading .actions::-webkit-scrollbar {
+    display: none;
   }
   .heading .actions .btn {
-    flex: 1;
+    flex: 0 0 auto;
+  }
+  .table-cards thead {
+    display: none;
+  }
+  .table-cards,
+  .table-cards tbody,
+  .table-cards tr,
+  .table-cards td {
+    display: block;
+    width: 100%;
+  }
+  .table-cards tr {
+    padding: 12px 0;
+    border-bottom: 1px solid var(--line);
+  }
+  .table-cards td {
+    padding: 3px 0;
+    border: 0;
+    max-width: none;
+    min-width: 0;
+    white-space: normal;
+    text-align: left;
+  }
+  .table-cards td:empty {
+    display: none;
+  }
+  .table-cards td.card-title {
+    font-size: 13px;
+    padding-bottom: 6px;
+  }
+  .table-cards td[data-label]::before {
+    content: attr(data-label);
+    display: inline-block;
+    min-width: 88px;
+    margin-right: 8px;
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .table-cards .actions {
+    padding-top: 6px;
+  }
+  .invoice-paper td,
+  .invoice-paper th {
+    white-space: normal;
+    overflow-wrap: anywhere;
   }
   .metrics {
     gap: 11px;
@@ -1661,6 +1806,10 @@ dialog.wide {
   }
   .modal-body {
     padding: 17px;
+  }
+  .modal-body .form-actions {
+    margin: 14px -17px -17px;
+    padding: 14px 17px 17px;
   }
   .modal-head {
     padding: 17px;
@@ -1739,7 +1888,7 @@ dialog.wide {
   #toast {
     left: 16px;
     right: 16px;
-    bottom: 16px;
+    bottom: 80px;
     max-width: none;
   }
 }
@@ -1799,12 +1948,12 @@ dialog.wide {
 }
 .catalog-picker {
   margin: 0;
-  flex: 1;
-  min-width: 170px;
+  flex: 0 1 300px;
+  min-width: 200px;
 }
 .catalog-picker select {
   margin: 0;
-  padding: 10px;
+  padding: 10px 12px;
 }
 .quote-scope {
   min-width: 175px;
@@ -1894,27 +2043,27 @@ select:disabled {
 .sales-stages .label {
   text-transform: capitalize;
 }
-.automation-banner {
-  display: grid;
-  grid-template-columns: 1.5fr 1fr;
-  gap: 32px;
-  background: var(--ink);
-  color: white;
+.status-strip {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 24px;
+  border: 1px solid var(--line);
   border-radius: var(--radius-lg);
-  padding: 32px;
+  background: #fff;
+  padding: 16px 20px;
 }
-.automation-banner h2 {
-  font-size: 30px;
-  line-height: 1.2;
-  margin: 12px 0;
+.status-strip p {
+  font-size: 12px;
+  margin-top: 4px;
+  color: var(--muted);
 }
-.automation-banner p {
-  color: var(--muted-on-dark);
-  margin: 12px 0;
-  line-height: 1.6;
-}
-.automation-banner .eyebrow {
-  color: var(--muted-on-dark);
+.strip-facts {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 12px;
+  white-space: nowrap;
 }
 .proposal-card,
 .assistant-message {
@@ -1947,20 +2096,18 @@ select:disabled {
   .sales-stages {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
-  .automation-banner {
-    grid-template-columns: 1fr;
-    gap: 18px;
+  .status-strip {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .strip-facts {
+    white-space: normal;
+    flex-wrap: wrap;
   }
 }
 @media (max-width: 560px) {
   .sales-stages {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-  .automation-banner {
-    padding: 22px;
-  }
-  .automation-banner h2 {
-    font-size: 26px;
   }
 }
 .pager {
@@ -2033,6 +2180,7 @@ input:focus,
 select:focus,
 textarea:focus {
   outline: 2px solid var(--ink);
+  outline-offset: -1px;
   border-color: var(--ink);
 }
 .bar {

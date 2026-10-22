@@ -3,11 +3,9 @@
   display: none !important;
 }
 .line-item .line-extra {
-  grid-column: 1 / -1;
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  margin-top: -3px;
 }
 .line-item .line-extra input,
 .line-item .line-extra select {
@@ -31,11 +29,8 @@
 .no-price .line-head {
   grid-template-columns: 1fr 72px 30px;
 }
-.doc-options {
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  padding: 14px 14px 4px;
-  margin-bottom: 16px;
+.doc-options .check-row {
+  margin-top: 4px;
 }
 .preview-row small {
   display: block;

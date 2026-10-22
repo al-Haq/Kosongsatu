@@ -417,13 +417,13 @@ export default function recurringUI(h) {
           `<div class="attention"><div><strong>${E(c.title)}</strong><small>${E(clientName(c.client_id))} / ${c.days_left >= 0 ? `ends ${dateLabel(c.end_date)} (${days(c.days_left)})` : `ended ${dateLabel(c.end_date)}`} / ${E(r.renewals[c.renewal] || "")}</small><a class="link-button" href="#/contract/${E(c.id)}">Review contract →</a></div>${contractTag(c)}</div>`,
       ),
     ];
-    return `<section class="panel mt22"><div class="panel-head"><div><h2>Recurring & contracts</h2><p>Plans waiting for you and contracts ending soon</p></div><a href="#/recurring">Open recurring →</a></div>${rows.slice(0, 8).join("")}</section>`;
+    return `<section class="panel mt22"><div class="panel-head"><div><h2>Recurring and contracts</h2><p>Plans waiting for you and contracts ending soon</p></div><a href="#/recurring">Open recurring →</a></div>${rows.slice(0, 8).join("")}</section>`;
   }
   function clientPanel(c) {
     const r = R();
     const plans = r.plans.filter((p) => p.client_id === c.id),
       contracts = r.contracts.filter((x) => x.client_id === c.id);
-    return `<section class="panel mt22"><div class="panel-head"><div><h2>Contracts & recurring plans</h2><p>${contracts.length} contract${contracts.length === 1 ? "" : "s"} / ${plans.length} plan${plans.length === 1 ? "" : "s"}</p></div>${c.archived ? "" : `<div class="actions">${button("New contract", "rec-contract-new", c.id)}${button("New plan", "rec-plan-new", c.id, false, "plus")}</div>`}</div>${
+    return `<section class="panel mt22"><div class="panel-head"><div><h2>Contracts and recurring plans</h2><p>${contracts.length} contract${contracts.length === 1 ? "" : "s"} / ${plans.length} plan${plans.length === 1 ? "" : "s"}</p></div>${c.archived ? "" : `<div class="actions">${button("New contract", "rec-contract-new", c.id)}${button("New plan", "rec-plan-new", c.id, false, "plus")}</div>`}</div>${
       contracts.length || plans.length
         ? [
             ...contracts.map(

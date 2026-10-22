@@ -338,7 +338,7 @@ export default function commsUI(h) {
     if (pending.length)
       parts.push(
         `<section class="panel"><div class="panel-head"><h2>Follow-up awaiting approval</h2>${badge("Pending review")}</div>${pending
-          .map((p) => `<div class="payment"><strong>${E(p.payload.subject)}</strong><p>${E(TONES[p.payload.tone])} tone · ${p.payload.generated_by === "ai" ? "AI draft" : "Template draft"} · ${timeLabel(p.created)}</p>${button("Review & send", "comms-review", p.id, true)}</div>`)
+          .map((p) => `<div class="payment"><strong>${E(p.payload.subject)}</strong><p>${E(TONES[p.payload.tone])} tone · ${p.payload.generated_by === "ai" ? "AI draft" : "Template draft"} · ${timeLabel(p.created)}</p>${button("Review and send", "comms-review", p.id, true)}</div>`)
           .join("")}</section>`,
       );
     const wa = (C().whatsapp?.log || []).filter((x) => x.document_id === d.id).slice(0, 6);
