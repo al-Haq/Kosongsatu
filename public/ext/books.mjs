@@ -87,7 +87,7 @@ export default function booksUI(h) {
           if (el.isConnected) el.innerHTML = html;
         })
         .catch((e) => {
-          if (el.isConnected) el.innerHTML = `<div class="notice"><p>${E(e.message)}</p></div>`;
+          if (el.isConnected) el.innerHTML = `<div class="notice error"><p>${E(e.message)}</p></div>`;
         });
     }
   }
@@ -116,19 +116,17 @@ export default function booksUI(h) {
       ],
       sub || "list",
     );
-    if (sub === "vendors") return heading("Vendors", "Suppliers you buy from, with their registration and default category.", button("Add vendor", "books-new-vendor", "", true, "plus")) + t + vendorsTable();
+    if (sub === "vendors") return heading("Vendors", "", button("Add vendor", "books-new-vendor", "", true, "plus")) + t + vendorsTable();
     if (sub === "categories")
       return (
-        heading("Expense categories", "Rename, add or retire categories, and say how each one is treated for tax.", button("Add category", "books-new-category", "", true, "plus")) +
+        heading("Expense categories", "", button("Add category", "books-new-category", "", true, "plus")) +
         t +
         categoriesTable()
       );
     const f = filters();
     const q = qs({ ...f, limit: 50 });
     return (
-      heading(
-        "Expenses",
-        "Money going out: receipts, costs you owe and bill payments.",
+      heading("Expenses", "",
         button("Scan receipt", "books-scan", "", false, "receipt") + button("New expense", "books-new-expense", "", true, "plus"),
       ) +
       t +
@@ -333,7 +331,7 @@ export default function booksUI(h) {
     if (sub === "pos") {
       const list = b.pos;
       return (
-        heading("Purchase orders", "Orders to your suppliers. A received order becomes one supplier bill.", button("New purchase order", "books-new-po", "", true, "plus")) +
+        heading("Purchase orders", "", button("New purchase order", "books-new-po", "", true, "plus")) +
         t +
         `<section class="panel">${
           list.length
@@ -346,7 +344,7 @@ export default function booksUI(h) {
       const list = b.recurring;
       const every = { week: "Weekly", month: "Monthly", quarter: "Quarterly", year: "Yearly" };
       return (
-        heading("Recurring costs", "Regular costs such as rent or subscriptions, used only in the cash flow forecast.", button("Add recurring cost", "books-new-recurring", "", true, "plus")) +
+        heading("Recurring costs", "", button("Add recurring cost", "books-new-recurring", "", true, "plus")) +
         t +
         `<section class="panel">${
           list.length
@@ -358,7 +356,7 @@ export default function booksUI(h) {
     const list = b.bills;
     const open = list.filter((x) => x.state === "open" && x.balance > 0);
     return (
-      heading("Supplier bills", "Invoices from your suppliers, their due dates and what you have paid.", button("New bill", "books-new-bill", "", true, "plus")) +
+      heading("Supplier bills", "", button("New bill", "books-new-bill", "", true, "plus")) +
       t +
       `<div class="books-tiles books-tiles-3"><div class="metric"><div class="label">Unpaid bills</div><div class="value">${money(open.reduce((s, x) => s + x.balance, 0))}</div><div class="hint">${open.length} open</div></div><div class="metric"><div class="label">Overdue</div><div class="value red-text">${money(open.filter((x) => x.due_date < T()).reduce((s, x) => s + x.balance, 0))}</div><div class="hint">Past their due date</div></div><div class="metric"><div class="label">Due in 30 days</div><div class="value">${money(open.filter((x) => x.due_date >= T() && x.due_date <= addDays(T(), 30)).reduce((s, x) => s + x.balance, 0))}</div><div class="hint">Included in the cash flow forecast</div></div></div><section class="panel">${
         list.length
@@ -387,7 +385,7 @@ export default function booksUI(h) {
     const po = x.po_id ? B().pos.find((p) => p.id === x.po_id) : null;
     return (
       heading(`${x.number}${x.reference ? " · " + x.reference : ""}`, x.vendor_name, actions) +
-      `<div class="doc-grid"><section class="panel"><div class="panel-head"><div><h2>Supplier bill</h2><p>Bill date ${dateLabel(x.bill_date)} · due ${dateLabel(x.due_date)}</p></div>${statusTag(x.status)}</div><div class="table-wrap"><table><caption class="sr-only">Bill lines</caption><thead><tr><th>Description</th><th class="num">Qty</th><th class="num">Rate</th><th class="num">SST</th><th class="num">Amount</th></tr></thead><tbody>${x.items.map((l) => `<tr><td>${E(l.description)}<small>${E(catName(l.category_id))}</small></td><td class="num">${l.quantity}</td><td class="num">${money(l.rate)}</td><td class="num">${l.tax ? money(l.tax) : "—"}</td><td class="num">${money(l.amount)}</td></tr>`).join("")}</tbody></table></div><div class="totals"><div class="total-row"><span>Subtotal</span><strong>${money(x.subtotal)}</strong></div>${x.tax ? `<div class="total-row"><span>SST / tax</span><strong>${money(x.tax)}</strong></div>` : ""}<div class="total-row emphasis"><span>Total</span><span>${money(x.total)}</span></div><div class="total-row"><span>Paid</span><strong>${money(x.paid)}</strong></div><div class="total-row emphasis"><span>Balance</span><span>${money(x.balance)}</span></div></div>${x.notes ? `<div class="paper-notes"><h3>Notes</h3><p>${E(x.notes)}</p></div>` : ""}${x.state === "void" ? `<div class="notice mt22"><p>Void: ${E(x.void_reason || "")}</p></div>` : ""}</section><div class="stack"><section class="panel"><div class="panel-head"><h2>Payments</h2></div>${x.payments.length ? x.payments.map((p) => `<div class="payment"><div class="payment-top"><strong>${money(p.amount)}</strong>${tag("Paid", "green")}</div><p>${dateLabel(p.paid_date)} · ${E(p.payment_method)}${p.reference ? "<br>Reference: " + E(p.reference) : ""}</p><button class="link-button" data-action="books-edit-expense" data-id="${E(p.id)}">Open expense</button></div>`).join("") : "<p>No payments yet.</p>"}</section><section class="panel"><div class="panel-head"><h2>Vendor</h2></div><p class="books-pre">${E([x.vendor.name, x.vendor.registration && "Reg " + x.vendor.registration, x.vendor.tin && "TIN " + x.vendor.tin, x.vendor.address].filter(Boolean).join("\n"))}</p>${po ? `<p class="mt22">From purchase order <a href="#/po/${E(po.id)}">${E(po.number)}</a></p>` : ""}</section><section class="panel"><div class="panel-head"><h2>Attachments</h2></div>${placeholder("bill-files", x.id)}<form data-form="books-bill-file" data-id="${E(x.id)}" class="mt22"><label>Add the supplier's invoice (photo or PDF)<input type="file" class="books-file" accept="image/png,image/jpeg,image/webp,image/gif,application/pdf" required></label>${h.errorBlock()}<button class="btn" type="submit">Upload</button></form></section></div></div>`
+      `<div class="doc-grid"><section class="panel"><div class="panel-head"><div><h2>Supplier bill</h2><p>Bill date ${dateLabel(x.bill_date)} · due ${dateLabel(x.due_date)}</p></div>${statusTag(x.status)}</div><div class="table-wrap"><table><caption class="sr-only">Bill lines</caption><thead><tr><th>Description</th><th class="num">Qty</th><th class="num">Rate</th><th class="num">SST</th><th class="num">Amount</th></tr></thead><tbody>${x.items.map((l) => `<tr><td>${E(l.description)}<small>${E(catName(l.category_id))}</small></td><td class="num">${l.quantity}</td><td class="num">${money(l.rate)}</td><td class="num">${l.tax ? money(l.tax) : "—"}</td><td class="num">${money(l.amount)}</td></tr>`).join("")}</tbody></table></div><div class="totals"><div class="total-row"><span>Subtotal</span><strong>${money(x.subtotal)}</strong></div>${x.tax ? `<div class="total-row"><span>SST / tax</span><strong>${money(x.tax)}</strong></div>` : ""}<div class="total-row emphasis"><span>Total</span><span>${money(x.total)}</span></div><div class="total-row"><span>Paid</span><strong>${money(x.paid)}</strong></div><div class="total-row emphasis"><span>Balance</span><span>${money(x.balance)}</span></div></div>${x.notes ? `<div class="paper-notes"><h3>Notes</h3><p>${E(x.notes)}</p></div>` : ""}${x.state === "void" ? `<div class="notice warn mt22"><p>Void: ${E(x.void_reason || "")}</p></div>` : ""}</section><div class="stack"><section class="panel"><div class="panel-head"><h2>Payments</h2></div>${x.payments.length ? x.payments.map((p) => `<div class="payment"><div class="payment-top"><strong>${money(p.amount)}</strong>${tag("Paid", "green")}</div><p>${dateLabel(p.paid_date)} · ${E(p.payment_method)}${p.reference ? "<br>Reference: " + E(p.reference) : ""}</p><button class="link-button" data-action="books-edit-expense" data-id="${E(p.id)}">Open expense</button></div>`).join("") : "<p>No payments yet.</p>"}</section><section class="panel"><div class="panel-head"><h2>Vendor</h2></div><p class="books-pre">${E([x.vendor.name, x.vendor.registration && "Reg " + x.vendor.registration, x.vendor.tin && "TIN " + x.vendor.tin, x.vendor.address].filter(Boolean).join("\n"))}</p>${po ? `<p class="mt22">From purchase order <a href="#/po/${E(po.id)}">${E(po.number)}</a></p>` : ""}</section><section class="panel"><div class="panel-head"><h2>Attachments</h2></div>${placeholder("bill-files", x.id)}<form data-form="books-bill-file" data-id="${E(x.id)}" class="mt22"><label>Add the supplier's invoice (photo or PDF)<input type="file" class="books-file" accept="image/png,image/jpeg,image/webp,image/gif,application/pdf" required></label>${h.errorBlock()}<button class="btn" type="submit">Upload</button></form></section></div></div>`
     );
   }
   loaders["bill-files"] = async (id) => {
@@ -427,7 +425,7 @@ export default function booksUI(h) {
     a.push(`<a class="btn" href="/api/books/pos/${E(p.id)}/pdf">${icon("download")} PDF</a>`);
     return (
       heading(p.number || "Draft purchase order", p.vendor_name, a.join("")) +
-      `<div class="doc-grid"><section class="panel"><div class="panel-head"><div><h2>Purchase order</h2><p>Ordered ${dateLabel(p.po_date)}${p.expected_date ? " · needed by " + dateLabel(p.expected_date) : ""}</p></div>${statusTag(poStatus(p))}</div><div class="table-wrap"><table><caption class="sr-only">Order lines</caption><thead><tr><th>Description</th><th class="num">Qty</th><th class="num">Rate</th><th class="num">SST</th><th class="num">Amount</th></tr></thead><tbody>${p.items.map((l) => `<tr><td>${E(l.description)}<small>${E(catName(l.category_id))}</small></td><td class="num">${l.quantity}</td><td class="num">${money(l.rate)}</td><td class="num">${l.tax ? money(l.tax) : "—"}</td><td class="num">${money(l.amount)}</td></tr>`).join("")}</tbody></table></div><div class="totals"><div class="total-row"><span>Subtotal</span><strong>${money(p.subtotal)}</strong></div>${p.tax ? `<div class="total-row"><span>SST</span><strong>${money(p.tax)}</strong></div>` : ""}<div class="total-row emphasis"><span>Total</span><span>${money(p.total)}</span></div></div>${p.terms ? `<div class="paper-notes"><h3>Terms</h3><p>${E(p.terms)}</p></div>` : ""}${p.notes ? `<div class="paper-notes"><h3>Notes</h3><p>${E(p.notes)}</p></div>` : ""}${p.state === "cancelled" ? `<div class="notice mt22"><p>Cancelled: ${E(p.cancel_reason || "")}</p></div>` : ""}</section><div class="stack"><section class="panel"><div class="panel-head"><h2>Vendor</h2></div><p class="books-pre">${E([p.vendor.name, p.vendor.contact && "Attn: " + p.vendor.contact, p.vendor.email, p.vendor.address].filter(Boolean).join("\n"))}</p></section><section class="panel"><div class="panel-head"><h2>Emails</h2></div>${p.emails?.length ? p.emails.map((m) => `<div class="payment"><div class="payment-top"><strong>${E(m.subject)}</strong>${tag(m.status === "sent" ? "Sent" : m.status === "failed" ? "Failed" : "Sending", m.status === "sent" ? "green" : m.status === "failed" ? "red" : "blue")}</div><p>${E(m.recipients)}<br>${h.timeLabel(m.created)}</p></div>`).join("") : `<p>${B().mail ? "Not emailed yet." : "Email is not configured on the server. Download the PDF and send it yourself."}</p>`}</section></div></div>`
+      `<div class="doc-grid"><section class="panel"><div class="panel-head"><div><h2>Purchase order</h2><p>Ordered ${dateLabel(p.po_date)}${p.expected_date ? " · needed by " + dateLabel(p.expected_date) : ""}</p></div>${statusTag(poStatus(p))}</div><div class="table-wrap"><table><caption class="sr-only">Order lines</caption><thead><tr><th>Description</th><th class="num">Qty</th><th class="num">Rate</th><th class="num">SST</th><th class="num">Amount</th></tr></thead><tbody>${p.items.map((l) => `<tr><td>${E(l.description)}<small>${E(catName(l.category_id))}</small></td><td class="num">${l.quantity}</td><td class="num">${money(l.rate)}</td><td class="num">${l.tax ? money(l.tax) : "—"}</td><td class="num">${money(l.amount)}</td></tr>`).join("")}</tbody></table></div><div class="totals"><div class="total-row"><span>Subtotal</span><strong>${money(p.subtotal)}</strong></div>${p.tax ? `<div class="total-row"><span>SST</span><strong>${money(p.tax)}</strong></div>` : ""}<div class="total-row emphasis"><span>Total</span><span>${money(p.total)}</span></div></div>${p.terms ? `<div class="paper-notes"><h3>Terms</h3><p>${E(p.terms)}</p></div>` : ""}${p.notes ? `<div class="paper-notes"><h3>Notes</h3><p>${E(p.notes)}</p></div>` : ""}${p.state === "cancelled" ? `<div class="notice warn mt22"><p>Cancelled: ${E(p.cancel_reason || "")}</p></div>` : ""}</section><div class="stack"><section class="panel"><div class="panel-head"><h2>Vendor</h2></div><p class="books-pre">${E([p.vendor.name, p.vendor.contact && "Attn: " + p.vendor.contact, p.vendor.email, p.vendor.address].filter(Boolean).join("\n"))}</p></section><section class="panel"><div class="panel-head"><h2>Emails</h2></div>${p.emails?.length ? p.emails.map((m) => `<div class="payment"><div class="payment-top"><strong>${E(m.subject)}</strong>${tag(m.status === "sent" ? "Sent" : m.status === "failed" ? "Failed" : "Sending", m.status === "sent" ? "green" : m.status === "failed" ? "red" : "blue")}</div><p>${E(m.recipients)}<br>${h.timeLabel(m.created)}</p></div>`).join("") : `<p>${B().mail ? "Not emailed yet." : "Email is not configured on the server. Download the PDF and send it yourself."}</p>`}</section></div></div>`
     );
   }
   function poEmailModal(id) {
@@ -496,7 +494,7 @@ export default function booksUI(h) {
     if (!B()) return empty("Books are unavailable", "Refresh the page.");
     const active = sub || "sales";
     const r = period();
-    const head = heading("Reports", "Sales, profit, cash and tax, worked out from your invoices, receipts and expenses.");
+    const head = heading("Reports", "");
     if (active === "sales")
       return (
         head +
@@ -563,7 +561,7 @@ export default function booksUI(h) {
     const max = Math.max(1, ...f.weeks.map((w) => Math.abs(w.closing)));
     const kinds = { invoice: "Invoice", draft: "Recurring draft", schedule: "Recurring billing", expense: "Unpaid expense", bill: "Supplier bill", po: "Purchase order", recurring: "Recurring cost" };
     const chart = `<div class="books-flow" role="img" aria-label="Closing balance for the next 13 weeks. Lowest ${E(money(f.lowest.closing))} in week ${f.lowest.week}.">${f.weeks.map((w) => `<div class="books-flow-col ${w.negative ? "neg" : ""}" aria-hidden="true"><div class="books-flow-up">${w.closing >= 0 ? `<span data-books-h="${Math.round(pct(w.closing, max) * 1.1) + 2}"></span>` : ""}</div>${f.negativeWeeks.length ? `<div class="books-flow-down">${w.closing < 0 ? `<span data-books-h="${Math.round(pct(w.closing, max) * 0.6) + 2}"></span>` : ""}</div>` : ""}<small>W${w.week}</small></div>`).join("")}</div>`;
-    return `<div class="panel-head"><div><h2>Next 13 weeks</h2><p>${f.opening.known ? `Starting cash ${money(f.opening.estimated)} today (bank ${money(f.opening.balance)} on ${dateLabel(f.opening.date)}${f.opening.receipts ? ", + " + money(f.opening.receipts) + " received" : ""}${f.opening.refunds ? ", − " + money(f.opening.refunds) + " refunded" : ""}${f.opening.spent ? ", − " + money(f.opening.spent) + " spent" : ""})` : "No bank balance entered, so the forecast starts at RM 0.00."}</p></div><a class="btn" href="/api/books/forecast.csv">${icon("download")} CSV</a></div>${f.negativeWeeks.length ? `<div class="notice"><p>Cash is forecast to go below zero in week ${f.negativeWeeks.join(", ")}. Chase the invoices that are due or move payments.</p></div>` : `<div class="notice info"><p>Cash stays above zero for the next 13 weeks. Lowest point: ${money(f.lowest.closing)} in week ${f.lowest.week}.</p></div>`}${chart}<div class="table-wrap mt22"><table class="books-forecast"><caption class="sr-only">Weekly cash flow forecast</caption><thead><tr><th>Week</th><th class="num">Money in</th><th class="num">Money out</th><th class="num">Net</th><th class="num">Closing</th></tr></thead><tbody>${f.weeks
+    return `<div class="panel-head"><div><h2>Next 13 weeks</h2><p>${f.opening.known ? `Starting cash ${money(f.opening.estimated)} today (bank ${money(f.opening.balance)} on ${dateLabel(f.opening.date)}${f.opening.receipts ? ", + " + money(f.opening.receipts) + " received" : ""}${f.opening.refunds ? ", − " + money(f.opening.refunds) + " refunded" : ""}${f.opening.spent ? ", − " + money(f.opening.spent) + " spent" : ""})` : "No bank balance entered, so the forecast starts at RM 0.00."}</p></div><a class="btn" href="/api/books/forecast.csv">${icon("download")} CSV</a></div>${f.negativeWeeks.length ? `<div class="notice warn"><p>Cash is forecast to go below zero in week ${f.negativeWeeks.join(", ")}. Chase the invoices that are due or move payments.</p></div>` : `<div class="notice info"><p>Cash stays above zero for the next 13 weeks. Lowest point: ${money(f.lowest.closing)} in week ${f.lowest.week}.</p></div>`}${chart}<div class="table-wrap mt22"><table class="books-forecast"><caption class="sr-only">Weekly cash flow forecast</caption><thead><tr><th>Week</th><th class="num">Money in</th><th class="num">Money out</th><th class="num">Net</th><th class="num">Closing</th></tr></thead><tbody>${f.weeks
       .map(
         (w) =>
           `<tr class="${w.negative ? "books-neg" : ""}"><td><strong>Week ${w.week}</strong><small>${dateLabel(w.start)} – ${dateLabel(w.end)}</small>${w.items.length ? `<details><summary>${w.items.length} item${w.items.length === 1 ? "" : "s"}</summary><ul class="books-items">${w.items.map((i) => `<li><span>${E(kinds[i.kind] || i.kind)}: ${i.kind === "invoice" ? `<a href="#/document/${E(i.ref)}">${E(i.label)}</a>` : i.kind === "bill" ? `<a href="#/bill/${E(i.ref)}">${E(i.label)}</a>` : i.kind === "po" ? `<a href="#/po/${E(i.ref)}">${E(i.label)}</a>` : E(i.label)}${i.note ? ` <small>${E(i.note)}</small>` : ""}</span><span class="num ${i.amount < 0 ? "red-text" : "teal"}">${money(i.amount)}</span></li>`).join("")}</ul></details>` : ""}</td><td class="num">${money(w.inflow)}</td><td class="num">${money(w.outflow)}</td><td class="num">${money(w.net)}</td><td class="num ${w.negative ? "red-text" : ""}"><strong>${money(w.closing)}</strong>${w.negative ? '<small class="red-text">Below zero</small>' : ""}</td></tr>`,
@@ -635,7 +633,7 @@ export default function booksUI(h) {
       x.cash === null
         ? `<form data-form="books-cash" class="books-inline-cash"><div class="books-range-grid">${input("Bank balance (MYR)", "balance", "", "number", true, 'step="0.01" min="-99999999.99" max="99999999.99"')}${input("On date", "date", T(), "date", true, `max="${T()}"`)}<div class="books-range-go"><button class="btn primary" type="submit">Save balance</button></div></div>${h.errorBlock()}</form>`
         : ""
-    }${x.negativeWeeks?.length ? `<div class="notice mt22"><p>Cash is forecast to go below zero in week ${x.negativeWeeks.join(", ")} of the next 13. <a href="#/reports/cashflow">See the forecast</a>.</p></div>` : ""}<h3 class="books-sub mt22">Most critical invoices</h3>${
+    }${x.negativeWeeks?.length ? `<div class="notice warn mt22"><p>Cash is forecast to go below zero in week ${x.negativeWeeks.join(", ")} of the next 13. <a href="#/reports/cashflow">See the forecast</a>.</p></div>` : ""}<h3 class="books-sub mt22">Most critical invoices</h3>${
       x.critical.length
         ? x.critical
             .map(
@@ -698,7 +696,7 @@ export default function booksUI(h) {
           toast("Receipt read. Check the details before saving.");
         } catch (e) {
           const w = modal.querySelector(".books-warnings");
-          if (w) w.innerHTML = `<div class="notice mt22"><p>${E(e.message)}</p></div>`;
+          if (w) w.innerHTML = `<div class="notice error mt22"><p>${E(e.message)}</p></div>`;
           else throw e;
         } finally {
           if (el.isConnected) el.textContent = "Read again";

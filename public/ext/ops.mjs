@@ -182,7 +182,7 @@ export default function opsUI(h) {
     const nav = `<div class="actions">${button("Previous", "ops-week", h.addDays(week, -7))}${button("This week", "ops-week", mondayOf(S().today))}${button("Next", "ops-week", h.addDays(week, 7))}</div>`;
     let body;
     if (!data) body = '<p class="ops-loading">Loading time…</p>';
-    else if (data.error) body = `<p class="notice">${E(data.error)}</p>`;
+    else if (data.error) body = `<p class="notice error">${E(data.error)}</p>`;
     else if (!data.entries.length) body = empty("No time this week", "Start the timer or add time to see it here.");
     else {
       const rows = new Map();
@@ -219,7 +219,7 @@ export default function opsUI(h) {
     const week = mondayOf(/^\d{4}-\d{2}-\d{2}$/.test(param || "") ? param : S().today);
     const data = load("week:" + week, `/ops/time?from=${week}&to=${h.addDays(week, 6)}`);
     return (
-      heading("Timesheets", "Log time by client and project, then bill it in one step.", button("Add time", "ops-time-new", "", true, "plus")) +
+      heading("Timesheets", "", button("Add time", "ops-time-new", "", true, "plus")) +
       timerPanel() +
       weekPanel(week, data) +
       unbilledPanel()
@@ -272,7 +272,7 @@ export default function opsUI(h) {
           )
           .join("")}</tbody></table></div></section>`
       : `<section class="panel">${empty("No projects yet", "Create a project to track its budget, milestones and time.", button("New project", "ops-project-new", "", true))}</section>`;
-    return heading("Projects", "Budgets, milestones and time for client work.", button("New project", "ops-project-new", "", true, "plus")) + table + readyPanel();
+    return heading("Projects", "", button("New project", "ops-project-new", "", true, "plus")) + table + readyPanel();
   }
   function readyPanel() {
     const ready = ops().milestones.filter((m) => m.status === "ready");
@@ -324,7 +324,7 @@ export default function opsUI(h) {
       (p.budget ? `<div class="ops-budget">${progress(st.invoiced, p.budget)}</div>` : "") +
       (p.description ? `<section class="panel"><p class="ops-pre">${E(p.description)}</p></section>` : "") +
       `<section class="panel mt22"><div class="panel-head"><div><h2>Milestones</h2><p>Bill a fixed amount or a share of the budget, once each</p></div>${p.status !== "cancelled" ? button("Add milestone", "ops-ms-new", id) : ""}</div>${ms.length ? `<div class="table-wrap"><table><thead><tr><th>Milestone</th><th>Due</th><th class="num">Amount</th><th>SST</th><th>Status</th><th><span class="sr-only">Actions</span></th></tr></thead><tbody>${milestoneRows(ms, p)}</tbody></table></div>` : "<p>No milestones yet.</p>"}</section>` +
-      `<section class="panel mt22"><div class="panel-head"><div><h2>Time</h2><p>Latest entries for this project</p></div></div>${!data ? '<p class="ops-loading">Loading time…</p>' : data.error ? `<p class="notice">${E(data.error)}</p>` : data.time.length ? entryTable(data.time, false) : "<p>No time logged yet.</p>"}</section>` +
+      `<section class="panel mt22"><div class="panel-head"><div><h2>Time</h2><p>Latest entries for this project</p></div></div>${!data ? '<p class="ops-loading">Loading time…</p>' : data.error ? `<p class="notice error">${E(data.error)}</p>` : data.time.length ? entryTable(data.time, false) : "<p>No time logged yet.</p>"}</section>` +
       (st.invoices.length
         ? `<section class="panel mt22"><div class="panel-head"><h2>Invoices</h2></div><div class="table-wrap"><table><thead><tr><th>Invoice</th><th>Status</th><th class="num">This project</th><th class="num">Invoice total</th><th class="num">Paid</th></tr></thead><tbody>${st.invoices.map((d) => `<tr><td>${docLink(d.id)}</td><td>${badge(d.status)}</td><td class="num">${money(d.net)}</td><td class="num">${money(d.total)}</td><td class="num">${money(d.paid)}</td></tr>`).join("")}</tbody></table></div></section>`
         : "")
@@ -351,13 +351,13 @@ export default function opsUI(h) {
     const inv = ops().inventory;
     if (!inv.enabled)
       return (
-        heading("Inventory", "Optional stock counts for selected catalog items.") +
+        heading("Inventory", "") +
         `<section class="panel"><h2>Inventory is off</h2><p class="mt22">Turn it on if you sell goods and want stock counts for selected catalog items. Service businesses can leave it off; nothing changes while it is off.</p><div class="actions mt22">${button("Turn on inventory", "ops-inventory-on", "", true)}</div></section>`
       );
     const low = inv.items.filter((i) => i.low);
     return (
-      heading("Inventory", "Stock on hand for the catalog items you track.", button("Track an item", "ops-stock-track", "", true, "plus")) +
-      (low.length ? `<div class="notice"><p>${low.length} ${low.length === 1 ? "item is" : "items are"} at or below the reorder level.</p></div>` : "") +
+      heading("Inventory", "", button("Track an item", "ops-stock-track", "", true, "plus")) +
+      (low.length ? `<div class="notice warn"><p>${low.length} ${low.length === 1 ? "item is" : "items are"} at or below the reorder level.</p></div>` : "") +
       `<section class="panel"><form data-form="ops-inventory-settings" class="ops-inline-form">${pick("Deduct stock when", "trigger", [["invoice", "An invoice is issued"], ["delivery_order", "A delivery order is issued"]], inv.trigger)}<button class="btn" type="submit">Save</button>${button("Turn off inventory", "ops-inventory-off")}<div class="form-error" role="alert"></div></form><p class="field-hint">Lines are matched to tracked items by catalog item or SKU. Voiding the document puts the stock back. Stock can go below zero; issuing is never blocked.</p></section>` +
       `<section class="panel mt22">${inv.items.length ? `<div class="table-wrap"><table><thead><tr><th>Item</th><th>SKU</th><th class="num">On hand</th><th class="num">Reorder at</th><th>Status</th><th><span class="sr-only">Actions</span></th></tr></thead><tbody>${inv.items
         .map(
@@ -474,7 +474,7 @@ export default function opsUI(h) {
     const open = d.state !== "void";
     let body;
     if (!w) body = '<p class="ops-loading">Loading…</p>';
-    else if (w.error) body = `<p class="notice">${E(w.error)}</p>`;
+    else if (w.error) body = `<p class="notice error">${E(w.error)}</p>`;
     else {
       const photos = w.photos.length
         ? `<div class="ops-photos">${w.photos

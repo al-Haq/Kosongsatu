@@ -21,6 +21,7 @@ test("wrong password is refused and the owner can sign out", async ({ page }) =>
   await page.click('form[data-form="login"] button[type=submit]');
   await expect(page.locator('form[data-form="login"] .form-error')).toContainText("incorrect");
   await signIn(page);
+  await page.click(".avatar-menu summary");
   await page.click('[data-action="logout"]');
   await expect(page.locator('form[data-form="login"]')).toBeVisible();
 });

@@ -59,7 +59,7 @@ export default function platformUI(h) {
     const d = quick,
       q = ext().quick;
     const selected = d.client?.id || (!d.clientChoices?.length && d.clientQuery ? "__new__" : "");
-    const warn = d.warnings?.length ? `<div class="notice pq-warn"><ul>${d.warnings.map((w) => `<li>${E(w)}</li>`).join("")}</ul></div>` : "";
+    const warn = d.warnings?.length ? `<div class="notice warn pq-warn"><ul>${d.warnings.map((w) => `<li>${E(w)}</li>`).join("")}</ul></div>` : "";
     const ai =
       !d.understood && q.ai && d.source !== "ai"
         ? `<div class="notice info pq-ai"><div><p>The parser could not read every part. You can fill the lines yourself, or ask your AI model.</p><label class="check-row"><input type="checkbox" id="pq-consent"> Send this text and your client and service names to ${E(q.aiOrigin)}.</label></div>${button("Ask the AI model", "platform-quick-ai")}</div>`
@@ -132,8 +132,8 @@ export default function platformUI(h) {
     const off = webhooks.filter(autoOff);
     const byId = Object.fromEntries(webhooks.map((w) => [w.id, w]));
     return (
-      heading("Webhooks", "Send business events to n8n, Zapier, Make or your own server as they happen, without polling.", webhooks.length < 10 ? button("Add endpoint", "platform-webhook-new", "", true, "plus") : "") +
-      off.map((w) => `<div class="notice">${icon("hook")}<p><strong>${E(w.url)}</strong> was turned off${w.disabled_at ? " on " + E(timeLabel(w.disabled_at)) : ""}. ${E(w.disabled_reason)} Fix the receiver, then turn it on again.</p></div>`).join("") +
+      heading("Webhooks", "", webhooks.length < 10 ? button("Add endpoint", "platform-webhook-new", "", true, "plus") : "") +
+      off.map((w) => `<div class="notice warn">${icon("hook")}<p><strong>${E(w.url)}</strong> was turned off${w.disabled_at ? " on " + E(timeLabel(w.disabled_at)) : ""}. ${E(w.disabled_reason)} Fix the receiver, then turn it on again.</p></div>`).join("") +
       `<section class="panel pw-section"><div class="panel-head"><div><h2>Endpoints</h2><p>Each delivery is signed. Failed deliveries are retried for up to 24 hours.</p></div></div>${
         webhooks.length
           ? `<div class="table-wrap"><table><thead><tr><th>Endpoint</th><th>Events</th><th>Status</th><th>Last delivery</th><th><span class="sr-only">Actions</span></th></tr></thead><tbody>${webhooks
@@ -209,7 +209,7 @@ const valid = fresh && /^[0-9a-f]{64}$/.test(v1) &&
   function importPage() {
     const { imports } = ext();
     return (
-      heading("Import", "Clients, services and past invoices from a spreadsheet or your previous system.") +
+      heading("Import", "") +
       `<div class="notice info">${icon("shield")}<p>Imports never email, share or issue anything. Each file is checked row by row first and imported only if every row is valid. Import clients first, then services, then invoices.</p></div><div class="pi-grid">${Object.entries(IMPORTS)
         .map(
           ([kind, [title, text, cols]]) =>
@@ -237,7 +237,7 @@ const valid = fresh && /^[0-9a-f]{64}$/.test(v1) &&
     const label = { ok: tag("Import", "green"), skip: tag("Skip", "blue"), error: tag("Error", "red") };
     showModal(
       `Check ${IMPORTS[kind][0].toLowerCase()}`,
-      `<p><strong>${E(name)}</strong>: ${r.units} ${kind === "invoices" ? "invoices" : "rows"} checked. ${r.created} to import, ${r.skipped} already in the workspace, ${r.errors} with problems.</p>${r.errors ? '<div class="notice"><p>Fix the rows marked Error and check the file again. Nothing is imported until every row is valid.</p></div>' : ""}<div class="table-wrap mt22 pi-preview"><table><thead><tr><th>Row</th><th>Record</th><th>Result</th></tr></thead><tbody>${r.results
+      `<p><strong>${E(name)}</strong>: ${r.units} ${kind === "invoices" ? "invoices" : "rows"} checked. ${r.created} to import, ${r.skipped} already in the workspace, ${r.errors} with problems.</p>${r.errors ? '<div class="notice error"><p>Fix the rows marked Error and check the file again. Nothing is imported until every row is valid.</p></div>' : ""}<div class="table-wrap mt22 pi-preview"><table><thead><tr><th>Row</th><th>Record</th><th>Result</th></tr></thead><tbody>${r.results
         .map((x) => `<tr class="${x.status === "error" ? "pi-error" : ""}"><td>${x.lines.length > 1 ? `${x.lines[0]}–${x.lines.at(-1)}` : x.lines[0]}</td><td>${E(x.summary || "")}${x.message ? `<small>${E(x.message)}</small>` : ""}</td><td>${label[x.status]}</td></tr>`)
         .join("")}</tbody></table></div>${h.errorBlock()}<div class="form-actions">${button("Cancel", "close-modal")}${!r.errors && r.created ? button(`Import ${r.created} record${r.created === 1 ? "" : "s"}`, "platform-import-commit", "", true) : ""}</div>`,
       true,
@@ -419,7 +419,7 @@ const valid = fresh && /^[0-9a-f]{64}$/.test(v1) &&
 
   function overviewNotices() {
     const off = ext().webhooks.filter(autoOff);
-    return off.length ? `<div class="notice mt22">${icon("hook")}<p>${off.length === 1 ? "A webhook endpoint was" : off.length + " webhook endpoints were"} turned off after repeated failures.</p><a href="#/webhooks">Review →</a></div>` : "";
+    return off.length ? `<div class="notice warn mt22">${icon("hook")}<p>${off.length === 1 ? "A webhook endpoint was" : off.length + " webhook endpoints were"} turned off after repeated failures.</p><a href="#/webhooks">Review →</a></div>` : "";
   }
 
   return {
@@ -437,7 +437,7 @@ const valid = fresh && /^[0-9a-f]{64}$/.test(v1) &&
     action,
     submit,
     slots: {
-      topbar: () => `<button type="button" class="btn ghost pq-top" data-action="platform-quick" aria-label="Quick invoice">${icon("bolt")}<span>Quick invoice</span></button>`,
+      topbar: () => `<button type="button" class="btn pq-top" data-action="platform-quick" aria-label="Quick invoice">${icon("bolt")}<span>Quick invoice</span></button>`,
       overview: () => overviewNotices() + quickPanel(),
       settings: installPanel,
     },
