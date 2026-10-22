@@ -201,9 +201,11 @@ export function createApp({
       if (secure) headers["Strict-Transport-Security"] = "max-age=31536000";
       res.setTimeout(20000);
       const send = (status, data, extra = {}) => {
+        const bin = req.method === "DELETE" && status < 300 ? requestContext.getStore()?.binId : null;
         res.writeHead(status, {
           ...headers,
           "Content-Type": "application/json; charset=utf-8",
+          ...(bin ? { "X-Bin-Entry": bin } : {}),
           ...extra,
         });
         res.end(
@@ -1191,7 +1193,7 @@ export function createApp({
           const fileRoute = path.match(/^\/api\/files\/([\w-]+)$/);
           if (fileRoute && method === "GET") return sendFile(store.file(fileRoute[1]), url);
           if (fileRoute && method === "DELETE") {
-            store.deleteFile(fileRoute[1]);
+            store.removeFile(fileRoute[1]);
             return send(200, { ok: true });
           }
           const secretRoute = path.match(/^\/api\/secrets\/([A-Z][A-Z0-9_]{1,63})$/);

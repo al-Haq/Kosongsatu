@@ -25,7 +25,9 @@ let S = null,
   search = "",
   page = 0,
   toastTimer,
-  generatedLink = "";
+  generatedLink = "",
+  // The copy a delete just kept in Recently deleted; the next toast offers "Undo".
+  undoBin = null;
 const E = (value) =>
   String(value ?? "").replace(
     /[&<>"']/g,
@@ -100,10 +102,12 @@ const empty = (title, body = "", cta = "") =>
   `<div class="empty">${icon("doc")}<h2>${E(title)}</h2><p>${E(body)}</p>${cta}</div>`;
 function toast(message, error = false) {
   const t = $("#toast");
-  t.textContent = message;
-  t.className = "show" + (error ? " error" : "");
+  const undo = !error && undoBin && Date.now() - undoBin.at < 15000 ? undoBin.id : "";
+  undoBin = null;
+  t.innerHTML = `<span>${E(message)}</span>${undo ? `<button type="button" class="toast-undo" data-action="bin-undo" data-id="${E(undo)}">Undo</button>` : ""}`;
+  t.className = "show" + (error ? " error" : "") + (undo ? " with-action" : "");
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => (t.className = ""), 5500);
+  toastTimer = setTimeout(() => (t.className = ""), undo ? 10000 : 5500);
 }
 async function api(path, method = "GET", body) {
   const retryable =
@@ -122,6 +126,8 @@ async function api(path, method = "GET", body) {
     ...(body ? { body: JSON.stringify(body) } : {}),
   });
   if (response.ok || response.status < 500) requestKeys.delete(requestId);
+  const bin = response.ok && response.headers.get("X-Bin-Entry");
+  if (bin) undoBin = { id: bin, at: Date.now() };
   let data;
   try {
     data = await response.json();
@@ -1142,7 +1148,7 @@ async function runAction(action, id, el) {
     case "delete-draft":
       confirmModal(
         "Delete this draft?",
-        "The draft is removed permanently. The deletion is kept in the audit history.",
+        "The draft moves to Recently deleted, where you can restore it for 30 days.",
         "confirm-delete-draft",
         id,
         "Delete draft",
@@ -1151,7 +1157,7 @@ async function runAction(action, id, el) {
     case "delete-client":
       confirmModal(
         "Delete client?",
-        "Only clients with no documents, receipts, schedules or sales records can be deleted. Archive a client with history instead.",
+        "Only clients with no documents, receipts, schedules or sales records can be deleted; archive a client with history instead. A deleted client can be restored from Recently deleted for 30 days.",
         "confirm-delete-client",
         id,
         "Delete client",
@@ -1160,7 +1166,7 @@ async function runAction(action, id, el) {
     case "delete-service":
       confirmModal(
         "Delete service?",
-        "Existing documents keep their line text and rates. A service used by a schedule must be marked inactive instead.",
+        "Existing documents keep their line text and rates. A service used by a schedule must be marked inactive instead. You can restore it from Recently deleted for 30 days.",
         "confirm-delete-service",
         id,
         "Delete service",
@@ -1184,7 +1190,7 @@ async function runAction(action, id, el) {
       if (target === "draft") navigate(location.hash.includes("quote") ? "quotes" : "invoices");
       else if (target === "client") navigate("clients");
       else renderRoute();
-      toast("Deleted. The audit history keeps a record.");
+      toast({ draft: "Draft deleted.", client: "Client deleted.", service: "Service deleted." }[target]);
       break;
     }
     case "archive-client":

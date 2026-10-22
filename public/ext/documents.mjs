@@ -264,6 +264,10 @@ export default function documentsUI(h) {
         updateSum();
         return true;
       case "doc-instalments-clear":
+        h.confirmModal("Remove the instalment plan?", "The invoice due date applies again. You can set up a new plan at any time.", "doc-instalments-clear-yes", id, "Remove plan");
+        return true;
+      case "doc-instalments-clear-yes":
+        modal.close();
         await api(`/ext/documents/${id}/instalments`, "DELETE");
         await reload("Instalment plan removed. The invoice due date applies again.");
         return true;

@@ -565,7 +565,7 @@ export default function opsUI(h) {
         timeForm(id);
         return true;
       case "ops-time-delete":
-        confirmModal("Delete time entry", "Delete this time entry? The audit history keeps a record.", "ops-time-delete-yes", id, "Delete");
+        confirmModal("Delete time entry", "Delete this time entry? You can restore it from Recently deleted for 30 days.", "ops-time-delete-yes", id, "Delete");
         return true;
       case "ops-time-delete-yes":
         await api("/ops/time/" + encodeURIComponent(id), "DELETE");
@@ -608,7 +608,7 @@ export default function opsUI(h) {
         projectForm(id);
         return true;
       case "ops-project-delete":
-        confirmModal("Delete project", "Delete this project and its milestones? Projects with time or invoices cannot be deleted.", "ops-project-delete-yes", id, "Delete project");
+        confirmModal("Delete project", "Delete this project and its milestones? Projects with time or invoices cannot be deleted. You can restore it from Recently deleted for 30 days.", "ops-project-delete-yes", id, "Delete project");
         return true;
       case "ops-project-delete-yes":
         await api("/ops/projects/" + encodeURIComponent(id), "DELETE");
@@ -622,7 +622,7 @@ export default function opsUI(h) {
         milestoneForm(null, id);
         return true;
       case "ops-ms-delete":
-        confirmModal("Delete milestone", "Delete this milestone?", "ops-ms-delete-yes", id, "Delete");
+        confirmModal("Delete milestone", "Delete this milestone? You can restore it from Recently deleted for 30 days.", "ops-ms-delete-yes", id, "Delete");
         return true;
       case "ops-ms-delete-yes":
         await api("/ops/milestones/" + encodeURIComponent(id), "DELETE");
@@ -697,7 +697,7 @@ export default function opsUI(h) {
         return true;
       case "ops-po-file-delete": {
         const [fid, pid] = id.split("|");
-        confirmModal("Delete PO file", "Delete this file? The audit history keeps a record.", "ops-po-file-delete-yes", `${fid}|${pid}`, "Delete file");
+        confirmModal("Delete PO file", "Delete this file? You can restore it from Recently deleted for 30 days.", "ops-po-file-delete-yes", `${fid}|${pid}`, "Delete file");
         return true;
       }
       case "ops-po-file-delete-yes": {
@@ -724,7 +724,7 @@ export default function opsUI(h) {
         return true;
       }
       case "ops-photo-delete":
-        confirmModal("Delete photo", "Delete this photo? The audit history keeps a record.", "ops-photo-delete-yes", id, "Delete photo");
+        confirmModal("Delete photo", "Delete this photo? You can restore it from Recently deleted for 30 days.", "ops-photo-delete-yes", id, "Delete photo");
         return true;
       case "ops-photo-delete-yes":
         await api("/ops/photos/" + encodeURIComponent(id), "DELETE");
@@ -742,7 +742,7 @@ export default function opsUI(h) {
         return true;
       }
       case "ops-log-delete":
-        confirmModal("Delete work log entry", "Delete this entry?", "ops-log-delete-yes", id, "Delete");
+        confirmModal("Delete work log entry", "Delete this entry? You can restore it from Recently deleted for 30 days.", "ops-log-delete-yes", id, "Delete");
         return true;
       case "ops-log-delete-yes":
         await api("/ops/logs/" + encodeURIComponent(id), "DELETE");

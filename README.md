@@ -54,7 +54,7 @@ The core workspace:
 - Platform: outgoing webhooks with signatures, CSV import of clients, services and historical invoices, an installable app, invoices typed in plain language, a Docker/Caddy hosting kit with install and update scripts.
 - Sales opportunities, customer POs, an MCP server and scoped REST tools for agents and n8n, with owner approval of every proposal.
 
-Each module is described for owners in [docs/features](docs/features): [documents](docs/features/documents.md), [recurring](docs/features/recurring.md), [tax](docs/features/tax.md), [payments](docs/features/payments.md), [comms](docs/features/comms.md), [portal](docs/features/portal.md), [books](docs/features/books.md), [ops](docs/features/ops.md), [team](docs/features/team.md), [platform](docs/features/platform.md). The roadmap and status of all 100 features is in [docs/100-CIRI.md](docs/100-CIRI.md).
+Each module is described for owners in [docs/features](docs/features): [documents](docs/features/documents.md), [recurring](docs/features/recurring.md), [tax](docs/features/tax.md), [payments](docs/features/payments.md), [comms](docs/features/comms.md), [portal](docs/features/portal.md), [books](docs/features/books.md), [ops](docs/features/ops.md), [team](docs/features/team.md), [platform](docs/features/platform.md), [recently deleted](docs/features/trash.md). The roadmap and status of all 100 features is in [docs/100-CIRI.md](docs/100-CIRI.md).
 
 **Issued** means published/locked inside this app. Sharing opens a link or WhatsApp composer unless email or WhatsApp Business is set up. A viewed status means the link was opened and is not proof of delivery or identity.
 

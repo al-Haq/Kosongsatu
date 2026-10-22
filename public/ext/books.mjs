@@ -736,7 +736,7 @@ export default function booksUI(h) {
         await reload(type === "books-archive-vendor" ? "Vendor archived." : "Vendor restored.");
         return true;
       case "books-delete-vendor":
-        h.confirmModal("Delete vendor?", "Only vendors with no expenses, bills, orders or recurring costs can be deleted. Archive a vendor with history instead.", "books-confirm-delete-vendor", id, "Delete vendor");
+        h.confirmModal("Delete vendor?", "Only vendors with no expenses, bills, orders or recurring costs can be deleted; archive a vendor with history instead. You can restore it from Recently deleted for 30 days.", "books-confirm-delete-vendor", id, "Delete vendor");
         return true;
       case "books-confirm-delete-vendor":
         try {
@@ -817,7 +817,7 @@ export default function booksUI(h) {
         recurringForm(id);
         return true;
       case "books-delete-recurring":
-        h.confirmModal("Delete recurring cost?", "It is removed from the forecast. Expenses you already recorded stay.", "books-confirm-delete-recurring", id, "Delete");
+        h.confirmModal("Delete recurring cost?", "It is removed from the forecast. Expenses you already recorded stay. You can restore it from Recently deleted for 30 days.", "books-confirm-delete-recurring", id, "Delete");
         return true;
       case "books-confirm-delete-recurring":
         await h.api("/books/recurring/" + id, "DELETE");

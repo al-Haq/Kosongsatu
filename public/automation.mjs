@@ -182,7 +182,7 @@ export function automationUI(h) {
         opportunityForm(sid);
         break;
       case "sales-delete":
-        if (!confirm("Delete this opportunity? The audit history keeps a record."))
+        if (!confirm("Delete this opportunity? You can restore it from Recently deleted for 30 days."))
           break;
         await api("/sales/opportunities/" + sid, "DELETE");
         await refresh();

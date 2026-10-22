@@ -309,7 +309,7 @@ const valid = fresh && /^[0-9a-f]{64}$/.test(v1) &&
         confirmPassword("New signing secret", "platform-webhook-rotate", id, "The old secret stops working at once. Update your receiver with the new one.");
         return true;
       case "platform-webhook-delete":
-        h.confirmModal("Delete endpoint", "The endpoint and its delivery log are removed. Events are no longer sent to it.", "platform-webhook-delete-confirm", id, "Delete endpoint");
+        h.confirmModal("Delete endpoint", "Events are no longer sent to it and its delivery log is cleared. You can restore the endpoint, switched off, from Recently deleted for 30 days.", "platform-webhook-delete-confirm", id, "Delete endpoint");
         return true;
       case "platform-webhook-delete-confirm":
         await api(`/platform/webhooks/${id}`, "DELETE");
