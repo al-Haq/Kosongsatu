@@ -141,7 +141,7 @@ export function portalGuest(h) {
       )
       .join("")}</div>`;
   const feedbackForm = (mode, id) =>
-    `<form data-form="portal-feedback" data-mode="${mode}" data-id="${E(id)}"><p>How was the work on this invoice? Your rating goes to the business only.</p>${stars("rate-" + mode)}${h.area("Comment (optional)", "comment", "", 500)}<label class="check-row"><input type="checkbox" name="consent"> You may show my rating and comment as a testimonial.</label>${h.input("Name to show with a testimonial (optional)", "display_name", "", "text", false, 'maxlength="80"')}${h.errorBlock()}<div class="form-actions"><button class="btn primary" type="submit">Send feedback</button></div></form>`;
+    `<form data-form="portal-feedback" data-mode="${mode}" data-id="${E(id)}"><p>How was the work on this invoice? Your rating goes to the business only.</p>${stars("rate-" + mode)}<div class="portal-more">${h.area("Comment (optional)", "comment", "", 500)}<label class="check-row"><input type="checkbox" name="consent"> You may show my rating and comment as a testimonial.</label>${h.input("Name to show with a testimonial (optional)", "display_name", "", "text", false, 'maxlength="80"')}${h.errorBlock()}<div class="form-actions"><button class="btn primary" type="submit">Send feedback</button></div></div></form>`;
   const feedbackThanks = '<div class="notice info"><p>Thank you for your feedback.</p></div>';
   const feedbackPanel = (f, mode, id) =>
     !f

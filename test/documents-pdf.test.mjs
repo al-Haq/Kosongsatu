@@ -108,6 +108,26 @@ test("Bahasa Melayu labels, other currencies and the exchange rate", async () =>
   }
 });
 
+test("scripts Archivo lacks (Cyrillic, Arabic, Hebrew) fall back to DejaVu per string", async () => {
+  const { store, draft } = setup();
+  try {
+    const latin = store.issue(draft({ items: [{ description: "Réparation Łódź – café", quantity: 1, rate: "10" }] }).id);
+    const l = await capture(() => renderPdf(store.document(latin.id)));
+    assert.ok(l.fonts.has("Body") && l.fonts.has("Bold"));
+    assert.ok(!l.fonts.has("Fallback") && !l.fonts.has("FallbackBold"), "Latin text never needs the fallback");
+    const c2 = store.saveClient({ name: "ООО Ромашка", email: "ru@example.com" });
+    const mixed = store.issue(
+      draft({ client_id: c2.id, items: [{ description: "Консультация consulting", quantity: 1, rate: "10" }], notes: "شكراً · תודה" }).id,
+    );
+    const m = await capture(() => renderPdf(store.document(mixed.id)));
+    assert.ok(m.fonts.has("Fallback"), "Cyrillic, Arabic and Hebrew strings use DejaVu");
+    assert.ok(m.fonts.has("Body") && m.text.includes("INVOICE"), "the rest of the page stays in Archivo");
+    assert.ok(m.text.some((s) => s.includes("Консультация")) && m.text.some((s) => s.includes("ООО Ромашка")));
+  } finally {
+    store.db.close();
+  }
+});
+
 const font = cjkFontPath(process.env.PDF_CJK_FONT);
 test("Chinese documents use a CJK font from the system or PDF_CJK_FONT", { skip: !font && "no CJK font installed" }, async () => {
   const { store, draft } = setup();
@@ -117,7 +137,7 @@ test("Chinese documents use a CJK font from the system or PDF_CJK_FONT", { skip:
     assert.ok(r.text.includes("发票"));
     assert.ok(r.text.includes("网站设计 Website\n") || r.text.some((s) => s.startsWith("网站设计")));
     assert.ok(r.fonts.has("CJK"), "CJK text is drawn with the CJK font");
-    assert.ok(r.fonts.has("Body"), "Latin-only text keeps DejaVu");
+    assert.ok(r.fonts.has("Body"), "Latin-only text keeps Archivo");
     const face = loadFontFace(font);
     assert.ok(face.data.length > 1000);
     // English documents switch fonts only for the strings that need it.

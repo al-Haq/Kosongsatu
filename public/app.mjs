@@ -3,7 +3,7 @@ import { dmy, isoDate, tidyDmy } from "./dates.mjs";
 import { financeUI } from "./finance.mjs";
 import { UI_PLUGINS } from "./plugins.mjs";
 import { totals, toMYR, basisPoints, percentOf } from "./ext/documents-calc.mjs";
-import { labels, titleFor, statusLabel, LOCALES } from "./ext/documents-i18n.mjs";
+import { labels, titleFor, statusLabel, formatDate } from "./ext/documents-i18n.mjs";
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
 const app = $("#app"),
@@ -244,7 +244,7 @@ function renderShell(html, active) {
       ([group, items]) =>
         `<span class="nav-group">${E(group)}</span>${items.map((n) => `<a href="#/${n.key}" class="${n.key === active ? "active" : ""}" ${n.key === active ? 'aria-current="page"' : ""}>${icon(n.icon)}${E(n.label)}</a>`).join("")}`,
     )
-    .join("")}</nav><div class="owner-box"><strong>NAWLOGIC</strong><small>${E(session.email)}</small></div></aside><div class="workspace"><header class="topbar"><div class="top-left"><button class="btn ghost mobile-toggle" data-action="toggle-nav" aria-label="Toggle navigation">${icon("menu")}</button><span class="top-title">${E(title)}</span></div><div class="right">${slot("topbar")}${S.settings.demo ? '<span class="badge orange">DEMO DATA</span>' : ""}<details class="avatar-menu"><summary class="avatar" aria-label="Account menu">${E(initials(session.email))}</summary><div class="menu"><small>${E(session.email)}</small>${accountLink}<button type="button" data-action="logout">Sign out</button></div></details></div></header><main class="content">${S.settings.demo ? '<div class="notice"><p>Demo workspace. All clients, documents and payments are examples.</p></div>' : ""}${html}</main></div></div>`;
+    .join("")}</nav><div class="owner-box"><strong>NAWLOGIC</strong><small>${E(session.email)}</small></div></aside><div class="workspace"><header class="topbar"><div class="top-left"><button class="btn ghost mobile-toggle" data-action="toggle-nav" aria-label="Toggle navigation">${icon("menu")}</button><span class="top-title">${E(title)}</span></div><div class="right">${slot("topbar")}${S.settings.demo ? '<span class="badge orange">DEMO DATA</span>' : ""}<details class="dropdown avatar-menu"><summary class="avatar" aria-label="Account menu">${E(initials(session.email))}</summary><div class="menu"><small>${E(session.email)}</small>${accountLink}<button type="button" data-action="logout">Sign out</button></div></details></div></header><main class="content">${S.settings.demo ? '<div class="notice"><p>Demo workspace. All clients, documents and payments are examples.</p></div>' : ""}${html}</main></div></div>`;
 }
 const heading = (title, sub, actions = "") =>
   `<div class="heading"><div><h1>${E(title)}</h1>${sub ? `<p>${E(sub)}</p>` : ""}</div><div class="actions">${actions}</div></div>`;
@@ -488,15 +488,7 @@ function settings() {
   );
 }
 // Labels, columns and money on the paper follow the document's language and currency.
-const dateIn = (lang, s) =>
-  s
-    ? new Intl.DateTimeFormat(LOCALES[lang] || "en-MY", {
-        day: "2-digit",
-        month: "short",
-        year: "numeric",
-        timeZone: "UTC",
-      }).format(new Date(s + "T00:00:00Z"))
-    : "-";
+const dateIn = (lang, s) => formatDate(lang, s);
 const fieldApplies = (f, kind) =>
   f.applies === "all" || f.applies === kind || (f.applies === "invoice" && kind === "proforma");
 function dueLabelFor(t, kind) {
@@ -570,7 +562,7 @@ function paper(d, publicView = false) {
     .map((f) => `<br>${E(f.label)}: ${E(f.value)}${f.internal ? ' <span class="badge">Internal</span>' : ""}`)
     .join("");
   const totals = priced
-    ? `<div class="totals"><div class="total-row"><span>${t("subtotal")}</span><strong>${m(d.subtotal)}</strong></div>${d.discount ? `<div class="total-row"><span>${t("discount")}</span><strong>−${m(d.discount)}</strong></div>` : ""}${deducted ? `<div class="total-row"><span>${t("lessDepositShort")}</span><strong>${m(deducted)}</strong></div>` : ""}${taxRows(d.items, cur, t)}<div class="total-row emphasis"><span>${d.kind === "invoice" || d.kind === "quote" ? t("originalTotal") : t("total")}</span><span>${m(d.total)}</span></div>${d.credit ? `<div class="total-row"><span>${t("creditNotes")}</span><strong>−${m(d.credit)}</strong></div>` : ""}${d.debit ? `<div class="total-row"><span>${t("debitNotes")}</span><strong>+${m(d.debit)}</strong></div>` : ""}${d.credit || d.debit ? `<div class="total-row emphasis"><span>${t("adjustedTotal")}</span><span>${m(d.adjusted_total)}</span></div>` : ""}${d.kind === "invoice" ? `<div class="total-row"><span>${t("paid")}</span><strong>${m(d.paid)}</strong></div><div class="total-row emphasis"><span>${t("balanceDue")}</span><span>${m(d.balance)}</span></div>` : ""}</div>`
+    ? `<div class="totals"><div class="total-row"><span>${t("subtotal")}</span><strong>${m(d.subtotal)}</strong></div>${d.discount ? `<div class="total-row"><span>${t("discount")}</span><strong>−${m(d.discount)}</strong></div>` : ""}${deducted ? `<div class="total-row"><span>${t("lessDepositShort")}</span><strong>${m(deducted)}</strong></div>` : ""}${taxRows(d.items, cur, t)}<div class="total-row ${d.kind === "invoice" ? "strong" : "emphasis"}"><span>${d.kind === "invoice" || d.kind === "quote" ? t("originalTotal") : t("total")}</span><span>${m(d.total)}</span></div>${d.credit ? `<div class="total-row"><span>${t("creditNotes")}</span><strong>−${m(d.credit)}</strong></div>` : ""}${d.debit ? `<div class="total-row"><span>${t("debitNotes")}</span><strong>+${m(d.debit)}</strong></div>` : ""}${d.credit || d.debit ? `<div class="total-row strong"><span>${t("adjustedTotal")}</span><span>${m(d.adjusted_total)}</span></div>` : ""}${d.kind === "invoice" ? `<div class="total-row"><span>${t("paid")}</span><strong>${m(d.paid)}</strong></div><div class="total-row emphasis"><span>${t("balanceDue")}</span><span>${m(d.balance)}</span></div>` : ""}</div>`
     : "";
   const deposit =
     d.kind === "quote" && d.deposit?.total
@@ -584,7 +576,7 @@ function paper(d, publicView = false) {
       ? `<div class="paper-notes signature-grid">${[t("deliveredBy"), t("receivedBy")].map((h, n) => `<div><h3>${E(h)}</h3>${n ? `<p>${E(t("goodsReceived"))}</p>` : ""}<div class="signature-line">${E(t("signature"))}</div><div class="signature-line">${E(t("name"))}</div><div class="signature-line">${E(t("date"))}</div></div>`).join("")}</div>`
       : "";
   const bank =
-    (d.kind === "invoice" || d.kind === "proforma") && d.state !== "void" && b.pdfShowBank !== false
+    (d.kind === "invoice" || d.kind === "proforma") && d.state !== "void" && b.pdfShowBank !== false && !(d.kind === "invoice" && d.balance <= 0)
       ? `<div class="paper-notes"><h3>${t("paymentInformation")}</h3>${b.bankAccount ? `<p>${E([b.bankName, b.bankHolder, b.bankAccount].filter(Boolean).join("\n"))}</p><p>${t("reference")}: ${E(d.number || t("notYetIssued"))}</p>` : `<p>${t("bankMissing")}</p>`}</div>`
       : "";
   return `<section class="panel invoice-paper" lang="${lang === "zh" ? "zh-Hans" : lang}"><div class="paper-head"><div>${logoHtml}<div class="paper-company"><strong>${E(b.company)}</strong><p>${E([b.registration ? `${t("regShort")}: ${b.registration}` : "", b.address, b.email, b.phone].filter(Boolean).join("\n"))}</p></div></div><div><h2>${E(titleFor(lang, d.kind))}</h2><p>${E(d.number || t("draft"))}</p></div></div>${b.demo ? `<div class="notice">${t("demoShort")}</div>` : ""}<div class="billing-grid"><div><div class="eyebrow">${d.kind === "delivery_order" ? t("deliverTo") : t("billTo")}</div><strong>${E(c.name)}</strong><p>${E([c.contact, c.address, buyerTax].filter(Boolean).join("\n"))}</p></div><div><div class="eyebrow">${t("documentDetails")}</div><p>${details}${customHtml}</p></div></div><div class="table-wrap"><table class="${wide ? "wide-lines" : ""}${priced ? "" : " no-price-lines"}"><thead><tr>${showCode ? `<th class="line-code">${t("code")}</th>` : ""}<th>${t("description")}</th><th class="num line-qty">${t("qty")}</th>${showUnit ? `<th class="line-unit">${t("unit")}</th>` : ""}${priced ? `<th class="num line-rate">${t("rate")}</th>${showDiscount ? `<th class="num line-disc">${t("discount")}</th>` : ""}<th class="num">${t("amount")}</th>` : ""}</tr></thead><tbody>${items.map(cell).join("")}</tbody></table></div>${totals}${deposit}${plan}${bank}${d.terms && b.pdfShowTerms !== false ? `<div class="paper-notes"><h3>${t("terms")}</h3><p>${E(d.terms)}</p></div>` : ""}${d.notes && b.pdfShowNotes !== false ? `<div class="paper-notes"><h3>${t("notes")}</h3><p>${E(d.notes)}</p></div>` : ""}${files.length ? `<div class="paper-notes"><h3>${t("attachments")}</h3><p>${files.map((f) => E(f.name)).join("\n")}</p></div>` : ""}${signatures}${slot("paper", d, publicView)}${publicView && !d.ext?.tax?.einvoice ? `<p class="field-hint">${t("businessDocument")}</p>` : ""}</section>`;
@@ -652,6 +644,8 @@ function documentView(id) {
   const d = S.documents.find((d) => d.id === id);
   if (!d) return empty("Document not found");
   const cur = d.currency || "MYR";
+  // Three actions stay visible; the rest (duplicate, delivery, proof, ...) wait in "More".
+  const more = button("Duplicate", "duplicate-document", id) + slot("documentActions", d);
   const actions =
     (d.state === "draft"
       ? button("Edit draft", "edit-document", id) +
@@ -661,9 +655,8 @@ function documentView(id) {
         ? ""
         : button("Share", "share-document", id, true, "copy") +
           button("Email", "email-document", id)) +
-    button("Duplicate", "duplicate-document", id) +
-    slot("documentActions", d) +
-    `<a class="btn" href="/api/documents/${id}/pdf">${icon("download")} PDF</a>`;
+    `<a class="btn" href="/api/documents/${id}/pdf">${icon("download")} PDF</a>` +
+    (more ? `<details class="dropdown"><summary class="btn">More</summary><div class="menu">${more}</div></details>` : "");
   const events = S.audit.filter((a) => a.entity_id === id).slice(0, 8);
   return (
     heading(d.number || `Draft ${kindUI(d.kind).one}`, d.client.name, actions) +
@@ -1244,7 +1237,9 @@ async function renderPublic() {
       d.kind === "delivery_order"
         ? `<section class="balance-card"><p>${t("deliveryDate")}</p><div class="value">${dl(d.due_date)}</div></section>`
         : d.kind === "invoice"
-          ? `<section class="balance-card"><p>${t("balanceDue")}</p><div class="value">${m(d.balance)}</div><p>${d.next_due_date && d.instalments?.length ? E(t("nextPaymentDue", { amount: m(d.next_due_amount), date: dl(d.next_due_date) })) : `${t("due")} ${dl(d.due_date)}`}</p><p>${t("total")} ${m(d.adjusted_total ?? d.total)} / ${t("paid")} ${m(d.paid)}</p></section>`
+          ? d.balance <= 0
+            ? `<section class="balance-card paid"><p>${t("status")}</p><div class="value">${E(statusLabel(lang, d.status))}</div><p>${d.status === "Credited" ? t("fullyCredited") : t("thankYou")}</p><p>${t("total")} ${m(d.adjusted_total ?? d.total)} / ${t("paid")} ${m(d.paid)}</p></section>`
+            : `<section class="balance-card"><p>${t("balanceDue")}</p><div class="value">${m(d.balance)}</div><p>${d.next_due_date && d.instalments?.length ? E(t("nextPaymentDue", { amount: m(d.next_due_amount), date: dl(d.next_due_date) })) : `${t("due")} ${dl(d.due_date)}`}</p><p>${t("total")} ${m(d.adjusted_total ?? d.total)} / ${t("paid")} ${m(d.paid)}</p></section>`
           : `<section class="balance-card"><p>${d.kind === "quote" ? t("quotationTotal") : t("documentTotal")}</p><div class="value">${m(d.total)}</div><p>${due} ${dl(d.due_date)}</p><p>${t("total")} ${m(d.adjusted_total ?? d.total)}</p></section>`;
     const bankLines = d.business.bankAccount
       ? E(d.business.bankName) + "<br>" + E(d.business.bankHolder) + "<br><strong>" + E(d.business.bankAccount) + "</strong>"
@@ -1253,11 +1248,12 @@ async function renderPublic() {
     if (d.kind === "quote")
       info = `<h2>${t("yourQuotation")}</h2>${d.deposit?.total ? `<p class="mt22">${E(t("depositOf", { value: d.deposit.type === "percent" ? d.deposit.value + "%" : "", amount: m(d.deposit.total) }).replace("  ", " "))}</p>` : ""}${d.state === "accepted" ? `<div class="notice info mt22"><p>${E(t("acceptedBy", { name: d.accepted_name }))}</p></div>` : d.status === "Expired" ? `<p class="mt22">${t("quoteExpired")}</p>` : `<p class="mt22">${t("reviewAccept")}</p><button class="btn primary full" data-action="public-accept">${t("acceptQuotation")}</button>`}`;
     else if (d.kind === "invoice")
-      info = `<h2>${t("paymentInformation")}</h2>${d.balance <= 0 ? `<div class="notice info mt22"><p>${d.status === "Credited" ? t("fullyCredited") : t("thankYou")}</p></div>` : `${d.online_payment && cur === "MYR" ? `<p class="mt22">${E(t("payOnline", { amount: m(d.balance) }))}${d.online_methods ? " (" + E(d.online_methods) + ")" : ""}</p><button class="btn primary full" data-action="public-pay">${t("payOnlineButton")}</button><h3 class="mt22">${t("orBank")}</h3>` : ""}<p class="mt22">${bankLines}</p><p class="field-hint">${E(t("useReference", { number: d.number }))}</p><button class="btn ${d.online_payment && cur === "MYR" ? "" : "primary "}full" data-action="public-reference">${t("submitReference")}</button>`}${d.proofs.length ? `<div class="mt22">${d.proofs.map((p) => `<div class="payment"><strong>${E(p.reference)}</strong><p>${badge(p.status === "pending" ? "Pending review" : p.status === "confirmed" ? "Confirmed" : "Rejected", p.status === "pending" ? t("pendingReview") : p.status === "confirmed" ? t("confirmed") : t("rejected"))}${p.slip ? " Payment slip attached." : ""}</p></div>`).join("")}</div>` : ""}`;
+      // Settled: the card above already says so; only submitted references remain worth a panel.
+      info = `${d.balance <= 0 ? (d.proofs.length ? `<h2>${t("paymentInformation")}</h2>` : "") : `<h2>${t("paymentInformation")}</h2>${d.online_payment && cur === "MYR" ? `<p class="mt22">${E(t("payOnline", { amount: m(d.balance) }))}${d.online_methods ? " (" + E(d.online_methods) + ")" : ""}</p><button class="btn primary full" data-action="public-pay">${t("payOnlineButton")}</button><h3 class="mt22">${t("orBank")}</h3>` : ""}<p class="mt22">${bankLines}</p><p class="field-hint">${E(t("useReference", { number: d.number }))}</p><button class="btn ${d.online_payment && cur === "MYR" ? "" : "primary "}full" data-action="public-reference">${t("submitReference")}</button>`}${d.proofs.length ? `<div class="mt22">${d.proofs.map((p) => `<div class="payment"><strong>${E(p.reference)}</strong><p>${badge(p.status === "pending" ? "Pending review" : p.status === "confirmed" ? "Confirmed" : "Rejected", p.status === "pending" ? t("pendingReview") : p.status === "confirmed" ? t("confirmed") : t("rejected"))}${p.slip ? " Payment slip attached." : ""}</p></div>`).join("")}</div>` : ""}`;
     else if (d.kind === "proforma")
       info = `<h2>${t("paymentInformation")}</h2><p class="mt22">${t("proformaNote")}</p>${d.business.pdfShowBank === false ? "" : `<p class="mt22">${bankLines}</p><p class="field-hint">${E(t("useReference", { number: d.number }))}</p>`}`;
     else info = `<h2>${t("yourDocument")}</h2><p class="mt22">${d.kind === "sales_order" ? t("orderNote") : t("deliveryNote")}</p>`;
-    app.innerHTML = `<main class="public-wrap"><header class="public-header">${brand}<span class="badge">${t("privateDocument")}</span></header><div class="public-top"><div><h1>${E(t("kind_" + d.kind))} ${E(d.number)}</h1><p>${E(d.client.name)} / ${badge(d.status, statusLabel(lang, d.status))}</p></div><div class="actions"><a class="btn" href="/api/public/${token}/pdf">${icon("download")} ${t("downloadPdf")}</a></div></div><div class="doc-grid">${paper(d, true)}<aside class="stack">${card}<section class="panel">${info}</section>${slot("publicPanels", d, token)}</aside></div><footer class="public-footer">${t("poweredBy")}<br>${t("questions")}</footer></main>`;
+    app.innerHTML = `<main class="public-wrap"><header class="public-header">${brand}</header><div class="public-top"><div><h1>${E(t("kind_" + d.kind))} ${E(d.number)}</h1><p>${E(d.client.name)}</p></div><div class="actions">${badge(d.status, statusLabel(lang, d.status))}<a class="btn" href="/api/public/${token}/pdf">${icon("download")} ${t("downloadPdf")}</a></div></div><div class="doc-grid">${paper(d, true)}<aside class="stack">${card}${info ? `<section class="panel">${info}</section>` : ""}${slot("publicPanels", d, token)}</aside></div><footer class="public-footer">${t("privateDocument")} · ${t("poweredBy")}<br>${t("questions")}</footer></main>`;
   } catch (e) {
     app.innerHTML = `<main class="error-page">${logo()}<h1>This document link is unavailable.</h1><p>${E(e.message)} Contact Nawlogic for a new link.</p></main>`;
   }
@@ -1394,7 +1390,13 @@ async function submitForm(form) {
   }
 }
 document.addEventListener("click", (event) => {
-  for (const menu of $$(".avatar-menu[open]")) if (!menu.contains(event.target)) menu.removeAttribute("open");
+  for (const menu of $$(".dropdown[open]")) if (!menu.contains(event.target)) menu.removeAttribute("open");
+});
+document.addEventListener("change", (event) => {
+  const picker = event.target;
+  if (!picker.matches?.(".file-pick input[type=file]")) return;
+  const name = picker.closest(".file-row")?.querySelector(".file-name");
+  if (name) name.textContent = picker.files?.[0]?.name || name.dataset.empty || "";
 });
 document.addEventListener("click", async (event) => {
   const el = event.target.closest("[data-action]");

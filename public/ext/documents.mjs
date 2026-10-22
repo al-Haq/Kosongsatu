@@ -158,7 +158,7 @@ export default function documentsUI(h) {
       )
       .join("")}${
       d.state !== "void" && files.length < 10
-        ? `<form data-form="doc-attachment" data-id="${E(d.id)}" class="mt22"><label>PDF or image, up to 5 MB<input type="file" name="file" accept="application/pdf,image/png,image/jpeg,image/webp,image/gif" required></label><label class="check-row"><input type="checkbox" name="client"> Visible to the client</label>${h.errorBlock()}<div class="form-actions"><button class="btn" type="submit">Upload</button></div></form>`
+        ? `<form data-form="doc-attachment" data-id="${E(d.id)}" class="mt22"><div class="file-row"><label class="btn file-pick">Choose file<input type="file" name="file" accept="application/pdf,image/png,image/jpeg,image/webp,image/gif" required></label><span class="file-name muted" data-empty="PDF or image, up to 5 MB">PDF or image, up to 5 MB</span><button class="btn" type="submit">Upload</button></div><label class="check-row"><input type="checkbox" name="client"> Visible to the client</label>${h.errorBlock()}</form>`
         : ""
     }</section>`;
   }

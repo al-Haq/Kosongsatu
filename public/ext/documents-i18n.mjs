@@ -516,6 +516,13 @@ export const LABELS = { en, ms, zh };
 export const LANGUAGE_NAMES = { en: "English", ms: "Bahasa Melayu", zh: "中文" };
 // Locale used for dates on each document language.
 export const LOCALES = { en: "en-MY", ms: "ms-MY", zh: "zh-MY" };
+// "21 Oct 2026", "21 Okt 2026", "2026年10月21日": the one date format on screens, in emails and in PDFs.
+export function formatDate(lang, iso) {
+  if (!iso) return "";
+  const [y, m, d] = String(iso).slice(0, 10).split("-").map(Number);
+  if (!y || !m || !d) return String(iso);
+  return new Intl.DateTimeFormat(LOCALES[lang] || "en-MY", { day: "2-digit", month: "short", year: "numeric", timeZone: "UTC" }).format(new Date(Date.UTC(y, m - 1, d)));
+}
 // t(lang)(key, { name: value }) with English as the fallback for missing keys.
 export function labels(lang = "en") {
   const dict = LABELS[lang] || en;

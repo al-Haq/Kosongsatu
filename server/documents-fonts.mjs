@@ -1,5 +1,39 @@
 import { readFileSync, statSync } from "node:fs";
 import { isAbsolute, extname } from "node:path";
+import { fileURLToPath } from "node:url";
+import { openSync } from "fontkit";
+// Archivo, the interface typeface, is the document face (OFL, see LICENSE-Archivo.txt).
+// It covers Latin scripts only, so a string with other characters (Cyrillic,
+// Greek, Arabic, Hebrew, ...) is drawn with DejaVu Sans, which has those glyphs.
+const fontFile = (name) => fileURLToPath(new URL(`../public/assets/fonts/${name}`, import.meta.url));
+export const TEXT_FONTS = {
+  Body: fontFile("Archivo-Regular.ttf"),
+  Bold: fontFile("Archivo-Bold.ttf"),
+  Fallback: fontFile("DejaVuSans.ttf"),
+  FallbackBold: fontFile("DejaVuSans-Bold.ttf"),
+};
+let archivo = null;
+// True when Archivo has a glyph for every character of the string. Control
+// characters and line breaks are laid out by pdfkit and need no glyph.
+export function archivoCovers(value) {
+  archivo ??= openSync(TEXT_FONTS.Body);
+  for (const ch of String(value ?? "")) {
+    const cp = ch.codePointAt(0);
+    if (cp < 0x20 || (cp >= 0x7f && cp < 0xa0)) continue;
+    if (!archivo.hasGlyphForCodePoint(cp)) return false;
+  }
+  return true;
+}
+// Registers Body, Bold and their DejaVu fallbacks on a pdfkit document.
+export function registerTextFonts(pdf) {
+  for (const [name, path] of Object.entries(TEXT_FONTS)) pdf.registerFont(name, path);
+}
+// The registered font to draw one string with: "Body" or "Bold" in Archivo when
+// it covers the text, the DejaVu fallback of the same weight when it does not.
+export function textFont(name, value) {
+  if (archivoCovers(value)) return name;
+  return name === "Bold" ? "FallbackBold" : "Fallback";
+}
 // Chinese (and other CJK) text needs a CJK font in PDFs: DejaVu has no CJK glyphs
 // and would print empty boxes. The font comes from the PDF_CJK_FONT setting or
 // from the usual system folders (Debian/Ubuntu: apt install fonts-noto-cjk).
