@@ -932,7 +932,7 @@ function shareModal(id) {
   const d = S.documents.find((d) => d.id === id);
   showModal(
     "Client document link",
-    `<p>Anyone with this private link can view this document and download its PDF.</p>${input("Link validity (days)", "linkdays", 30, "number", true, 'min="1" max="90" step="1"')}${d.token_hash ? '<div class="notice mt22"><p>Replacing the link will immediately disable the previous link. Keep using your existing link unless a replacement is needed.</p></div>' : ""}<div class="actions mt22">${button(d.token_hash ? "Replace existing link" : "Generate private link", "generate-link", id, true)}${d.token_hash ? button("Revoke existing link", "revoke-link", id) : ""}</div>`,
+    `<p>Anyone with this private link can view this document and download its PDF.</p>${input("Link validity (days)", "linkdays", 30, "number", true, 'min="1" max="90" step="1"')}${d.token_hash ? '<div class="notice warn mt22"><p>Replacing the link will immediately disable the previous link. Keep using your existing link unless a replacement is needed.</p></div>' : ""}<div class="actions mt22">${button(d.token_hash ? "Replace existing link" : "Generate private link", "generate-link", id, true)}${d.token_hash ? button("Revoke existing link", "revoke-link", id) : ""}</div>`,
   );
 }
 async function runAction(action, id, el) {

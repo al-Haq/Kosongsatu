@@ -123,7 +123,7 @@ export default function recurringUI(h) {
     const c = p.contract_id ? contract(p.contract_id) : null;
     const errorRun = p.runs.find((r) => r.error_step && r.error_step === p.last_error_step);
     const notice = p.last_error
-      ? `<div class="notice rec-notice" role="alert"><div><p><strong>${E(STEP[p.last_error_step] || "Automation")} failed</strong>${p.last_error_at ? " · " + timeLabel(p.last_error_at) : ""}</p><p>${E(p.last_error)}</p><p>${
+      ? `<div class="notice error rec-notice" role="alert"><div><p><strong>${E(STEP[p.last_error_step] || "Automation")} failed</strong>${p.last_error_at ? " · " + timeLabel(p.last_error_at) : ""}</p><p>${E(p.last_error)}</p><p>${
           p.last_error_step === "generate"
             ? "The plan waits until you try again or edit it."
             : p.last_error_step === "issue"
@@ -324,9 +324,9 @@ export default function recurringUI(h) {
           button("Renew now", "rec-contract-renew", c.id, true);
     const note =
       c.display_status === "expiring"
-        ? `<div class="notice"><p>Ends ${dateLabel(c.end_date)} (${days(c.days_left)}). ${c.renewal === "auto" ? "It renews automatically for another " + c.term_months + " months." : "Renew it now or let it end; linked plans stop billing after the end date."}</p></div>`
+        ? `<div class="notice warn"><p>Ends ${dateLabel(c.end_date)} (${days(c.days_left)}). ${c.renewal === "auto" ? "It renews automatically for another " + c.term_months + " months." : "Renew it now or let it end; linked plans stop billing after the end date."}</p></div>`
         : c.display_status === "ended"
-          ? `<div class="notice"><p>Ended ${dateLabel(c.end_date)}. Linked plans no longer bill. Renew to continue.</p></div>`
+          ? `<div class="notice warn"><p>Ended ${dateLabel(c.end_date)}. Linked plans no longer bill. Renew to continue.</p></div>`
           : "";
     return (
       heading(c.title, clientName(c.client_id), actions) +

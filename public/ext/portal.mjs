@@ -50,7 +50,7 @@ export default function portalUI(h) {
     if (!s || !HELD.includes(kind)) return `<div data-portal-credit data-kind="${E(kind)}"></div>`;
     const warn = s.held || s.over_limit;
     if (!warn && s.credit_limit === null && s.hold_days === null) return `<div data-portal-credit data-kind="${E(kind)}"></div>`;
-    return `<div class="notice ${warn ? "" : "info"} portal-credit-note" data-portal-credit data-kind="${E(kind)}"><p><strong>${warn ? "Client on hold or over limit." : "Credit check."}</strong> ${E(creditLine(s))}${s.reasons.length ? "<br>" + s.reasons.map(E).join("<br>") : ""}${warn ? "<br>Issuing will be blocked unless you allow it with a reason." : ""}</p></div>`;
+    return `<div class="notice ${warn ? "warn" : "info"} portal-credit-note" data-portal-credit data-kind="${E(kind)}"><p><strong>${warn ? "Client on hold or over limit." : "Credit check."}</strong> ${E(creditLine(s))}${s.reasons.length ? "<br>" + s.reasons.map(E).join("<br>") : ""}${warn ? "<br>Issuing will be blocked unless you allow it with a reason." : ""}</p></div>`;
   }
   function creditPanel(d) {
     const c = P()?.drafts?.[d.id];
@@ -61,7 +61,7 @@ export default function portalUI(h) {
       c.blocked
         ? c.override
           ? `<div class="notice info mt22"><p>Issue allowed by ${E(c.override.actor)} on ${E(timeLabel(c.override.created))}.<br>Reason: ${E(c.override.reason)}</p></div>`
-          : `<div class="notice mt22"><p>${E(c.reasons.join(". "))}.</p></div><div class="actions mt22">${button("Allow issue", "portal-credit-override", d.id)}</div><p class="field-hint">Issuing stays blocked until you allow it with a reason. The reason is kept in the audit history.</p>`
+          : `<div class="notice warn mt22"><p>${E(c.reasons.join(". "))}.</p></div><div class="actions mt22">${button("Allow issue", "portal-credit-override", d.id)}</div><p class="field-hint">Issuing stays blocked until you allow it with a reason. The reason is kept in the audit history.</p>`
         : ""
     }</section>`;
   }
