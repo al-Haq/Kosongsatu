@@ -117,6 +117,10 @@ export function attachFiles(Store) {
       this.audit("file.deleted", entityId, `${rows.length} attached file(s) removed with the record`);
       return rows.length;
     },
+    // A file the user deletes (DELETE /api/files/:id). Kept in Recently deleted.
+    removeFile(fid) {
+      return this.deleteFile(fid);
+    },
     deleteFile(fid) {
       const f = this.file(fid);
       this.db.prepare("DELETE FROM files WHERE id=?").run(fid);

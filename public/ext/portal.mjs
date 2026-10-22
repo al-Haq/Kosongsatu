@@ -206,7 +206,7 @@ export default function portalUI(h) {
           return true;
         }
         case "portal-contact-delete":
-          h.confirmModal("Remove contact?", "The contact loses portal access and copies of invoices. The change is kept in the audit history.", "portal-contact-delete-confirm", id, "Remove contact");
+          h.confirmModal("Remove contact?", "The contact loses portal access and copies of invoices. You can restore it from Recently deleted for 30 days.", "portal-contact-delete-confirm", id, "Remove contact");
           return true;
         case "portal-contact-delete-confirm":
           try {

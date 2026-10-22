@@ -1475,6 +1475,23 @@ dialog.wide {
 #toast.show {
   display: block;
 }
+#toast.show.with-action {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.toast-undo {
+  background: none;
+  border: 0;
+  padding: 0;
+  color: #fff;
+  font: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+  white-space: nowrap;
+}
 #toast.error {
   background: var(--red);
 }

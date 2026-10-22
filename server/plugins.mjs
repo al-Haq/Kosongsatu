@@ -11,6 +11,7 @@ import books from "./ext/books.mjs";
 import ops from "./ext/ops.mjs";
 import team from "./ext/team.mjs";
 import platform from "./ext/platform.mjs";
+import trash from "./ext/trash.mjs";
 import { runMigrations } from "./migrate.mjs";
 import { FILE_MIGRATIONS, attachFiles } from "./files.mjs";
 import { SECRET_MIGRATIONS, attachSecrets } from "./secrets.mjs";
@@ -25,6 +26,8 @@ export const PLUGINS = [
   ops,
   team,
   platform,
+  // Last: its delete wrappers must sit outside every other module's.
+  trash,
 ];
 for (const p of PLUGINS)
   for (const m of p.migrations || [])

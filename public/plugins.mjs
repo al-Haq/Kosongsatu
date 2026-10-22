@@ -9,6 +9,7 @@ import books from "./ext/books.mjs";
 import ops from "./ext/ops.mjs";
 import team from "./ext/team.mjs";
 import platform from "./ext/platform.mjs";
+import trash from "./ext/trash.mjs";
 export const UI_PLUGINS = [
   ["documents", documents],
   ["recurring", recurring],
@@ -20,4 +21,5 @@ export const UI_PLUGINS = [
   ["ops", ops],
   ["team", team],
   ["platform", platform],
+  ["trash", trash],
 ];

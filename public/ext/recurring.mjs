@@ -516,7 +516,7 @@ export default function recurringUI(h) {
           );
           return true;
         case "rec-plan-delete":
-          confirmModal("Delete plan?", "Only plans that never created an invoice can be deleted. Pause a used plan instead.", "rec-plan-delete-confirm", id, "Delete plan");
+          confirmModal("Delete plan?", "Only plans that never created an invoice can be deleted; pause a used plan instead. A deleted plan can be restored, paused, from Recently deleted for 30 days.", "rec-plan-delete-confirm", id, "Delete plan");
           return true;
         case "rec-plan-delete-confirm":
           try {
@@ -561,7 +561,7 @@ export default function recurringUI(h) {
           h.reasonForm("Cancel contract", "rec-contract-cancel", id);
           return true;
         case "rec-contract-delete":
-          confirmModal("Delete contract?", "Only contracts with no linked plans can be deleted. The deletion is kept in the audit history.", "rec-contract-delete-confirm", id, "Delete contract");
+          confirmModal("Delete contract?", "Only contracts with no linked plans can be deleted. You can restore it from Recently deleted for 30 days.", "rec-contract-delete-confirm", id, "Delete contract");
           return true;
         case "rec-contract-delete-confirm":
           try {

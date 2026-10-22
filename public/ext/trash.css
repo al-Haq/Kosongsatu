@@ -1,0 +1,18 @@
+/* Recently deleted: the list of deleted records and the Undo button in the toast. */
+.bin-table td.card-title strong {
+  display: block;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.bin-table td.card-title small {
+  color: var(--muted);
+}
+.bin-actions .actions {
+  justify-content: flex-end;
+  flex-wrap: nowrap;
+}
+@media (max-width: 640px) {
+  .bin-actions .actions {
+    justify-content: flex-start;
+  }
+}

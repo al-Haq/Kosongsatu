@@ -4,7 +4,7 @@ Kosongsatu's core (documents, finance, banking, sales, automation) lives in `ser
 
 A module can add tables, Store methods, routes, background jobs, Settings keys, PDF blocks and screens without editing core files. Edit a core file only when a feature changes core behaviour, and keep that change small.
 
-Modules: `documents`, `recurring`, `tax`, `payments`, `comms`, `portal`, `books`, `ops`, `team`, `platform`.
+Modules: `documents`, `recurring`, `tax`, `payments`, `comms`, `portal`, `books`, `ops`, `team`, `platform`, `trash`.
 
 ## Server module
 
@@ -66,6 +66,7 @@ The request object `r`: `{ req, res, url, path, method, ip, body(), rawBody(limi
 
 ### Shared services
 
+- **Recently deleted** (`server/trash.mjs`): a module that adds a user-facing delete registers it in `TRACKED` (Store method, table, how it is named and where it opens). The delete then keeps a 30-day copy of the record, the rows that point at it and its files, and the browser shows Undo. Internal clean-up (replacing a logo, expiring scans) keeps calling the plain delete and keeps no copy. `trash` is the last module so its wrappers sit outside every other module's.
 - **Files** (`server/files.mjs`): `store.saveFile({ entity_type, entity_id, purpose, name, data, visibility }, { accept, maxBytes })`, `store.files(type, id, purpose)`, `store.file(id)`, `store.deleteFile(id)`, `store.deleteFilesFor(recordId)` (call it when your module deletes a record; core deletes already do). Types are sniffed from content (PNG, JPEG, WEBP, GIF, PDF), 5 MB by default. Owner routes: `POST /api/files?entity_type=&entity_id=&purpose=&name=&visibility=` (raw body), `GET /api/files?…`, `GET /api/files/:id`, `DELETE /api/files/:id`. Serve client-visible files from your own guest route with `r.sendFile(file, r.url)` after checking the client's token.
 - **Settings keys** (`server/secrets.mjs`): `store.config(NAME)`, `store.secret(NAME)`, `store.setSecret(NAME, value)`. Declared keys appear in Settings automatically.
 - **Events**: every audit entry is an event. `store.auditSince(consumer, limit)` returns new entries for that consumer (a new consumer starts at the latest entry); `store.ackAudit(consumer, lastId)` moves its cursor. Audit `action` names include `document.issued`, `quotation.accepted`, `receipt.received`, `payment.allocated`, `online_payment.paid`, `payment.reference.submitted`, `document.viewed`, `document.voided`, `email.sent`.
