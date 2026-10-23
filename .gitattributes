@@ -1,0 +1,3 @@
+# Check out text files with LF on every system, so a Windows clone keeps the
+# shell scripts runnable and matches what the tests read.
+* text=auto eol=lf

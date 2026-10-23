@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { DatabaseSync } from "node:sqlite";
 import { mkdtemp, rm, readFile } from "node:fs/promises";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { tmpdir } from "node:os";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
@@ -13,7 +14,7 @@ import { fixture } from "./helpers.mjs";
 import { member } from "./team-helpers.mjs";
 
 const run = promisify(execFile);
-const cli = new URL("../server/cli.mjs", import.meta.url).pathname;
+const cli = fileURLToPath(new URL("../server/cli.mjs", import.meta.url));
 
 // Simulates an attacker with direct database access.
 const tamper = (db, sql, ...args) => {

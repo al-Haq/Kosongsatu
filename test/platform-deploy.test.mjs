@@ -4,21 +4,29 @@ import { spawn, spawnSync } from "node:child_process";
 import { readFileSync, mkdtempSync, mkdirSync, writeFileSync, statSync, rmSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { fixture } from "./helpers.mjs";
 
 const root = new URL("../", import.meta.url);
-const read = (p) => readFileSync(new URL(p, root), "utf8");
+// Line endings normalised, so a clone checked out with CRLF reads the same.
+const read = (p) => readFileSync(new URL(p, root), "utf8").replace(/\r\n/g, "\n");
+const path = (p) => fileURLToPath(new URL(p, root));
+// The deploy scripts run on the Linux server (apt, Docker, root). Running them
+// needs a POSIX shell and file modes, so those tests are left to Linux and macOS.
+const onServerOs = { skip: process.platform === "win32" && "runs the Linux deploy scripts; the Linux CI job covers it" };
 const bash = (script, env = {}) => spawnSync("bash", ["-c", script], { encoding: "utf8", env: { PATH: process.env.PATH, ...env } });
 
 test("shell scripts parse and use strict mode", () => {
   for (const file of ["scripts/install.sh", "scripts/update.sh", "scripts/companies.sh"]) {
-    const r = spawnSync("bash", ["-n", new URL(file, root).pathname], { encoding: "utf8" });
-    assert.equal(r.status, 0, file + ": " + r.stderr);
+    if (process.platform !== "win32") {
+      const r = spawnSync("bash", ["-n", path(file)], { encoding: "utf8" });
+      assert.equal(r.status, 0, file + ": " + r.stderr);
+      assert.ok(statSync(path(file)).mode & 0o100, file + " is executable");
+    }
     const src = read(file);
     assert.match(src, /^#!\/usr\/bin\/env bash\n/);
     assert.match(src, /\nset -euo pipefail\n/);
     assert.match(src, /if \[\[ "\$\{BASH_SOURCE\[0\]\}" == "\$0" \]\]; then main "\$@"; fi\n$/, "functions can be loaded without running");
-    assert.ok(statSync(new URL(file, root)).mode & 0o100, file + " is executable");
   }
   const install = read("scripts/install.sh");
   assert.match(install, /\[\[ \$EUID -eq 0 \]\]/, "requires root");
@@ -28,11 +36,11 @@ test("shell scripts parse and use strict mode", () => {
   assert.match(read("scripts/update.sh"), /cli\.mjs backup \|\|\s+die/, "an update stops when the backup fails");
 });
 
-test("install.sh writes a private .env once and never replaces existing keys", () => {
+test("install.sh writes a private .env once and never replaces existing keys", onServerOs, () => {
   const dir = mkdtempSync(join(tmpdir(), "nwl-install-"));
   try {
     const env = join(dir, ".env");
-    const run = (vars) => bash(`source "${new URL("scripts/install.sh", root).pathname}"; write_env`, { ENV_FILE: env, ...vars });
+    const run = (vars) => bash(`source "${path("scripts/install.sh")}"; write_env`, { ENV_FILE: env, ...vars });
     let r = run({ DOMAIN: "billing.example.com", ACME_EMAIL: "ops@example.com" });
     assert.equal(r.status, 0, r.stderr);
     const first = readFileSync(env, "utf8");
@@ -61,12 +69,12 @@ test("install.sh writes a private .env once and never replaces existing keys", (
   }
 });
 
-test("install.sh keeps a Cloudflare Tunnel token out of .env and switches the compose files", () => {
+test("install.sh keeps a Cloudflare Tunnel token out of .env and switches the compose files", onServerOs, () => {
   const dir = mkdtempSync(join(tmpdir(), "nwl-tunnel-"));
   try {
     const env = join(dir, ".env"), tunnelEnv = join(dir, ".env.cloudflare");
     const token = "eyJhIjoiZmFrZSIsInQiOiJmYWtlIiwicyI6ImZha2UifQ-abcdefghijklmnop";
-    const run = (vars) => bash(`source "${new URL("scripts/install.sh", root).pathname}"; write_env`, { ENV_FILE: env, TUNNEL_ENV_FILE: tunnelEnv, ...vars });
+    const run = (vars) => bash(`source "${path("scripts/install.sh")}"; write_env`, { ENV_FILE: env, TUNNEL_ENV_FILE: tunnelEnv, ...vars });
     let r = run({ DOMAIN: "billing.example.com", OWNER_EMAIL: "owner@example.com", ACME_EMAIL: "", TUNNEL: "1", CLOUDFLARE_TUNNEL_TOKEN: token });
     assert.equal(r.status, 0, r.stderr);
     const first = readFileSync(env, "utf8");
@@ -78,7 +86,7 @@ test("install.sh keeps a Cloudflare Tunnel token out of .env and switches the co
     assert.equal(readFileSync(tunnelEnv, "utf8"), `TUNNEL_TOKEN=${token}\n`);
     assert.equal(statSync(tunnelEnv).mode & 0o777, 0o600, "token file readable by its owner only");
     // The saved token is offered as the default on a re-run.
-    r = bash(`source "${new URL("scripts/install.sh", root).pathname}"; tunnel_token_get`, { ENV_FILE: env, TUNNEL_ENV_FILE: tunnelEnv });
+    r = bash(`source "${path("scripts/install.sh")}"; tunnel_token_get`, { ENV_FILE: env, TUNNEL_ENV_FILE: tunnelEnv });
     assert.equal(r.stdout.trim(), token);
     // Back to Caddy: the override and the token file go away, the keys stay.
     r = run({ DOMAIN: "billing.example.com", ACME_EMAIL: "ops@example.com" });
@@ -94,7 +102,7 @@ test("install.sh keeps a Cloudflare Tunnel token out of .env and switches the co
     assert.match(install, /compose up -d --remove-orphans/, "a leftover cloudflared container is removed when switching back");
     assert.match(read("scripts/update.sh"), /compose up -d --remove-orphans/);
     assert.match(install, /== "none" \]\] && CLOUDFLARE_TUNNEL_TOKEN=""/, "'none' clears a saved token");
-    const tokenOk = (v) => bash(`source "${new URL("scripts/install.sh", root).pathname}"; valid_tunnel_token "$V"`, { V: v }).status === 0;
+    const tokenOk = (v) => bash(`source "${path("scripts/install.sh")}"; valid_tunnel_token "$V"`, { V: v }).status === 0;
     assert.ok(tokenOk("eyJhIjoiMTIzIiwidCI6IjQ1NiIsInMiOiJhYmMrLz09In0=" + "A".repeat(20)), "standard base64 with + / =");
     assert.ok(tokenOk("eyJhIjoiMTIzIn0-_" + "b".repeat(40)), "URL-safe base64");
     assert.ok(!tokenOk("short"), "too short");
@@ -105,10 +113,10 @@ test("install.sh keeps a Cloudflare Tunnel token out of .env and switches the co
   }
 });
 
-test("several companies on one server: each install is its own compose project, image and folder", () => {
+test("several companies on one server: each install is its own compose project, image and folder", onServerOs, () => {
   const dir = mkdtempSync(join(tmpdir(), "nwl-multi-"));
   try {
-    const installSh = new URL("scripts/install.sh", root).pathname;
+    const installSh = path("scripts/install.sh");
     const src = (fn, vars = {}) => bash(`source "${installSh}"; ${fn}`, vars);
     const get = (text, k) => text.match(new RegExp(`^${k}=(.*)$`, "m"))?.[1];
     // A fresh install takes its project name from its folder, made safe for Compose.
@@ -139,7 +147,7 @@ test("several companies on one server: each install is its own compose project, 
     assert.match(update, /PREVIOUS="\$IMAGE-previous"/);
     assert.match(read("scripts/install.sh"), /--filter publish=443/, "a second Caddy install on the same server is refused");
     // companies.sh: names, folders and what "add" does.
-    const companies = new URL("scripts/companies.sh", root).pathname;
+    const companies = path("scripts/companies.sh");
     const c = (fn, vars = {}) => bash(`source "${companies}"; ${fn}`, vars);
     for (const ok of ["acme", "syarikat-b", "a1"]) assert.equal(c('valid_slug "$V"', { V: ok }).status, 0, ok);
     for (const bad of ["Syarikat B", "-x", "x", "a".repeat(40), "../etc", "a;b"]) assert.notEqual(c('valid_slug "$V"', { V: bad }).status, 0, bad);
@@ -202,8 +210,8 @@ test("compose override for Cloudflare Tunnel: cloudflared instead of Caddy, toke
   assert.match(c.slice(c.indexOf("\n  app:"), c.indexOf("\n  cloudflared:")), /TRUST_PROXY: "1"/);
 });
 
-test("install.sh validates the domain and emails", () => {
-  const check = (fn, value) => bash(`source "${new URL("scripts/install.sh", root).pathname}"; ${fn} "$V"`, { V: value }).status === 0;
+test("install.sh validates the domain and emails", onServerOs, () => {
+  const check = (fn, value) => bash(`source "${path("scripts/install.sh")}"; ${fn} "$V"`, { V: value }).status === 0;
   for (const ok of ["billing.example.com", "a.b.example.my", "xn--bcher-kva.example"]) assert.ok(check("valid_domain", ok), ok);
   for (const bad of ["localhost", "-x.example.com", "billing.example.com/", "http://x.com", "a..b.com", "billing example.com", "x.com;rm -rf /"]) assert.ok(!check("valid_domain", bad), bad);
   for (const ok of ["owner@example.com", "first.last+billing@company.com.my"]) assert.ok(check("valid_email", ok), ok);
@@ -255,7 +263,10 @@ test("the container health check command works against the app", async () => {
   assert.equal(read("Dockerfile").match(/"node", "-e", "(.+?)"\]/)[1], js, "same check in both files");
   // The server runs in this process, so the check must not block the event loop.
   const exitCode = (port) =>
-    new Promise((resolve) => spawn(process.execPath, ["-e", js], { env: { PORT: port }, stdio: "ignore" }).on("exit", resolve));
+    new Promise((resolve) =>
+      // Windows needs SystemRoot in the environment to open a network socket.
+      spawn(process.execPath, ["-e", js], { env: { PORT: port, ...(process.env.SystemRoot && { SystemRoot: process.env.SystemRoot }) }, stdio: "ignore" }).on("exit", resolve),
+    );
   const f = await fixture();
   try {
     assert.equal(await exitCode(new URL(f.base).port), 0, "healthy");

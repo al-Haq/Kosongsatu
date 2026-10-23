@@ -59,7 +59,8 @@ test("v1 migration preserves duplicate receipts, old reversals, anchor and rollb
     );
     const snap = (await readdir(dir)).find((f) => f.includes(".pre-v2-"));
     assert.ok(snap);
-    assert.equal((await stat(join(dir, snap))).mode & 0o777, 0o600);
+    // Windows has no owner-only file mode (chmod only sets read-only).
+    if (process.platform !== "win32") assert.equal((await stat(join(dir, snap))).mode & 0o777, 0o600);
     const old = new DatabaseSync(join(dir, snap), { readOnly: true });
     assert.equal(old.prepare("PRAGMA user_version").get().user_version, 0);
     assert.equal(old.prepare("SELECT count(*) n FROM payments").get().n, 3);
