@@ -84,12 +84,52 @@ export function rateTotals(d) {
   return [...by.values()].sort((a, b) => a.rate - b.rate);
 }
 
+// What is left on each invoice line after earlier notes. The notes are replayed
+// in order and split the way a new note is: a credit within a rate goes to the
+// lines it was made for (or all lines of that rate) by what they had left, a
+// debit by their value. Credits take value and SST off; debits add them back.
+export function lineUsage(d, notes = []) {
+  const values = lineValues(d);
+  const left = values.map((v) => v.gross),
+    taxLeft = values.map((v) => v.tax);
+  for (const a of notes) {
+    const credit = a.kind === "credit";
+    const from = String(a.tax_from_lines || "")
+      .split(",")
+      .map((n) => Number(n) - 1)
+      .filter((n) => Number.isInteger(n) && n >= 0 && n < values.length);
+    for (const row of noteLines(d, a)) {
+      const ofRate = (list) => list.filter((n) => values[n].rate === row.rate);
+      const pool = ofRate(from).length ? ofRate(from) : ofRate(values.map((v, n) => n));
+      if (!pool.length) continue;
+      const room = pool.map((n) => Math.max(0, left[n]));
+      const weights = credit && room.some((w) => w > 0) ? room : pool.map((n) => values[n].gross);
+      const gross = splitProportional(row.taxable + row.tax, weights),
+        tax = splitProportional(row.tax, weights);
+      pool.forEach((n, k) => {
+        left[n] += credit ? -gross[k] : gross[k];
+        taxLeft[n] += credit ? -tax[k] : tax[k];
+      });
+    }
+  }
+  return values.map((v, n) => ({ ...v, left: Math.max(0, left[n]), taxLeft: Math.max(0, taxLeft[n]) }));
+}
+// How much a credit note can still take off the chosen lines (or the whole invoice).
+export function creditRoom(d, lines = null, notes = []) {
+  const usage = lineUsage(d, notes);
+  const chosen = lines && lines.length ? lines : usage.map((v, n) => n);
+  return chosen.reduce((s, n) => s + (usage[n]?.left || 0), 0);
+}
+
 // The SST inside a note: its tax-inclusive amount is split across the invoice's
 // rates in proportion to their tax-inclusive value (all lines, or only the chosen
 // ones), then the SST is taken out of each share. The rows always add up to the
 // note amount, so the ledger (adjusted total, allocations) is unchanged.
-export function noteTaxLines(d, amount, lines = null) {
-  const values = lineValues(d);
+// For a credit note, pass the invoice's earlier notes: the split then uses what
+// is left on each line, and the SST credited at a rate never goes beyond the SST
+// still on the invoice at that rate.
+export function noteTaxLines(d, amount, lines = null, { kind = "", prior = null } = {}) {
+  const values = prior && kind === "credit" ? lineUsage(d, prior) : lineValues(d);
   let chosen = values.map((v, n) => n);
   if (lines && lines.length) {
     check(Array.isArray(lines) && lines.length <= 50, "Choose the invoice lines for this note.");
@@ -99,22 +139,25 @@ export function noteTaxLines(d, amount, lines = null) {
       "Choose lines from this invoice.",
     );
   }
-  const byRate = new Map();
-  for (const n of chosen) byRate.set(values[n].rate, (byRate.get(values[n].rate) || 0) + values[n].gross);
+  const capped = values[0] && "left" in values[0];
+  const byRate = new Map(),
+    taxLeft = new Map();
+  for (const n of chosen) {
+    const v = values[n];
+    byRate.set(v.rate, (byRate.get(v.rate) || 0) + (capped ? v.left : v.gross));
+    taxLeft.set(v.rate, (taxLeft.get(v.rate) || 0) + (capped ? v.taxLeft : 0));
+  }
   const rates = [...byRate.keys()].sort((a, b) => a - b);
   const gross = rates.map((r) => byRate.get(r));
   const shares = splitProportional(amount, gross);
   return rates
     .map((rate, n) => {
       const share = shares[n];
-      const tax = rate ? Math.round((share * rate) / (100 + rate)) : 0;
+      let tax = rate ? Math.round((share * rate) / (100 + rate)) : 0;
+      if (capped) tax = Math.min(tax, taxLeft.get(rate));
       return { rate, taxable: share - tax, tax };
     })
     .filter((r) => r.taxable || r.tax);
-}
-export function chosenGross(d, lines) {
-  const values = lineValues(d);
-  return lines.reduce((s, n) => s + (values[n]?.gross || 0), 0);
 }
 export function parseTaxLines(a) {
   if (!a?.tax_lines) return null;

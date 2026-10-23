@@ -2,7 +2,13 @@ import PDFDocument from "pdfkit";
 import { currency as formatMoney } from "./domain.mjs";
 import { pdfContext, drawLogo } from "./pdf.mjs";
 import { LOCALES } from "../public/ext/documents-i18n.mjs";
-const TYPE_KEYS = { Invoice: "kind_invoice", "Credit note": "kind_credit", "Debit note": "kind_debit", Payment: "payment" };
+const TYPE_KEYS = {
+  Invoice: "kind_invoice",
+  "Credit note": "kind_credit",
+  "Debit note": "kind_debit",
+  Payment: "payment",
+  "Moved to customer funds": "movedToFunds",
+};
 export function renderStatementPdf(s) {
   return new Promise((resolve, reject) => {
     const pdf = new PDFDocument({

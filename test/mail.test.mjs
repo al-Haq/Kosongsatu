@@ -180,6 +180,45 @@ test("statement shows opening balance, movements, closing balance and aging", as
     s.db.close();
   }
 });
+test("a later credit note does not change a statement that ended before it", async () => {
+  const { s, c, invoice } = fixture();
+  try {
+    // RM 100 invoiced and paid in full in one month; RM 20 credited two months later.
+    const d = invoice(addDays(today(), -80), addDays(today(), -66), "100.00");
+    s.recordPayment(d.id, { amount: "100.00", paid_date: addDays(today(), -75), method: "Bank transfer", reference: "STMT-OLD" });
+    const period = { from_date: addDays(today(), -85), to_date: addDays(today(), -60) };
+    const before = s.statement(c.id, period);
+    assert.equal(before.closing, 0);
+    s.adjustment(d.id, { kind: "credit", amount: "20.00", reason: "Goodwill discount", issue_date: today() });
+    const after = s.statement(c.id, period);
+    assert.equal(after.closing, 0, "the old period still closes at zero");
+    assert.equal(after.outstanding, 0);
+    assert.deepEqual(after.open, []);
+    assert.deepEqual(
+      after.lines.map((l) => [l.type, l.debit, l.credit]),
+      [
+        ["Invoice", 10000, 0],
+        ["Payment", 0, 10000],
+      ],
+    );
+    // The current period shows the note and the RM 20 moving to customer funds.
+    const now = s.statement(c.id, { from_date: addDays(today(), -30), to_date: today() });
+    assert.equal(now.opening, 0);
+    assert.deepEqual(
+      now.lines.map((l) => [l.type, l.debit, l.credit]).sort(),
+      [
+        ["Credit note", 0, 2000],
+        ["Moved to customer funds", 2000, 0],
+      ],
+    );
+    assert.equal(now.closing, 0);
+    assert.equal(now.outstanding, 0);
+    const pdf = await renderStatementPdf(now);
+    assert.equal(pdf.subarray(0, 4).toString(), "%PDF");
+  } finally {
+    s.db.close();
+  }
+});
 test("email and statement routes need an owner session and report mail status", async () => {
   const { s, c, invoice } = fixture();
   const { createOwner } = await import("../server/auth.mjs");

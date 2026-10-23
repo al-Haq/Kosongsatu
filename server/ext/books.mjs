@@ -49,7 +49,7 @@ function pnlRows(p) {
     rows.push([basis, "Income", basis === "Accrual" ? "Invoiced, net of credit/debit notes, excl. SST" : "Received from customers, less refunds", ...b.income.byMonth.map(money), money(b.income.total)]);
     for (const c of b.categories) rows.push([basis, "Expenses", c.name, ...c.byMonth.map(money), money(c.total)]);
     rows.push([basis, "Expenses", "Total expenses", ...b.expenses.byMonth.map(money), money(b.expenses.total)]);
-    rows.push([basis, "Result", "Net profit / (loss)", ...b.net.byMonth.map(money), money(b.net.total)]);
+    rows.push([basis, "Result", basis === "Accrual" ? "Net profit / (loss)" : "Net cash (money in less money out, not profit)", ...b.net.byMonth.map(money), money(b.net.total)]);
     if (basis === "Accrual") rows.push([basis, "Memo", "SST charged (not income)", ...b.sst.byMonth.map(money), money(b.sst.total)]);
     rows.push([]);
   }
@@ -318,7 +318,7 @@ export default {
                 { cells: ["Income: " + incomeLabel, currency(b.income.total)], bold: true },
                 ...b.categories.map((c) => ({ cells: ["   " + c.name, currency(c.total)] })),
                 { cells: ["Total expenses", currency(b.expenses.total)], bold: true, rule: true },
-                { cells: ["Net profit / (loss)", currency(b.net.total)], bold: true, rule: true, color: b.net.total < 0 ? "red" : "" },
+                { cells: [title === "Accrual basis" ? "Net profit / (loss)" : "Net cash (money in less money out, not profit)", currency(b.net.total)], bold: true, rule: true, color: b.net.total < 0 ? "red" : "" },
                 ...(title === "Accrual basis" ? [{ cells: ["Memo: SST charged on invoices (owed to customs, not income)", currency(b.sst.total)] }] : []),
               ],
             },

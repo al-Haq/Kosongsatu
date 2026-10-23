@@ -134,3 +134,90 @@ test("HTTP: notes accept chosen lines, and the note PDF route works", async () =
     await f.close();
   }
 });
+
+test("the same line cannot be credited twice, so its SST is never credited more than once", () => {
+  const s = store();
+  try {
+    const c = s.saveClient({ name: "Twice" });
+    const d = s.issue(
+      s.saveDocument({
+        kind: "invoice",
+        client_id: c.id,
+        issue_date: today(),
+        due_date: today(),
+        items: [
+          { description: "Service", quantity: 1, rate: "100.00", tax_rate: 8 },
+          { description: "Other", quantity: 1, rate: "100.00", tax_rate: 0 },
+        ],
+      }).id,
+    );
+    assert.equal(d.total, 20800);
+    const credited = () => s.document(d.id).adjustments.reduce((t, a) => t + JSON.parse(a.tax_lines).reduce((x, r) => x + r.tax, 0), 0);
+    s.adjustment(d.id, { kind: "credit", amount: "108.00", reason: "Service not given", tax_lines_from: [0] });
+    assert.equal(credited(), 800);
+    // Line 1 is fully credited: a second credit on it is refused.
+    assert.throws(() => s.adjustment(d.id, { kind: "credit", amount: "100.00", reason: "Again", tax_lines_from: [0] }), /larger than the chosen lines/);
+    // A credit on the whole invoice now comes only from what is left: the 0% line.
+    const rest = s.adjustment(d.id, { kind: "credit", amount: "100.00", reason: "Rest", issue_date: today() });
+    assert.deepEqual(JSON.parse(rest.tax_lines), [{ rate: 0, taxable: 10000, tax: 0 }]);
+    assert.equal(credited(), 800, "never more SST than the invoice charged");
+  } finally {
+    s.db.close();
+  }
+});
+
+test("partial credits on a line add up to its value and its SST, no more", () => {
+  const s = store();
+  try {
+    const c = s.saveClient({ name: "Parts" });
+    const d = s.issue(
+      s.saveDocument({
+        kind: "invoice",
+        client_id: c.id,
+        issue_date: today(),
+        due_date: today(),
+        items: [
+          { description: "Service", quantity: 1, rate: "100.00", tax_rate: 8 },
+          { description: "Goods", quantity: 1, rate: "50.00", tax_rate: 10 },
+        ],
+      }).id,
+    );
+    const a = s.adjustment(d.id, { kind: "credit", amount: "54.00", reason: "Half", tax_lines_from: [0] });
+    const b = s.adjustment(d.id, { kind: "credit", amount: "54.00", reason: "Other half", tax_lines_from: [0] });
+    const tax = (x) => JSON.parse(x.tax_lines).reduce((t, r) => t + r.tax, 0);
+    assert.equal(tax(a) + tax(b), 800);
+    assert.throws(() => s.adjustment(d.id, { kind: "credit", amount: "0.01", reason: "More", tax_lines_from: [0] }), /larger than the chosen lines/);
+    const all = s.adjustment(d.id, { kind: "credit", amount: "55.00", reason: "Goods back" });
+    assert.deepEqual(JSON.parse(all.tax_lines), [{ rate: 10, taxable: 5000, tax: 500 }]);
+  } finally {
+    s.db.close();
+  }
+});
+
+test("a whole-invoice credit after a line credit leaves no extra room on the lines it used", () => {
+  const s = store();
+  try {
+    const c = s.saveClient({ name: "Three lines" });
+    const d = s.issue(
+      s.saveDocument({
+        kind: "invoice",
+        client_id: c.id,
+        issue_date: today(),
+        due_date: today(),
+        items: [
+          { description: "Service A", quantity: 1, rate: "100.00", tax_rate: 8 },
+          { description: "Service B", quantity: 1, rate: "100.00", tax_rate: 8 },
+          { description: "Other", quantity: 1, rate: "100.00", tax_rate: 0 },
+        ],
+      }).id,
+    );
+    s.adjustment(d.id, { kind: "credit", amount: "108.00", reason: "A not given", tax_lines_from: [0] });
+    // The rest of the 8% value is line B only, so this whole-invoice credit uses B and the 0% line.
+    s.adjustment(d.id, { kind: "credit", amount: "208.00", reason: "Everything else" });
+    assert.equal(s.document(d.id).adjusted_total, 0);
+    const credited = s.document(d.id).adjustments.reduce((t, a) => t + JSON.parse(a.tax_lines).reduce((x, r) => x + r.tax, 0), 0);
+    assert.equal(credited, 1600, "exactly the invoice's SST, no more");
+  } finally {
+    s.db.close();
+  }
+});

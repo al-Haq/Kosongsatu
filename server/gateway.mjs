@@ -20,6 +20,9 @@ export { billplzSignature, gatewayConfiguration };
 // No prototype, so a name from a request ("constructor", "toString") is never a provider.
 export const PROVIDERS = Object.freeze(Object.assign(Object.create(null), { billplz, toyyibpay, stripe, ipay88 }));
 export const PROVIDER_ORDER = ["billplz", "toyyibpay", "stripe", "ipay88"];
+// Every provider here collects ringgit. An invoice in another currency is paid
+// by bank transfer, never through a payment page that would charge its number in RM.
+const inMyr = (d) => (d.currency || "MYR") === "MYR";
 export function migrateGateway(db, path) {
   const version = db.prepare("PRAGMA user_version").get().user_version;
   if (version >= 7) return;
@@ -170,7 +173,7 @@ export class Gateway {
   // Whether the client link can offer online payment for this document.
   canPay(d) {
     const name = this.active();
-    if (!name || d.kind !== "invoice" || d.state !== "issued" || d.balance < (PROVIDERS[name].minAmount || 1)) return false;
+    if (!name || d.kind !== "invoice" || d.state !== "issued" || !inMyr(d) || d.balance < (PROVIDERS[name].minAmount || 1)) return false;
     const contact = d.client.email || this.store.settings().email;
     return name === "stripe" ? true : name === "billplz" ? !!(contact || d.client.phone) : !!contact;
   }
@@ -183,6 +186,7 @@ export class Gateway {
       "This invoice is not awaiting payment.",
       409,
     );
+    check(inMyr(d), "Online payment is available for MYR invoices only.", 409);
     const name = this.active();
     check(name, "Online payment is not available for this invoice.", 503);
     const p = PROVIDERS[name],
@@ -312,8 +316,15 @@ export class Gateway {
       const paid = result.amount;
       const d = this.store.document(row.invoice_id);
       // If the invoice was settled another way meanwhile, the extra money stays
-      // as customer funds for the owner to allocate or refund.
-      const applied = d.kind === "invoice" && d.state === "issued" ? Math.min(d.balance, paid) : 0;
+      // as customer funds for the owner to allocate or refund. Money collected in
+      // RM is never applied to an invoice in another currency.
+      const applied = d.kind === "invoice" && d.state === "issued" && inMyr(d) ? Math.min(d.balance, paid) : 0;
+      if (!inMyr(d))
+        this.store.audit(
+          "online_payment.currency",
+          d.id,
+          `${p.label} ${row.bill_id}: RM ${(paid / 100).toFixed(2)} kept as customer funds; ${d.number} is in ${d.currency}`,
+        );
       // Prefer the provider's paid time (from the confirmation or the signed notice).
       const hintDate = typeof hint === "string" ? hint : hint?.paidAt;
       const stamp = [result.paidAt, hintDate].find(
@@ -322,6 +333,7 @@ export class Gateway {
       const paidDate = stamp ? stamp.slice(0, 10) : today();
       const receipt = this.store.receive({
         client_id: d.client_id,
+        currency: "MYR",
         amount: (paid / 100).toFixed(2),
         paid_date: paidDate > today() ? today() : paidDate,
         method: "Other",

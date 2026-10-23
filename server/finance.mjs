@@ -187,15 +187,19 @@ export function attachFinance(Store) {
         debit = adjustments
           .filter((a) => a.kind === "debit")
           .reduce((s, a) => s + a.amount, 0);
+      // A release is dated with the credit note that caused it (never before the
+      // payment it comes from), so balances as at an earlier date can still be
+      // worked out (statements, aging).
+      const releasesOf = this.db.prepare(
+        "SELECT r.amount, COALESCE(a.issue_date, substr(r.created,1,10)) AS date FROM allocation_releases r LEFT JOIN adjustments a ON a.id=r.adjustment_id WHERE r.payment_id=? ORDER BY r.created,r.id",
+      );
       const payments = d.payments.map((p) => {
-        const released = this.db
-          .prepare(
-            "SELECT COALESCE(sum(amount),0) amount FROM allocation_releases WHERE payment_id=?",
-          )
-          .get(p.id).amount;
+        const releases = releasesOf.all(p.id).map((r) => ({ amount: r.amount, date: r.date < p.paid_date ? p.paid_date : r.date }));
+        const released = releases.reduce((s, r) => s + r.amount, 0);
         return {
           ...p,
           released,
+          releases,
           applied: p.reversed ? 0 : p.amount - released,
         };
       });

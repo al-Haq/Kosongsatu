@@ -105,7 +105,7 @@ export default function taxUI(h) {
     const b = (label, act, bid, primary) => (compact ? small(label, act, bid) : button(label, act, bid, primary));
     const out = [];
     if (!isActive(e) && st.configured && ready) out.push(b(e ? "Submit again" : "Submit e-Invoice", "tax-submit", `${source}:${id}`, !e));
-    if (e && ["submitted", "unknown", "valid"].includes(e.state)) out.push(b(compact ? "Check" : "Check status", "tax-check", e.id));
+    if (e && ["sending", "submitted", "unknown", "valid"].includes(e.state)) out.push(b(compact ? "Check" : "Check status", "tax-check", e.id));
     if (e?.state === "valid" && e.cancel_until && e.cancel_until > new Date().toISOString()) out.push(b(compact ? "Cancel" : "Cancel e-Invoice", "tax-cancel", e.id));
     if (compact) return out.join("");
     return out.length ? `<div class="actions mt22">${out.join("")}</div>` : "";

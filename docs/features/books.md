@@ -89,7 +89,7 @@ Reports > Sales, for any period (quick buttons for this month, last month, this 
 Reports > Profit & loss shows both bases side by side, by category and by month:
 
 - **Accrual**: issued invoices by issue date and credit/debit notes by note date, **excluding SST** (SST is owed to customs and shown as a memo line); expenses by expense date; supplier bills by bill date.
-- **Cash**: money received less refunds; expenses and bill payments on the date they were paid (including SST paid).
+- **Cash**: money received less refunds; expenses and bill payments on the date they were paid (including SST paid). Its result is labelled **net cash** (money in less money out), not profit: it includes SST and ignores timing.
 
 Download it as **PDF** or **CSV**. It is clearly marked as a **management report, not audited accounts**. Equipment bought is shown as a cost here; your accountant may capitalise it.
 

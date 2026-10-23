@@ -164,9 +164,9 @@ export const MIXED = [
   { description: "Goods", quantity: "1", rate: "500.00", tax_rate: 10 },
   { description: "Exempt", quantity: "1", rate: "250.00", tax_rate: 0 },
 ];
-export function invoice(store, client, { items = MIXED, discount = "0", issue_date = today() } = {}) {
+export function invoice(store, client, { items = MIXED, discount = "0", issue_date = today(), ...more } = {}) {
   return store.issue(
-    store.saveDocument({ kind: "invoice", client_id: client.id, issue_date, due_date: addDays(issue_date, 14), items, discount }).id,
+    store.saveDocument({ kind: "invoice", client_id: client.id, issue_date, due_date: addDays(issue_date, 14), items, discount, ...more }).id,
   );
 }
 export function configure(store, { signing = null, env = "sandbox" } = {}) {

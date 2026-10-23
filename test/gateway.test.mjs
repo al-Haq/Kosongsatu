@@ -187,3 +187,42 @@ test("HTTP callback and browser return need a valid signature", async () => {
     s.db.close();
   }
 });
+test("online payment is for MYR invoices only; RM paid against another currency stays as customer funds", async () => {
+  const s = openDatabase(":memory:");
+  try {
+    s.saveSettings({ registration: "TEST-1", address: "Test office", email: "test@example.com", company: "Test Co" });
+    const c = s.saveClient({ name: "USD client", email: "usd@example.com" });
+    const d = s.issue(
+      s.saveDocument({
+        kind: "invoice",
+        client_id: c.id,
+        issue_date: today(),
+        due_date: addDays(today(), 14),
+        currency: "USD",
+        fx_rate: "4.5",
+        items: [{ description: "Work", quantity: "1", rate: "100.00" }],
+      }).id,
+    );
+    const { token } = s.share(d.id);
+    const fake = fakeBillplz();
+    const g = new Gateway(s, { config, fetcher: fake.fetcher });
+    assert.equal(g.canPay(s.document(d.id)), false);
+    await assert.rejects(g.checkout(token, "https://app.example"), (e) => e.status === 409 && /MYR invoices only/.test(e.message));
+    assert.equal(fake.bills.size, 0, "no RM bill is created for a USD invoice");
+    // A payment page opened before this check existed: RM 100 is collected for USD 100.
+    s.db
+      .prepare("INSERT INTO online_payments(id,invoice_id,provider,bill_id,amount,url,created,ref) VALUES(?,?,?,?,?,?,?,?)")
+      .run("op-usd", d.id, "billplz", "billUSD", 10000, "https://www.billplz-sandbox.com/bills/billUSD", new Date().toISOString(), "op-usd");
+    fake.bills.set("billUSD", { id: "billUSD", collection_id: "col1", amount: 10000, paid_amount: 10000, paid: true, state: "paid", paid_at: today() + "T10:00:00.000+08:00" });
+    assert.equal((await g.settle("billUSD")).state, "paid");
+    const doc = s.document(d.id);
+    assert.equal(doc.balance, 10000, "the USD invoice still owes USD 100.00");
+    assert.equal(doc.payments.length, 0);
+    const r = s.receipts().find((x) => x.reference === "Billplz billUSD");
+    assert.equal(r.currency, "MYR");
+    assert.equal(r.allocated, 0);
+    assert.equal(r.available, 10000, "the RM 100.00 waits as customer funds");
+  } finally {
+    s.db.close();
+  }
+});
