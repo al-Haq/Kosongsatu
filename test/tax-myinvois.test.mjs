@@ -398,6 +398,36 @@ test("a seller detail missing when the invoice was issued can be completed later
   }
 });
 
+test("the workspace checks each invoice with the seller details it will be sent with", async () => {
+  const f = await setup();
+  try {
+    const msic = (v) => f.store.db.prepare("UPDATE tax_settings SET data=json_set(data,'$.msic',?)").run(v);
+    const sentMsic = () => lastDoc(f.fake).json.Invoice[0].AccountingSupplierParty[0].Party[0].IndustryClassificationCode[0]._;
+    const old = invoice(f.store, readyClient(f.store));
+    // The MSIC code is cleared in Settings after the invoice was issued.
+    msic("");
+    let ws = await f.json("/api/workspace");
+    assert.ok(ws.ext.tax.supplierGaps.some((g) => /MSIC/.test(g)), "today's settings lack the code");
+    assert.equal(ws.ext.tax.ready[old.id].ready, true, "the invoice keeps the code it was issued with");
+    const fresh = invoice(f.store, readyClient(f.store));
+    ws = await f.json("/api/workspace");
+    assert.equal(ws.ext.tax.ready[fresh.id].ready, false);
+    assert.equal((await submit(f, { source: "invoice", id: old.id })).status, 201);
+    assert.equal(sentMsic(), "62010");
+    // A code that was not valid when the invoice was issued is taken from Settings once corrected.
+    msic("99999");
+    const wrong = invoice(f.store, readyClient(f.store));
+    msic("62021");
+    ws = await f.json("/api/workspace");
+    assert.equal(ws.ext.tax.ready[wrong.id].ready, true);
+    const r = await submit(f, { source: "invoice", id: wrong.id });
+    assert.equal(r.status, 201, await r.clone().text());
+    assert.equal(sentMsic(), "62021");
+  } finally {
+    await f.close();
+  }
+});
+
 test("automatic submission is opt-in, queued once and sent once", async () => {
   const f = await setup();
   try {

@@ -210,10 +210,22 @@ const lines3 = (v) => String(v || "").split(/\r?\n/).map((l) => l.trim()).filter
 export const SELLER_FIELDS = ["idType", "msic", "activity", "addressLines", "city", "postcode", "state", "country"];
 export const sellerProfile = (s) => Object.fromEntries(SELLER_FIELDS.map((k) => [k, s[k] ?? ""]));
 const filled = (v) => v !== undefined && v !== null && String(v).trim() !== "";
+// Checks for the kept details that MyInvois validates on their own.
+const KEPT_CHECKS = {
+  tin: validTin,
+  phone: (v) => validPhone(normalizePhone(v)),
+  idType: (v) => !!ID_TYPES[v],
+  msic: (v) => MSIC_CODES.has(v),
+  addressLines: (v) => lines3(v).length > 0,
+  state: (v) => !!STATE_CODES[v],
+  country: (v) => COUNTRY_CODES.has(v),
+};
+const usable = (k, v) => filled(v) && (!KEPT_CHECKS[k] || KEPT_CHECKS[k](v));
 // The seller as on the document: its business snapshot and the tax profile kept
 // at issue, so a later change of name or identity in Settings does not change
-// an e-Invoice for an earlier document. A detail that was still empty when the
-// document was issued comes from today's settings, so it can be completed later.
+// an e-Invoice for an earlier document. A detail that was empty or not valid
+// when the document was issued could never have been sent, so it comes from
+// today's settings and can be completed or corrected later.
 export function supplierParty(store, s = taxSettings(store), doc = null) {
   const now = store.settings();
   const snap = doc?.business || {};
@@ -224,8 +236,8 @@ export function supplierParty(store, s = taxSettings(store), doc = null) {
     } catch {
       kept = {};
     }
-  const b = Object.fromEntries(["tin", "registration", "sstNumber", "company", "phone", "email"].map((k) => [k, filled(snap[k]) ? snap[k] : now[k]]));
-  const t = Object.fromEntries(SELLER_FIELDS.map((k) => [k, filled(kept[k]) ? kept[k] : s[k]]));
+  const b = Object.fromEntries(["tin", "registration", "sstNumber", "company", "phone", "email"].map((k) => [k, usable(k, snap[k]) ? snap[k] : now[k]]));
+  const t = Object.fromEntries(SELLER_FIELDS.map((k) => [k, usable(k, kept[k]) ? kept[k] : s[k]]));
   return {
     tin: b.tin || "",
     idType: t.idType || "BRN",
@@ -426,6 +438,21 @@ export class EInvoices {
       supplier = supplierParty(store, s, doc);
       gaps = supplierGaps(store, s, supplier);
     };
+    // A note or refund names the same seller as the e-Invoice it refers to: the
+    // invoice's own, or the monthly consolidated one. A record sent before the
+    // seller was stored uses the invoice's details, or today's for a consolidation.
+    const sellerOfReference = (ref) => {
+      let sent = null;
+      try {
+        sent = ref.supplier ? JSON.parse(ref.supplier) : null;
+      } catch {
+        sent = null;
+      }
+      if (sent) supplier = sent;
+      else if (ref.consolidated) supplier = supplierParty(store, s);
+      else return;
+      gaps = supplierGaps(store, s, supplier);
+    };
     const fail = (list) => {
       throw new AppError("Not ready for e-Invoice: " + list.join("; ") + ".", 409);
     };
@@ -451,6 +478,7 @@ export class EInvoices {
       sellerOf(d);
       const ref = this.reference(d.id);
       if (!ref) fail(["submit the original invoice as an e-Invoice first and wait until it is valid"]);
+      sellerOfReference(ref);
       if (gaps.length) fail(gaps);
       const classes = lineClasses(store, d, s);
       const classFor = (rate) => classes[d.items.findIndex((i) => (i.tax_rate || 0) === rate)]?.code || s.defaultClass || "022";
@@ -490,6 +518,7 @@ export class EInvoices {
       sellerOf(d);
       const ref = this.reference(d.id);
       if (!ref) fail(["the related invoice needs a valid e-Invoice first"]);
+      sellerOfReference(ref);
       if (gaps.length) fail(gaps);
       const buyer = ref.consolidated ? GENERAL_PUBLIC : buyerParty(receipt.client);
       if (!ref.consolidated) {
@@ -626,6 +655,7 @@ export class EInvoices {
         total: built.total,
         errors: null,
         submitted_at: now(),
+        supplier: JSON.stringify(built.doc.supplier),
       };
       let eid;
       if (active) eid = this.set(active.id, fields).id;
@@ -634,9 +664,9 @@ export class EInvoices {
         const attempt = this.db.prepare("SELECT count(*) n FROM tax_einvoices WHERE source=? AND source_id=?").get(source, sourceId).n + 1;
         this.db
           .prepare(
-            "INSERT INTO tax_einvoices(id,source,source_id,type_code,code_number,version,environment,state,payload,document_hash,issued_at,total,submitted_at,dedupe_key,created,updated) VALUES(?,?,?,?,?,?,?,'sending',?,?,?,?,?,?,?,?)",
+            "INSERT INTO tax_einvoices(id,source,source_id,type_code,code_number,version,environment,state,payload,document_hash,issued_at,total,submitted_at,supplier,dedupe_key,created,updated) VALUES(?,?,?,?,?,?,?,'sending',?,?,?,?,?,?,?,?,?)",
           )
-          .run(eid, source, sourceId, built.typeCode, built.number, version, status.env, json, entry.documentHash, stamp.iso, built.total, now(), `${source}:${sourceId}:${attempt}`, now(), now());
+          .run(eid, source, sourceId, built.typeCode, built.number, version, status.env, json, entry.documentHash, stamp.iso, built.total, now(), fields.supplier, `${source}:${sourceId}:${attempt}`, now(), now());
       }
       if (built.invoiceId)
         this.db
