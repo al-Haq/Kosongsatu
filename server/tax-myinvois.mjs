@@ -36,6 +36,9 @@ export const SECRET_NAMES = {
 export const validationUrl = (env, uuid, longId) =>
   uuid && longId ? `${(HOSTS[env] || HOSTS.sandbox).portal}/${uuid}/share/${longId}` : null;
 const ACTIVE = ["queued", "sending", "submitted", "valid", "unknown"];
+// A send takes seconds. A record still at "sending" after this long was left by a
+// process that stopped before MyInvois answered; it is then looked up in MyInvois.
+const SENDING_STALE_MS = 2 * 60000;
 export const CANCEL_WINDOW_MS = 72 * 3600000;
 const B2C_LIMIT = 1000000; // RM10,000: larger sales need their own e-Invoice.
 
@@ -203,20 +206,38 @@ export class MyInvoisApi {
 
 // ---- Parties, classification and readiness ----
 const lines3 = (v) => String(v || "").split(/\r?\n/).map((l) => l.trim()).filter(Boolean).slice(0, 3);
-export function supplierParty(store, s = taxSettings(store)) {
-  const b = store.settings();
+// The seller's tax profile kept from the tax settings when an invoice is issued.
+export const SELLER_FIELDS = ["idType", "msic", "activity", "addressLines", "city", "postcode", "state", "country"];
+export const sellerProfile = (s) => Object.fromEntries(SELLER_FIELDS.map((k) => [k, s[k] ?? ""]));
+const filled = (v) => v !== undefined && v !== null && String(v).trim() !== "";
+// The seller as on the document: its business snapshot and the tax profile kept
+// at issue, so a later change of name or identity in Settings does not change
+// an e-Invoice for an earlier document. A detail that was still empty when the
+// document was issued comes from today's settings, so it can be completed later.
+export function supplierParty(store, s = taxSettings(store), doc = null) {
+  const now = store.settings();
+  const snap = doc?.business || {};
+  let kept = {};
+  if (doc?.id)
+    try {
+      kept = JSON.parse(store.db.prepare("SELECT seller FROM tax_doc_meta WHERE document_id=?").get(doc.id)?.seller || "{}");
+    } catch {
+      kept = {};
+    }
+  const b = Object.fromEntries(["tin", "registration", "sstNumber", "company", "phone", "email"].map((k) => [k, filled(snap[k]) ? snap[k] : now[k]]));
+  const t = Object.fromEntries(SELLER_FIELDS.map((k) => [k, filled(kept[k]) ? kept[k] : s[k]]));
   return {
     tin: b.tin || "",
-    idType: s.idType || "BRN",
+    idType: t.idType || "BRN",
     idValue: b.registration || "",
     sst: b.sstNumber || "NA",
     ttx: "NA",
     name: b.company,
     phone: normalizePhone(b.phone),
     email: b.email || "",
-    msic: s.msic,
-    activity: s.activity,
-    address: { lines: lines3(s.addressLines), city: s.city, postcode: s.postcode, state: s.state, country: s.country || "MYS" },
+    msic: t.msic,
+    activity: t.activity,
+    address: { lines: lines3(t.addressLines), city: t.city, postcode: t.postcode, state: t.state, country: t.country || "MYS" },
   };
 }
 export function buyerParty(c) {
@@ -254,8 +275,7 @@ function addressGaps(a, who) {
   } else if (!STATE_CODES[a.state]) out.push(`${who} state (use "Not applicable" outside Malaysia)`);
   return out;
 }
-export function supplierGaps(store, s = taxSettings(store)) {
-  const p = supplierParty(store, s);
+export function supplierGaps(store, s = taxSettings(store), p = supplierParty(store, s)) {
   const out = [];
   if (!validTin(p.tin)) out.push("Your business TIN (Settings)");
   if (!validIdNumber(p.idType, p.idValue)) out.push("Your registration number (Settings)");
@@ -399,14 +419,20 @@ export class EInvoices {
   build(source, sourceId, opts = {}) {
     const store = this.store,
       s = taxSettings(store);
-    const supplier = supplierParty(store, s);
-    const gaps = supplierGaps(store, s);
+    // Seller details: today's for documents made now, the document's own for the rest.
+    let supplier = supplierParty(store, s);
+    let gaps = supplierGaps(store, s, supplier);
+    const sellerOf = (doc) => {
+      supplier = supplierParty(store, s, doc);
+      gaps = supplierGaps(store, s, supplier);
+    };
     const fail = (list) => {
       throw new AppError("Not ready for e-Invoice: " + list.join("; ") + ".", 409);
     };
     if (source === "invoice") {
       const d = store.document(sourceId);
       check(d.kind === "invoice" && d.state === "issued", "Only issued invoices can be submitted as e-Invoices.", 409);
+      sellerOf(d);
       const r = readiness(store, d, s, gaps);
       if (r.mode === "consolidated")
         fail(["this client is set to the monthly consolidated e-Invoice. Change the client's e-Invoice setting to submit it on its own"]);
@@ -422,6 +448,7 @@ export class EInvoices {
       const a = this.db.prepare("SELECT * FROM adjustments WHERE id=?").get(sourceId);
       check(a && a.kind === source, "Note not found.", 404);
       const d = store.document(a.invoice_id);
+      sellerOf(d);
       const ref = this.reference(d.id);
       if (!ref) fail(["submit the original invoice as an e-Invoice first and wait until it is valid"]);
       if (gaps.length) fail(gaps);
@@ -457,6 +484,10 @@ export class EInvoices {
       check(invoiceId, "Choose the invoice this refund relates to.");
       const d = store.document(invoiceId);
       check(d.client_id === receipt.client_id, "Choose an invoice of the same client.");
+      // The refund is in the receipt's currency, at the receipt's exchange rate.
+      const currency = receipt.currency || "MYR";
+      check((d.currency || "MYR") === currency, `This refund is in ${currency}. Choose an invoice in ${currency}.`);
+      sellerOf(d);
       const ref = this.reference(d.id);
       if (!ref) fail(["the related invoice needs a valid e-Invoice first"]);
       if (gaps.length) fail(gaps);
@@ -470,7 +501,7 @@ export class EInvoices {
         number: f.number,
         total: f.amount,
         invoiceId,
-        doc: { typeCode: "04", number: f.number, currency: "MYR", supplier, buyer, lines: [oneLine(f.reason, f.amount, 0, s.defaultClass || "022")], billing: [{ id: ref.code_number, uuid: ref.uuid }] },
+        doc: { typeCode: "04", number: f.number, currency, fxRate: receipt.fx_rate, supplier, buyer, lines: [oneLine(f.reason, f.amount, 0, s.defaultClass || "022")], billing: [{ id: ref.code_number, uuid: ref.uuid }] },
       };
     }
     if (source === "consolidated") {
@@ -660,9 +691,17 @@ export class EInvoices {
     this.store.audit("einvoice.rejected", r.source_id, errors[0]?.message || "Rejected");
     return this.row(eid);
   }
+  // A submission interrupted mid-send: its answer is unknown, so it is looked up
+  // in MyInvois (found: carry on; not there after 15 minutes: free to send again).
+  interrupted(r) {
+    if (r.state !== "sending" || Date.now() - Date.parse(r.submitted_at || r.updated || r.created) < SENDING_STALE_MS) return r;
+    const message = "The submission was interrupted before MyInvois answered. Checking MyInvois for it.";
+    this.store.audit("einvoice.unknown", r.source_id, message);
+    return this.set(r.id, { state: "unknown", errors: [{ code: "", message }], next_check: now() });
+  }
   // Ask MyInvois for the current status.
   async refresh(eid) {
-    let r = this.row(eid);
+    let r = this.interrupted(this.row(eid));
     const backoff = (n) => new Date(Date.now() + Math.min(3600000, 30000 * 2 ** Math.min(n, 7))).toISOString();
     if (r.state === "unknown") return this.reconcile(r);
     if (!["submitted", "valid"].includes(r.state)) return r;
@@ -758,6 +797,7 @@ export class EInvoices {
         }
       }
     }
+    for (const r of this.db.prepare("SELECT * FROM tax_einvoices WHERE state='sending'").all()) this.interrupted(r);
     const due = this.db
       .prepare("SELECT id FROM tax_einvoices WHERE state IN ('submitted','unknown','valid') AND next_check IS NOT NULL AND next_check<=? ORDER BY next_check LIMIT ?")
       .all(now(), limit);

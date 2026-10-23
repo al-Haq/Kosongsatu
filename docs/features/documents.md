@@ -54,7 +54,8 @@ The template applies to invoices, quotations, proforma invoices, sales and deliv
 - **Payments**: a payment on a USD invoice is recorded as a USD receipt, with the rate on the day (it defaults to the invoice rate). A receipt can only be applied to invoices in its own currency. When you record money received on **Credits**, pick its currency.
 - **Reports and dashboards** convert to MYR at each document's or receipt's own rate: overview totals, client outstanding, the invoice CSV (MYR columns plus currency, rate and original amounts), and the SST report (SST figures in MYR).
 - **Statements** show one section per currency.
-- **Online payment (Billplz)** and **bank CSV import/matching** are MYR only. The Pay online button is hidden for other currencies, and a non-MYR receipt never matches a bank line.
+- When a credit note moves part of a payment back to customer funds, the statement shows that as its own line on the note's date ("Moved to customer funds"). A statement for an earlier period, and the accountant pack's month-end aging, keep the balances they had.
+- **Online payment** (all providers) and **bank CSV import/matching** are MYR only. The Pay online button is hidden for other currencies and the payment page refuses them. If ringgit is ever collected online for an invoice in another currency, it is kept as MYR customer funds and never marks that invoice paid. A non-MYR receipt never matches a bank line.
 
 ## 14. Documents in English, Bahasa Melayu and Chinese
 

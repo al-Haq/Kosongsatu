@@ -543,6 +543,10 @@ export function attachMail(Store) {
           d.state === "issued" &&
           (d.currency || "MYR") === (b.currency || "MYR"),
       );
+      // A credit note can later move part of a payment back to customer funds.
+      // That move is dated with the note, so a statement that ended before it
+      // still shows the payment in full and the balance it had then.
+      const moves = (p) => (p.reversed ? [] : p.releases || []);
       const entries = [];
       for (const d of docs) {
         entries.push({ date: d.issue_date, type: "Invoice", ref: d.number, debit: d.total, credit: 0 });
@@ -554,9 +558,12 @@ export function attachMail(Store) {
             debit: a.kind === "debit" ? a.amount : 0,
             credit: a.kind === "credit" ? a.amount : 0,
           });
-        for (const p of d.payments)
-          if (p.applied > 0)
-            entries.push({ date: p.paid_date, type: "Payment", ref: d.number, debit: 0, credit: p.applied });
+        for (const p of d.payments) {
+          if (p.reversed) continue;
+          entries.push({ date: p.paid_date, type: "Payment", ref: d.number, debit: 0, credit: p.amount });
+          for (const m of moves(p))
+            entries.push({ date: m.date, type: "Moved to customer funds", ref: d.number, debit: m.amount, credit: 0 });
+        }
       }
       entries.sort((a, b) => (a.date === b.date ? 0 : a.date < b.date ? -1 : 1));
       const net = (e) => e.debit - e.credit;
@@ -573,7 +580,11 @@ export function attachMail(Store) {
           let balance = d.total;
           for (const a of d.adjustments)
             if (a.issue_date <= to) balance += a.kind === "debit" ? a.amount : -a.amount;
-          for (const p of d.payments) if (p.paid_date <= to) balance -= p.applied;
+          for (const p of d.payments) {
+            if (p.reversed || p.paid_date > to) continue;
+            balance -= p.amount;
+            for (const m of moves(p)) if (m.date <= to) balance += m.amount;
+          }
           return { ...d, balance };
         });
       const aging = { current: 0, d30: 0, d60: 0, d90: 0, over90: 0 };

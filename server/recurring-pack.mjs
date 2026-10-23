@@ -63,7 +63,12 @@ export function packData(store, month) {
     let balance = d.total;
     for (const a of d.adjustments || [])
       if (a.issue_date <= r.to) balance += a.kind === "debit" ? a.amount : -a.amount;
-    for (const p of d.payments) if (p.paid_date <= r.to) balance -= p.applied ?? (p.reversed ? 0 : p.amount);
+    for (const p of d.payments) {
+      if (p.reversed || p.paid_date > r.to) continue;
+      balance -= p.amount;
+      // Money a later credit note moved to customer funds still counted then.
+      for (const m of p.releases || []) if (m.date <= r.to) balance += m.amount;
+    }
     if (balance <= 0) continue;
     const late = daysBetween(d.due_date, r.to);
     const bucket = late <= 0 ? "current" : late <= 30 ? "d30" : late <= 60 ? "d60" : late <= 90 ? "d90" : "over90";

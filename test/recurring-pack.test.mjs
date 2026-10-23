@@ -95,6 +95,29 @@ test("the pack lists the month's invoices, notes, cash, SST and aging at month e
   }
 });
 
+test("a credit note issued later does not reopen an invoice in an earlier month's aging", () => {
+  const { store } = setup();
+  try {
+    const c = store.saveClient({ name: "Paid client" });
+    const d = store.issue(
+      store.saveDocument({
+        kind: "invoice",
+        client_id: c.id,
+        issue_date: `${before}-03`,
+        due_date: `${before}-17`,
+        items: [{ description: "Work", quantity: 1, rate: "100.00" }],
+      }).id,
+    );
+    store.recordPayment(d.id, { amount: "100.00", paid_date: `${before}-05`, method: "Bank transfer", reference: "PAID-EARLY" });
+    store.adjustment(d.id, { kind: "credit", amount: "20.00", reason: "Goodwill", issue_date: today() });
+    const p = packData(store, before);
+    assert.equal(p.totals.outstanding, 0);
+    assert.deepEqual(p.open, []);
+  } finally {
+    store.db.close();
+  }
+});
+
 test("CSV files neutralise formulas and carry notes, receipts, refunds and SST", async () => {
   const { store } = setup();
   try {

@@ -53,7 +53,8 @@ Sales tax is always counted on the invoice date. Debit notes are added to item 1
 **What it does.** Every credit and debit note now carries its own SST split by rate. The note amount you type stays tax-inclusive, exactly as before, so the adjusted invoice total, allocations and customer funds still balance.
 
 - By default the amount is split across the whole invoice in proportion to each rate's tax-inclusive value (after the invoice discount), then the SST is taken out of each share. A full credit gives back exactly the SST of the invoice.
-- In the note form you can tick the invoice lines the note is about. The amount is then split across those lines only. A credit cannot be larger than the ticked lines.
+- In the note form you can tick the invoice lines the note is about. The amount is then split across those lines only. A credit cannot be larger than what the ticked lines have left after earlier credit notes, so a line (and its SST) is never credited twice.
+- A credit on the whole invoice is split over what is left on each line, and the SST credited at a rate never goes beyond the SST still on the invoice at that rate.
 - The note PDF shows the taxable amount and SST per rate. The SST summary report (CSV) and the SST-02 worksheet use the split: credit notes reduce and debit notes increase tax in the period of the note.
 
 Notes created before this feature have no stored split; reports estimate theirs the same proportional way and say so.
@@ -77,14 +78,15 @@ Notes created before this feature have no stored split; reports estimate theirs 
 - Once valid, the invoice PDF prints the validation QR code and link, and its footer says it is a validated MyInvois e-Invoice. The client page shows the QR code and a **Check on MyInvois** link. Sandbox documents are marked as tests.
 - **Automatic submission (opt-in):** in Tax > Settings you can submit each invoice when it is issued, and its notes once the invoice is valid. It is off by default. Each document is queued once (dedupe key) and sent once.
 
-**Safety.** Only the official hosts are contacted (`api.myinvois.hasil.gov.my`, `preprod-api.myinvois.hasil.gov.my`). A document can have only one active e-Invoice. If MyInvois does not answer, the record is marked "Checking" and looked up in MyInvois before anything is sent again; after 15 minutes without a trace it can be submitted again. A restored backup never resends: queued work is re-checked and automatic submission is switched off. An invoice with a valid e-Invoice cannot be voided until the e-Invoice is cancelled.
+**Safety.** Only the official hosts are contacted (`api.myinvois.hasil.gov.my`, `preprod-api.myinvois.hasil.gov.my`). A document can have only one active e-Invoice. If MyInvois does not answer, the record is marked "Checking" and looked up in MyInvois before anything is sent again; after 15 minutes without a trace it can be submitted again. A submission left at "Sending" because the server stopped mid-send is treated the same way after 2 minutes, by the background job or **Check status**. A restored backup never resends: queued work is re-checked and automatic submission is switched off. An invoice with a valid e-Invoice cannot be voided until the e-Invoice is cancelled.
 
 **e-Invoice date.** MyInvois rejects documents whose issue time is more than 72 hours before submission, so the e-Invoice carries the submission date and time (UTC). The invoice number links it to your invoice.
 
 ## 22. Cancel within 72 hours, and e-Invoice notes
 
 - **Cancel e-Invoice** appears on a valid e-Invoice until 72 hours after validation. It asks for a reason, which is sent to LHDN. The invoice in Kosongsatu stays issued; void it or issue a credit note afterwards. After 72 hours, use a credit or debit note.
-- Credit and debit notes are submitted as types 02 and 03, refund notes (Credits refunds) as type 04. Each refers to the original e-Invoice by its number and UUID, so the original must be valid first. A refund note asks which invoice it relates to. Note lines use the note's SST split.
+- Credit and debit notes are submitted as types 02 and 03, refund notes (Credits refunds) as type 04. Each refers to the original e-Invoice by its number and UUID, so the original must be valid first. A refund note asks which invoice it relates to, in the refund's currency; a refund in USD is a USD e-Invoice at the receipt's exchange rate. Note lines use the note's SST split.
+- **Seller details are locked per document.** An e-Invoice for an invoice (and its notes and refunds) uses the business details in that invoice's snapshot and the seller tax profile (ID type, MSIC, address) kept when it was issued. Renaming the company or changing its identity later does not change e-Invoices for earlier invoices. A detail that was still empty at issue comes from today's settings, so it can be completed afterwards.
 
 ## 23. Consolidated and self-billed e-Invoices
 

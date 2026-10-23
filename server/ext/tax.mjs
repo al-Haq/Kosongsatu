@@ -16,7 +16,7 @@ import {
 } from "../tax-codes.mjs";
 import {
   TAX_DEFAULTS,
-  chosenGross,
+  creditRoom,
   noteTaxLines,
   parseTaxLines,
   recentPeriods,
@@ -36,6 +36,7 @@ import {
   lineClasses,
   readiness,
   supplierGaps,
+  sellerProfile,
   validationUrl,
 } from "../tax-myinvois.mjs";
 import { certificateInfo } from "../tax-ubl.mjs";
@@ -74,6 +75,12 @@ CREATE TABLE tax_consolidated(id TEXT PRIMARY KEY, month TEXT NOT NULL, number T
 CREATE TABLE tax_consolidated_items(consolidated_id TEXT NOT NULL REFERENCES tax_consolidated(id) ON DELETE CASCADE, document_id TEXT NOT NULL UNIQUE REFERENCES documents(id), PRIMARY KEY(consolidated_id,document_id));
 CREATE TABLE tax_selfbilled(id TEXT PRIMARY KEY, number TEXT NOT NULL UNIQUE, type_code TEXT NOT NULL CHECK(type_code IN ('11','12','13','14')), ref_id TEXT REFERENCES tax_selfbilled(id), issue_date TEXT NOT NULL, supplier TEXT NOT NULL, lines TEXT NOT NULL, currency TEXT NOT NULL DEFAULT 'MYR', fx_rate TEXT NOT NULL DEFAULT '1', subtotal INTEGER NOT NULL, tax INTEGER NOT NULL, total INTEGER NOT NULL, notes TEXT NOT NULL DEFAULT '', created TEXT NOT NULL);
 CREATE TABLE tax_refund_refs(refund_id TEXT PRIMARY KEY REFERENCES refunds(id), reference_id TEXT NOT NULL REFERENCES documents(id));`,
+  },
+  {
+    // The seller's tax profile (ID type, MSIC, address) as it was when an invoice
+    // was issued. Name, TIN and registration are already in the business snapshot.
+    name: "tax-003-seller-snapshot",
+    sql: `ALTER TABLE tax_doc_meta ADD COLUMN seller TEXT NOT NULL DEFAULT '';`,
   },
 ];
 
@@ -244,6 +251,10 @@ function attach(Store) {
       }
       return this.tx(() => {
         const out = originalIssue.call(this, idv);
+        if (out.kind === "invoice")
+          this.db
+            .prepare("INSERT INTO tax_doc_meta(document_id,seller,updated) VALUES(?,?,?) ON CONFLICT(document_id) DO UPDATE SET seller=excluded.seller,updated=excluded.updated")
+            .run(out.id, JSON.stringify(sellerProfile(taxSettings(this))), new Date().toISOString());
         if (out.kind === "invoice" && !consolidateMode(out.client)) einvFor(this).queue("invoice", out.id);
         return out;
       });
@@ -259,11 +270,13 @@ function attach(Store) {
           lines = raw.map((n) => Number(n));
           check(lines.every((n) => Number.isInteger(n) && n >= 0 && n < d.items.length), "Choose lines from this invoice.");
           lines = [...new Set(lines)].sort((x, y) => x - y);
+          // Earlier credit notes on the same lines count: a line is never credited
+          // beyond its value, so its SST is never credited twice.
           if (b.kind === "credit" && /^\d{1,8}(\.\d{1,2})?$/.test(String(b.amount)))
-            check(money(b.amount) <= chosenGross(d, lines), "The credit is larger than the chosen lines.");
+            check(money(b.amount) <= creditRoom(d, lines, d.adjustments), "The credit is larger than the chosen lines have left after earlier credit notes.");
         }
         const a = originalAdjustment.call(this, invoiceId, b);
-        const rows = noteTaxLines(d, a.amount, lines);
+        const rows = noteTaxLines(d, a.amount, lines, { kind: a.kind, prior: d.adjustments });
         const from = lines ? lines.map((n) => n + 1).join(",") : "";
         this.db.prepare("UPDATE adjustments SET tax_lines=?,tax_from_lines=? WHERE id=?").run(JSON.stringify(rows), from, a.id);
         const einv = einvFor(this);

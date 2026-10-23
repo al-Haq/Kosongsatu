@@ -194,6 +194,52 @@ test("a submission that never arrived is released after 15 minutes", async () =>
   }
 });
 
+test("a submission left at 'sending' by a stopped process is recovered from MyInvois", async () => {
+  const f = await setup({ mode: "lost" });
+  try {
+    const d = invoice(f.store, readyClient(f.store));
+    const e = await (await submit(f, { source: "invoice", id: d.id })).json();
+    // The process stopped after sending, before it could record the answer.
+    const stopped = (minutes) =>
+      f.store.db
+        .prepare("UPDATE tax_einvoices SET state='sending',next_check=NULL,errors=NULL,submitted_at=? WHERE id=?")
+        .run(new Date(Date.now() - minutes * 60000).toISOString(), e.id);
+    stopped(0.5);
+    // Still in flight: nothing is touched, and nothing is sent twice.
+    await f.json("/api/jobs/tax:einvoice/run", "POST", {});
+    assert.equal(f.store.db.prepare("SELECT state FROM tax_einvoices WHERE id=?").get(e.id).state, "sending");
+    assert.equal((await submit(f, { source: "invoice", id: d.id })).status, 409);
+    stopped(5);
+    f.fake.state.mode = "valid";
+    for (const x of f.fake.docs.values()) Object.assign(x, { status: "Valid", longId: "LONGBACK" });
+    await f.json("/api/jobs/tax:einvoice/run", "POST", {});
+    const row = f.store.db.prepare("SELECT * FROM tax_einvoices WHERE id=?").get(e.id);
+    assert.equal(row.state, "valid", "found in MyInvois and validated");
+    assert.equal(row.long_id, "LONGBACK");
+    assert.equal(submissions(f.fake).length, 1, "never sent twice");
+  } finally {
+    await f.close();
+  }
+});
+
+test("a 'sending' submission MyInvois never received can be sent again after the check", async () => {
+  const f = await setup({ mode: "network" });
+  try {
+    const d = invoice(f.store, readyClient(f.store));
+    const e = await (await submit(f, { source: "invoice", id: d.id })).json();
+    const old = new Date(Date.now() - 20 * 60000).toISOString();
+    f.store.db.prepare("UPDATE tax_einvoices SET state='sending',next_check=NULL,submitted_at=? WHERE id=?").run(old, e.id);
+    // Checking the status (the owner's refresh) resolves it as well.
+    f.fake.state.mode = "valid";
+    const checked = await f.json(`/api/tax/einvoices/${e.id}/check`, "POST", {});
+    assert.equal(checked.state, "failed");
+    assert.match(JSON.stringify(checked.errors), /no record/);
+    assert.equal((await (await submit(f, { source: "invoice", id: d.id })).json()).state, "valid");
+  } finally {
+    await f.close();
+  }
+});
+
 test("a validated e-Invoice can be cancelled within 72 hours with a reason", async () => {
   const f = await setup();
   try {
@@ -268,6 +314,85 @@ test("a refund note becomes type 04 referencing the related invoice", async () =
     assert.equal(doc.BillingReference[0].InvoiceDocumentReference[0].ID[0]._, d.number);
     assert.equal(doc.LegalMonetaryTotal[0].PayableAmount[0]._, 40);
     assert.equal(f.store.db.prepare("SELECT reference_id FROM tax_refund_refs WHERE refund_id=?").get(refund.id).reference_id, d.id);
+  } finally {
+    await f.close();
+  }
+});
+
+test("a refund in another currency is a type 04 e-Invoice in that currency, not ringgit", async () => {
+  const f = await setup();
+  try {
+    const c = readyClient(f.store);
+    const d = invoice(f.store, c, { items: [{ description: "Work", quantity: "1", rate: "100.00" }], currency: "USD", fx_rate: "4.5" });
+    await submit(f, { source: "invoice", id: d.id });
+    f.store.recordPayment(d.id, { amount: "100.00", paid_date: today(), method: "Bank transfer", reference: "TT-USD-1" });
+    f.store.adjustment(d.id, { kind: "credit", amount: "20.00", reason: "Scope cut" });
+    const receipt = f.store.receipts()[0];
+    assert.equal(receipt.currency, "USD");
+    const refund = f.store.refund(receipt.id, { amount: "20.00", paid_date: today(), reference: "RF-USD-1", reason: "Return of credit" });
+    const myr = invoice(f.store, c, { items: [{ description: "Local work", quantity: "1", rate: "50.00" }] });
+    await submit(f, { source: "invoice", id: myr.id });
+    const wrong = await submit(f, { source: "refund", id: refund.id, invoice_id: myr.id });
+    assert.equal(wrong.status, 400);
+    assert.match((await wrong.json()).error, /in USD/);
+    const e = await (await submit(f, { source: "refund", id: refund.id, invoice_id: d.id })).json();
+    assert.equal(e.type_code, "04");
+    const doc = lastDoc(f.fake).json.Invoice[0];
+    assert.equal(doc.DocumentCurrencyCode[0]._, "USD");
+    assert.equal(doc.TaxExchangeRate[0].CalculationRate[0]._, 4.5);
+    assert.equal(doc.LegalMonetaryTotal[0].PayableAmount[0]._, 20);
+  } finally {
+    await f.close();
+  }
+});
+
+test("an e-Invoice keeps the seller details its invoice was issued with", async () => {
+  const f = await setup();
+  try {
+    const d = invoice(f.store, readyClient(f.store));
+    const issuedAs = d.business.company;
+    // The company is renamed and moves after the invoice was issued.
+    f.store.saveSettings({ company: "Renamed Sdn Bhd", tin: "C99999999990", registration: "202301099999" });
+    f.store.db.prepare("UPDATE tax_settings SET data=json_set(data,'$.city','Shah Alam','$.msic','62021','$.activity','Computer consultancy activities')").run();
+    await submit(f, { source: "invoice", id: d.id });
+    const seller = (doc) => doc.AccountingSupplierParty[0].Party[0];
+    const old = seller(lastDoc(f.fake).json.Invoice[0]);
+    assert.equal(old.PartyLegalEntity[0].RegistrationName[0]._, issuedAs);
+    assert.equal(old.PartyIdentification[0].ID[0]._, "C25845632020");
+    assert.equal(old.PartyIdentification[1].ID[0]._, "202001012345");
+    assert.equal(old.PostalAddress[0].CityName[0]._, "Kuala Lumpur");
+    assert.equal(old.IndustryClassificationCode[0]._, "62010");
+    // Its credit note refers to it with the same seller.
+    f.store.adjustment(d.id, { kind: "credit", amount: "10.00", reason: "Goodwill" });
+    const note = f.store.document(d.id).adjustments[0];
+    const rn = await submit(f, { source: "credit", id: note.id });
+    assert.equal(rn.status, 201, await rn.clone().text());
+    assert.equal(seller(lastDoc(f.fake).json.Invoice[0]).PartyLegalEntity[0].RegistrationName[0]._, issuedAs);
+    // An invoice issued now uses the new details.
+    const d2 = invoice(f.store, readyClient(f.store));
+    const r2 = await submit(f, { source: "invoice", id: d2.id });
+    assert.equal(r2.status, 201, await r2.clone().text());
+    const now = seller(lastDoc(f.fake).json.Invoice[0]);
+    assert.equal(now.PartyLegalEntity[0].RegistrationName[0]._, "Renamed Sdn Bhd");
+    assert.equal(now.PartyIdentification[0].ID[0]._, "C99999999990");
+    assert.equal(now.PostalAddress[0].CityName[0]._, "Shah Alam");
+  } finally {
+    await f.close();
+  }
+});
+
+test("a seller detail missing when the invoice was issued can be completed later", async () => {
+  const f = await setup();
+  try {
+    f.store.saveSettings({ tin: "" });
+    const d = invoice(f.store, readyClient(f.store));
+    const blocked = await submit(f, { source: "invoice", id: d.id });
+    assert.equal(blocked.status, 409);
+    assert.match((await blocked.json()).error, /TIN/);
+    f.store.saveSettings({ tin: "C25845632020" });
+    const e = await (await submit(f, { source: "invoice", id: d.id })).json();
+    assert.equal(e.state, "valid");
+    assert.equal(lastDoc(f.fake).json.Invoice[0].AccountingSupplierParty[0].Party[0].PartyIdentification[0].ID[0]._, "C25845632020");
   } finally {
     await f.close();
   }
