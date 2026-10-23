@@ -763,8 +763,10 @@ export default {
       classes = {};
     for (const d of store.documents()) {
       if (d.kind !== "invoice" || d.state === "void") continue;
-      // Checked with the seller details the invoice will be sent with, as on submission.
-      ready[d.id] = readiness(store, d, s, supplierGaps(store, s, supplierParty(store, s, d)));
+      // Checked with the seller details it will be sent with: the invoice's own,
+      // or today's for a sale reported in the monthly consolidated e-Invoice.
+      const own = readiness(store, d, s, supplierGaps(store, s, supplierParty(store, s, d)));
+      ready[d.id] = own?.mode === "consolidated" ? readiness(store, d, s, gaps) : own;
       classes[d.id] = lineClasses(store, d, s);
     }
     const last = today().slice(0, 7);
