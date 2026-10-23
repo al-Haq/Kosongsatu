@@ -77,6 +77,54 @@ test("B2C invoices of a month become one consolidated e-Invoice for the general 
   }
 });
 
+test("a note on a consolidated sale names the same seller as the consolidated e-Invoice", async () => {
+  const f = await setup();
+  try {
+    const b2c = f.store.saveClient({ name: "Walk-in", tax_fields: "1", tax_einvoice: "consolidate" });
+    const sale = invoice(f.store, b2c, { issue_date: lastMonth + "-10", items: [{ description: "Repair", quantity: "1", rate: "100.00" }] });
+    const city = (v) => f.store.db.prepare("UPDATE tax_settings SET data=json_set(data,'$.city',?)").run(v);
+    const sentCity = () => lastDoc(f.fake).AccountingSupplierParty[0].Party[0].PostalAddress[0].CityName[0]._;
+    // The business moves after the sale and before the month is consolidated.
+    city("Shah Alam");
+    const con = await f.json("/api/tax/consolidated", "POST", { month: lastMonth });
+    const e = await f.json("/api/tax/einvoices", "POST", { source: "consolidated", id: con.id });
+    assert.equal(e.state, "valid");
+    assert.equal(sentCity(), "Shah Alam");
+    // It moves again before a credit note: the note still matches what it refers to.
+    city("Ipoh");
+    const a = f.store.adjustment(sale.id, { kind: "credit", amount: "10.00", reason: "Discount" });
+    const note = await f.json("/api/tax/einvoices", "POST", { source: "credit", id: a.id });
+    assert.equal(note.state, "valid");
+    assert.equal(lastDoc(f.fake).BillingReference[0].InvoiceDocumentReference[0].UUID[0]._, e.uuid);
+    assert.equal(sentCity(), "Shah Alam", "same seller as the consolidated e-Invoice");
+  } finally {
+    await f.close();
+  }
+});
+
+test("consolidated sales are checked with today's seller details, which the consolidation is sent with", async () => {
+  const f = await setup();
+  try {
+    const b2c = f.store.saveClient({ name: "Walk-in", tax_fields: "1", tax_einvoice: "consolidate" });
+    const sale = invoice(f.store, b2c, { issue_date: lastMonth + "-10", items: [{ description: "Repair", quantity: "1", rate: "100.00" }] });
+    const msic = (v) => f.store.db.prepare("UPDATE tax_settings SET data=json_set(data,'$.msic',?)").run(v);
+    // The MSIC code is cleared after the sale.
+    msic("");
+    let ws = await f.json("/api/workspace");
+    assert.equal(ws.ext.tax.ready[sale.id].mode, "consolidated");
+    assert.equal(ws.ext.tax.ready[sale.id].ready, false, "the consolidation would go out with today's details");
+    const con = await f.json("/api/tax/consolidated", "POST", { month: lastMonth });
+    assert.equal((await f.auth("/api/tax/einvoices", "POST", { source: "consolidated", id: con.id })).status, 409);
+    msic("62010");
+    ws = await f.json("/api/workspace");
+    assert.equal(ws.ext.tax.ready[sale.id].ready, true);
+    const e = await f.json("/api/tax/einvoices", "POST", { source: "consolidated", id: con.id });
+    assert.equal(e.state, "valid");
+  } finally {
+    await f.close();
+  }
+});
+
 test("an unsubmitted consolidation can be deleted and rebuilt", async () => {
   const f = await setup();
   try {

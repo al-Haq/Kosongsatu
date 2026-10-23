@@ -398,6 +398,70 @@ test("a seller detail missing when the invoice was issued can be completed later
   }
 });
 
+test("the workspace checks each invoice with the seller details it will be sent with", async () => {
+  const f = await setup();
+  try {
+    const msic = (v) => f.store.db.prepare("UPDATE tax_settings SET data=json_set(data,'$.msic',?)").run(v);
+    const sentMsic = () => lastDoc(f.fake).json.Invoice[0].AccountingSupplierParty[0].Party[0].IndustryClassificationCode[0]._;
+    const old = invoice(f.store, readyClient(f.store));
+    // The MSIC code is cleared in Settings after the invoice was issued.
+    msic("");
+    let ws = await f.json("/api/workspace");
+    assert.ok(ws.ext.tax.supplierGaps.some((g) => /MSIC/.test(g)), "today's settings lack the code");
+    assert.equal(ws.ext.tax.ready[old.id].ready, true, "the invoice keeps the code it was issued with");
+    const fresh = invoice(f.store, readyClient(f.store));
+    ws = await f.json("/api/workspace");
+    assert.equal(ws.ext.tax.ready[fresh.id].ready, false);
+    assert.equal((await submit(f, { source: "invoice", id: old.id })).status, 201);
+    assert.equal(sentMsic(), "62010");
+    // A code that was not valid when the invoice was issued is taken from Settings once corrected.
+    msic("99999");
+    const wrong = invoice(f.store, readyClient(f.store));
+    msic("62021");
+    ws = await f.json("/api/workspace");
+    assert.equal(ws.ext.tax.ready[wrong.id].ready, true);
+    const r = await submit(f, { source: "invoice", id: wrong.id });
+    assert.equal(r.status, 201, await r.clone().text());
+    assert.equal(sentMsic(), "62021");
+  } finally {
+    await f.close();
+  }
+});
+
+test("a kept address that could not be sent comes from Settings as a whole once corrected", async () => {
+  const f = await setup();
+  try {
+    const set = (k, v) => f.store.db.prepare("UPDATE tax_settings SET data=json_set(data,?,?)").run("$." + k, v);
+    const sent = () => lastDoc(f.fake).json.Invoice[0].AccountingSupplierParty[0].Party[0].PostalAddress[0];
+    const moveToShahAlam = () => {
+      set("state", "10");
+      set("city", "Shah Alam");
+      set("postcode", "40000");
+    };
+    // Issued while the state was "Not applicable", which a Malaysian address cannot use.
+    set("state", "17");
+    const d = invoice(f.store, readyClient(f.store));
+    moveToShahAlam();
+    let ws = await f.json("/api/workspace");
+    assert.equal(ws.ext.tax.ready[d.id].ready, true, ws.ext.tax.ready[d.id].missing.join("; "));
+    let r = await submit(f, { source: "invoice", id: d.id });
+    assert.equal(r.status, 201, await r.clone().text());
+    assert.equal(sent().CountrySubentityCode[0]._, "10");
+    assert.equal(sent().CityName[0]._, "Shah Alam", "the whole address, not old and new mixed");
+    // The same for a Malaysian postcode that was not five digits.
+    set("postcode", "4000");
+    const d2 = invoice(f.store, readyClient(f.store));
+    moveToShahAlam();
+    ws = await f.json("/api/workspace");
+    assert.equal(ws.ext.tax.ready[d2.id].ready, true, ws.ext.tax.ready[d2.id].missing.join("; "));
+    r = await submit(f, { source: "invoice", id: d2.id });
+    assert.equal(r.status, 201, await r.clone().text());
+    assert.equal(sent().PostalZone[0]._, "40000");
+  } finally {
+    await f.close();
+  }
+});
+
 test("automatic submission is opt-in, queued once and sent once", async () => {
   const f = await setup();
   try {

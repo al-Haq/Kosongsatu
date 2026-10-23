@@ -36,6 +36,7 @@ import {
   lineClasses,
   readiness,
   supplierGaps,
+  supplierParty,
   sellerProfile,
   validationUrl,
 } from "../tax-myinvois.mjs";
@@ -81,6 +82,11 @@ CREATE TABLE tax_refund_refs(refund_id TEXT PRIMARY KEY REFERENCES refunds(id), 
     // was issued. Name, TIN and registration are already in the business snapshot.
     name: "tax-003-seller-snapshot",
     sql: `ALTER TABLE tax_doc_meta ADD COLUMN seller TEXT NOT NULL DEFAULT '';`,
+  },
+  {
+    // The seller each e-Invoice was sent with, so its notes and refunds match it.
+    name: "tax-004-einvoice-seller",
+    sql: `ALTER TABLE tax_einvoices ADD COLUMN supplier TEXT;`,
   },
 ];
 
@@ -757,7 +763,10 @@ export default {
       classes = {};
     for (const d of store.documents()) {
       if (d.kind !== "invoice" || d.state === "void") continue;
-      ready[d.id] = readiness(store, d, s, gaps);
+      // Checked with the seller details it will be sent with: the invoice's own,
+      // or today's for a sale reported in the monthly consolidated e-Invoice.
+      const own = readiness(store, d, s, supplierGaps(store, s, supplierParty(store, s, d)));
+      ready[d.id] = own?.mode === "consolidated" ? readiness(store, d, s, gaps) : own;
       classes[d.id] = lineClasses(store, d, s);
     }
     const last = today().slice(0, 7);
