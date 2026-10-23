@@ -155,7 +155,8 @@ test("encrypted backup restores a consistent new database and revokes sessions a
     const encrypted = await readFile(file);
     assert.equal(encrypted.subarray(0, 4).toString(), "NWL2");
     assert.ok(!encrypted.includes(Buffer.from("Backup client")));
-    assert.equal((await stat(file)).mode & 0o777, 0o600);
+    // Windows has no owner-only file mode (chmod only sets read-only).
+    if (process.platform !== "win32") assert.equal((await stat(file)).mode & 0o777, 0o600);
     assert.equal(manager.status().lastError, null);
     assert.equal((await readdir(directory)).length, 1);
     const output = join(dir, "restored.sqlite");
