@@ -1,4 +1,5 @@
 import { randomBytes } from "node:crypto";
+import { readCache } from "./context.mjs";
 import {
   id,
   hash,
@@ -176,11 +177,13 @@ export function attachFinance(Store) {
     },
     hydrate(row) {
       const d = originalHydrate.call(this, row);
-      const adjustments = this.db
-        .prepare(
-          "SELECT * FROM adjustments WHERE invoice_id=? ORDER BY created",
-        )
-        .all(row.id);
+      const adjustments = this.rowsOf(
+        "adjustments",
+        "invoice_id",
+        row.id,
+        () => this.db.prepare("SELECT * FROM adjustments WHERE invoice_id=? ORDER BY created, rowid").all(row.id),
+        "SELECT * FROM adjustments ORDER BY created, rowid",
+      );
       const credit = adjustments
           .filter((a) => a.kind === "credit")
           .reduce((s, a) => s + a.amount, 0),
@@ -190,11 +193,21 @@ export function attachFinance(Store) {
       // A release is dated with the credit note that caused it (never before the
       // payment it comes from), so balances as at an earlier date can still be
       // worked out (statements, aging).
-      const releasesOf = this.db.prepare(
-        "SELECT r.amount, COALESCE(a.issue_date, substr(r.created,1,10)) AS date FROM allocation_releases r LEFT JOIN adjustments a ON a.id=r.adjustment_id WHERE r.payment_id=? ORDER BY r.created,r.id",
-      );
+      const releasesOf = (pid) =>
+        this.rowsOf(
+          "releases",
+          "payment_id",
+          pid,
+          () =>
+            this.db
+              .prepare(
+                "SELECT r.amount, COALESCE(a.issue_date, substr(r.created,1,10)) AS date FROM allocation_releases r LEFT JOIN adjustments a ON a.id=r.adjustment_id WHERE r.payment_id=? ORDER BY r.created,r.id",
+              )
+              .all(pid),
+          "SELECT r.payment_id, r.amount, COALESCE(a.issue_date, substr(r.created,1,10)) AS date FROM allocation_releases r LEFT JOIN adjustments a ON a.id=r.adjustment_id ORDER BY r.created,r.id",
+        );
       const payments = d.payments.map((p) => {
-        const releases = releasesOf.all(p.id).map((r) => ({ amount: r.amount, date: r.date < p.paid_date ? p.paid_date : r.date }));
+        const releases = releasesOf(p.id).map((r) => ({ amount: r.amount, date: r.date < p.paid_date ? p.paid_date : r.date }));
         const released = releases.reduce((s, r) => s + r.amount, 0);
         return {
           ...p,
@@ -265,10 +278,15 @@ export function attachFinance(Store) {
       };
     },
     receipts() {
-      return this.db
+      // Read more than once while the workspace is built: worked out once then.
+      const cache = readCache.getStore();
+      if (cache?.receipts) return cache.receipts;
+      const out = this.db
         .prepare("SELECT id FROM cash_receipts ORDER BY created DESC,id")
         .all()
         .map((r) => this.receipt(r.id));
+      if (cache) cache.receipts = out;
+      return out;
     },
     receive(b) {
       return this.tx(() => {

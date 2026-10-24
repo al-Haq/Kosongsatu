@@ -7,7 +7,7 @@ import { migratePlugins, attachPlugins } from "./plugins.mjs";
 import { attachSales } from "./sales.mjs";
 import { attachAutomation } from "./automation.mjs";
 import { migrate } from "./migrations.mjs";
-import { requestContext } from "./context.mjs";
+import { requestContext, readCache } from "./context.mjs";
 import { attachFinance } from "./finance.mjs";
 import { attachBanking } from "./banking.mjs";
 import { loadMfaKey } from "./mfa.mjs";
@@ -90,8 +90,14 @@ export class Store {
   constructor(db) {
     this.db = db;
   }
+  // Builds a read-only answer with repeated reads worked out once (see readCache).
+  cachedReads(fn) {
+    return readCache.run({}, fn);
+  }
   tx(fn) {
     if (this._transaction) return fn();
+    const cache = readCache.getStore();
+    if (cache) for (const k of Object.keys(cache)) delete cache[k];
     this.db.exec("BEGIN IMMEDIATE");
     this._transaction = true;
     try {
@@ -206,16 +212,37 @@ export class Store {
     return s;
   }
   document(idv) {
+    const kept = readCache.getStore()?.byId?.get(idv);
+    if (kept) return kept;
     const row = this.db.prepare("SELECT * FROM documents WHERE id=?").get(idv);
     check(row, "Document not found.", 404);
     return this.hydrate(row);
   }
+  // Rows that belong to one document. While documents() works out every
+  // document at once, the whole set is read in one query (`all`, ordered as
+  // the single query is) and grouped by `key`, instead of one query each.
+  rowsOf(name, key, value, single, all) {
+    const bulk = this._bulk;
+    if (!bulk) return single();
+    let map = bulk.get(name);
+    if (!map) {
+      map = new Map();
+      for (const r of this.db.prepare(all).all()) {
+        if (!map.has(r[key])) map.set(r[key], []);
+        map.get(r[key]).push(r);
+      }
+      bulk.set(name, map);
+    }
+    return map.get(value) || [];
+  }
   hydrate(row) {
-    const payments = this.db
-      .prepare(
-        "SELECT * FROM payments WHERE invoice_id=? ORDER BY created DESC",
-      )
-      .all(row.id);
+    const payments = this.rowsOf(
+      "payments",
+      "invoice_id",
+      row.id,
+      () => this.db.prepare("SELECT * FROM payments WHERE invoice_id=? ORDER BY created DESC, rowid DESC").all(row.id),
+      "SELECT * FROM payments ORDER BY created DESC, rowid DESC",
+    );
     const paid = payments
       .filter((p) => !p.reversed)
       .reduce((s, p) => s + p.amount, 0);
@@ -236,18 +263,32 @@ export class Store {
       balance: row.total - paid,
       status: status(row, paid),
       payments,
-      proofs: this.db
-        .prepare(
-          "SELECT * FROM proofs WHERE invoice_id=? ORDER BY created DESC",
-        )
-        .all(row.id),
+      proofs: this.rowsOf(
+        "proofs",
+        "invoice_id",
+        row.id,
+        () => this.db.prepare("SELECT * FROM proofs WHERE invoice_id=? ORDER BY created DESC, rowid DESC").all(row.id),
+        "SELECT * FROM proofs ORDER BY created DESC, rowid DESC",
+      ),
     };
   }
   documents() {
-    return this.db
-      .prepare("SELECT * FROM documents ORDER BY created DESC")
-      .all()
-      .map((d) => this.hydrate(d));
+    const cache = readCache.getStore();
+    if (cache?.documents) return cache.documents;
+    const rows = this.db.prepare("SELECT * FROM documents ORDER BY created DESC").all();
+    // Every document at once: the rows each one needs are read in bulk (rowsOf).
+    this._bulk = new Map([["documents", new Map(rows.map((r) => [r.id, r]))]]);
+    let out;
+    try {
+      out = rows.map((d) => this.hydrate(d));
+    } finally {
+      this._bulk = null;
+    }
+    if (cache) {
+      cache.documents = out;
+      cache.byId = new Map(out.map((d) => [d.id, d]));
+    }
+    return out;
   }
   saveDocument(b, idv = id()) {
     const existing = this.db

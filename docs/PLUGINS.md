@@ -44,7 +44,10 @@ export default {
   },
   // Background work. Never overlaps itself. Runs as actor "job:<module>:<name>".
   jobs: [{ name: "sweep", every: 3600000, delay: 15000, async run(ctx) { return { done: 0 }; } }],
-  // Added to GET /api/workspace as S.ext.<name>.
+  // Added to GET /api/workspace as S.ext.<name>. Read documents with
+  // store.documents() / store.document(id): during the load they are worked
+  // out once for every module (store.cachedReads). Hydrating rows yourself
+  // repeats that work for each document.
   workspace(r) { return {}; },
   // Added to the client document JSON as d.ext.<name>. Client-safe data only.
   publicDocument(d, r) { return {}; },
