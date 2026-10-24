@@ -1,6 +1,7 @@
 import { automationUI } from "./automation.mjs";
 import { dmy, isoDate, tidyDmy } from "./dates.mjs";
 import { financeUI } from "./finance.mjs";
+import { createAutosave } from "./autosave.mjs";
 import { UI_PLUGINS } from "./plugins.mjs";
 import { totals, toMYR, basisPoints, percentOf } from "./ext/documents-calc.mjs";
 import { labels, titleFor, statusLabel, formatDate } from "./ext/documents-i18n.mjs";
@@ -17,7 +18,8 @@ const slot = (name, ...args) =>
 // can(kind, name) returning false. The server still enforces every permission.
 const allowed = (kind, name) =>
   plugins.every((p) => p.can?.(kind, name) !== false);
-const requestKeys = new Map();
+// Keeps unsaved form input on this device (see autosave.mjs); set up before boot.
+let autosave = null;
 let S = null,
   publicDoc = null,
   session = null,
@@ -114,18 +116,25 @@ async function api(path, method = "GET", body) {
     method === "POST" &&
     /^\/(documents|receipts|bank|clients|services|schedules|sales)/.test(path);
   const requestId = method + ":" + path + ":" + JSON.stringify(body);
-  if (retryable && !requestKeys.has(requestId))
-    requestKeys.set(requestId, crypto.randomUUID());
-  const response = await fetch("/api" + path, {
-    method,
-    headers: {
-      ...(retryable ? { "Idempotency-Key": requestKeys.get(requestId) } : {}),
-      ...(body ? { "Content-Type": "application/json" } : {}),
-      ...(method !== "GET" && session ? { "X-CSRF-Token": session.csrf } : {}),
-    },
-    ...(body ? { body: JSON.stringify(body) } : {}),
-  });
-  if (response.ok || response.status < 500) requestKeys.delete(requestId);
+  // Kept on this device until the server answers (see autosave.mjs).
+  const requestKey = retryable ? autosave?.requestKey(requestId) || crypto.randomUUID() : null;
+  let response;
+  try {
+    response = await fetch("/api" + path, {
+      method,
+      headers: {
+        ...(requestKey ? { "Idempotency-Key": requestKey } : {}),
+        ...(body ? { "Content-Type": "application/json" } : {}),
+        ...(method !== "GET" && session ? { "X-CSRF-Token": session.csrf } : {}),
+      },
+      ...(body ? { body: JSON.stringify(body) } : {}),
+    });
+  } catch {
+    // No answer: nothing is lost. The form keeps its input (and a draft on this
+    // device), and saving again reuses the same idempotency key, so it is not doubled.
+    throw new Error("No connection. What you typed is kept on this device. Save again when you are back online.");
+  }
+  if (requestKey && (response.ok || response.status < 500)) autosave?.answered(requestId);
   const bin = response.ok && response.headers.get("X-Bin-Entry");
   if (bin) undoBin = { id: bin, at: Date.now() };
   let data;
@@ -149,6 +158,7 @@ async function refresh() {
   S = await api("/workspace");
 }
 function showModal(title, body, wide = false) {
+  autosave?.flush();
   modal.className = wide ? "wide" : "";
   modal.innerHTML = `<div class="modal-head"><h2>${E(title)}</h2><button type="button" class="btn ghost" data-action="close-modal" aria-label="Close dialog">${icon("close")}</button></div><div class="modal-body">${body}</div>`;
   modal.showModal();
@@ -201,6 +211,7 @@ const confirmModal = (title, message, action, id, label) =>
     `<p>${E(message)}</p><div class="form-error" role="alert"></div><div class="form-actions">${button("Cancel", "close-modal")}${button(label, action, id, true)}</div>`,
   );
 function renderLogin() {
+  autosave?.flush();
   app.innerHTML = `<div class="login-screen"><section class="login-brand"><span class="eyebrow">NAWLOGIC / BILLING WORKSPACE</span><h1>Good work deserves<br><span class="accent">a clear invoice.</span></h1><p>From the first quotation to the final receipt. A quieter way to keep your business moving.</p><div class="login-points"><span>${icon("doc")}Create with confidence</span><span>${icon("wallet")}Track every payment</span><span>${icon("shield")}Your private workspace</span></div></section><section class="login-form"><div class="login-inner">${logo()}<h2>Welcome back.</h2><p>Sign in to your Nawlogic workspace.</p><form data-form="login">${input("Email address", "email", "", "email", true, 'autocomplete="username" maxlength="160"')}${input("Password", "password", "", "password", true, 'autocomplete="current-password" maxlength="256"')}<details class="mfa"><summary>Use an authenticator or recovery code</summary>${input("Authenticator or recovery code", "code", "", "text", false, 'autocomplete="one-time-code" maxlength="40"')}</details>${errorBlock()}<button class="btn primary" type="submit">Sign in ${icon("arrow")}</button></form>${slot("login")}<div class="login-footer">${icon("shield")} Team access only. Customer invoices use a separate private link.</div></div></section></div>`;
 }
 const NAV_GROUPS = ["Sell", "Get paid", "Records", "Books", "Operations", "Workspace"];
@@ -794,6 +805,7 @@ function settingsTabs(wanted) {
 }
 function renderRoute() {
   if (!session || !S) return;
+  autosave?.flush();
   const [rawPage, id] = location.hash.replace(/^#\/?/, "").split("/");
   const page = rawPage || "overview";
   let html,
@@ -1055,6 +1067,8 @@ async function runAction(action, id, el) {
   if (await advanced.action(action, id)) return;
   switch (action) {
     case "close-modal":
+      // Cancel or Close: what was typed in the dialog is not kept.
+      autosave?.discardIn(modal);
       modal.close();
       break;
     case "secret-edit":
@@ -1068,6 +1082,7 @@ async function runAction(action, id, el) {
       break;
     case "logout":
       await api("/logout", "POST", {});
+      autosave?.clearUser();
       session = null;
       S = null;
       renderLogin();
@@ -1402,6 +1417,7 @@ async function submitForm(form) {
     session = await api("/login", "POST", b);
     await refresh();
     renderRoute();
+    autosave?.showPending($("main.content"));
     return;
   }
   if (type === "client") {
@@ -1578,9 +1594,13 @@ document.addEventListener("submit", async (event) => {
   const error = $(".form-error", form);
   if (error) error.textContent = "";
   if (submit) submit.disabled = true;
+  // Taken before the save, which may replace the form.
+  const draftKey = autosave?.submit(form);
   try {
     await submitForm(form);
+    autosave?.saved(form, draftKey);
   } catch (e) {
+    autosave?.failed(form, draftKey);
     if (error && error.isConnected) error.textContent = e.message;
     else toast(e.message, true);
     if (form.dataset.form === "login" && /code/i.test(e.message)) $("details.mfa", form)?.setAttribute("open", "");
@@ -1652,6 +1672,7 @@ async function boot() {
     session = await api("/session");
     await refresh();
     renderRoute();
+    autosave?.showPending($("main.content"));
   } catch (e) {
     if (e.message === "Please sign in.") renderLogin();
     else {
@@ -1718,4 +1739,40 @@ advanced = financeUI(uiHelpers);
 workflow = automationUI(uiHelpers);
 plugins = UI_PLUGINS.map(([name, make]) => ({ name, ...make(uiHelpers) }));
 for (const p of plugins) Object.assign(icons, p.icons || {});
+// Esc closes a dialog like Cancel does.
+modal.addEventListener("cancel", () => autosave?.discardIn(modal));
+// Dialogs opened by these actions can be opened again from the "unsaved changes" list.
+const REOPEN = new Set([
+  ...["new-invoice", "client-invoice", "new-quote", "new-proforma", "new-sales-order", "new-delivery-order", "edit-document"],
+  ...["new-client", "edit-client", "new-service", "edit-service"],
+  ...plugins.flatMap((p) => p.autosaveOpeners || []),
+]);
+autosave = createAutosave({
+  user: () => session?.email || null,
+  extras: {
+    // Modules keep their own line rows (recurring plans, supplier bills...).
+    ...Object.assign({}, ...plugins.map((p) => p.autosave || {})),
+    // Invoice lines have no field names: kept as a list and rebuilt on restore.
+    editor: {
+      capture: (form) => editorData(form).items,
+      restore: (form, items) => {
+        if (!Array.isArray(items) || !items.length) return;
+        $("#line-items", form).innerHTML = items
+          .map((i) => lineMarkup({ ...i, rate: Math.round(Number(i.rate || 0) * 100) }, form.dataset.kind))
+          .join("");
+        updatePreview();
+      },
+    },
+  },
+  canReopen: (action) => REOPEN.has(action),
+  reopen: async (o) => {
+    if (o.route && location.hash !== o.route) {
+      location.hash = o.route.replace(/^#/, "");
+      await new Promise((r) => setTimeout(r, 0));
+    }
+    if (o.action === "edit-document" && !S.documents.some((d) => d.id === o.id && d.state === "draft"))
+      return toast("That draft is no longer editable.", true);
+    await runAction(o.action, o.id);
+  },
+});
 boot();

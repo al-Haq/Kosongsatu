@@ -90,12 +90,20 @@ export default function commsUI(h) {
       ? '<p class="field-hint">Opens are tracked with a tiny image. Many mail apps block or pre-load images, so treat opens as approximate.</p>'
       : "";
   function wireLanguage(form, query) {
-    let edited = false;
-    for (const f of [form.elements.subject, form.elements.message]) f?.addEventListener("input", () => (edited = true));
+    let edited = false,
+      edits = 0;
+    for (const f of [form.elements.subject, form.elements.message])
+      f?.addEventListener("input", () => {
+        edited = true;
+        edits++;
+      });
     form.elements.language?.addEventListener("change", async () => {
       if (edited && !confirm("Replace your edited subject and message with the template in this language?")) return;
+      const before = edits;
       try {
         const c = await api(`/comms/compose?${query}&language=${form.elements.language.value}`);
+        // Typed, or restored from a draft, while the template loaded: that text stays.
+        if (edits !== before) return;
         form.elements.subject.value = c.subject;
         form.elements.message.value = c.message;
         edited = false;

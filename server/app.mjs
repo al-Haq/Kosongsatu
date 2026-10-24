@@ -129,6 +129,8 @@ export function createApp({
   gatewayConfig,
   gatewayFetch,
   trustProxy = 0,
+  // Sign-in attempts per address per 15 minutes. Only the browser-test server raises it.
+  loginLimit = 10,
   backupConfig = {
     directory: process.env.BACKUP_DIRECTORY,
     key: process.env.BACKUP_KEY,
@@ -380,7 +382,7 @@ export function createApp({
         if (path === "/api/health" && method === "GET")
           return send(200, { ok: true });
         if (path === "/api/login" && method === "POST") {
-          allow("login:" + ipOf(req), 10, 15 * 60000);
+          allow("login:" + ipOf(req), loginLimit, 15 * 60000);
           const b = await body();
           const email = text(b.email || "", 160).toLowerCase();
           const owner = store.db

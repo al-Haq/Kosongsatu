@@ -27,6 +27,46 @@ The Overview shows:
 
 The charts are SVG built from attributes only, because the CSP allows no inline styles.
 
+## Autosave and offline
+
+What you type into a workspace form is kept on the device as you type (`public/autosave.mjs`). Nothing is lost if the computer or phone switches off, the tab closes or the connection drops before you press Save.
+
+**What gets kept, and where**
+
+- Each form's unsaved input is saved in the browser's `localStorage` for the signed-in user, about half a second after the last keystroke, and again when the page is hidden or closed.
+- Lines are kept too, including lines added later: invoices and quotations, recurring plans, supplier bills and purchase orders. A module keeps its own lines through an `autosave` capture/restore hook, and lists the actions that open its forms in `autosaveOpeners`.
+- A draft is only kept if all of it can be put back. A form with line rows but no hook is not autosaved. Neither is a form whose rows changed: a row added or removed, or one removed and a new one added in its place. A field's row is known from the `data-` attributes around it, such as a custom field row's `data-field`, and a tick box's or option's from its value, such as a time entry's id. A draft is never restored by half, or into the wrong rows.
+- Restoring a draft fires `input` and `change` only on fields whose value changes, as if typed. A module that fills fields when another changes, and does so after a wait (an email language's template), must not overwrite text typed or restored during that wait.
+- A draft belongs to its record and its parent. Every `data-` attribute on the form is part of the draft's key: the record (`data-id`) and the parent it is saved under (`data-project`, `data-doc`, `data-client`…). A milestone typed under one project never opens under another. Request keys are not part of the draft's key.
+
+**Getting it back**
+
+- Opening the same form again restores what was typed, with the note "Restored what you typed on … It is not saved yet." and a **Discard** button. A form on a page, such as Settings, is restored when you go back to that page.
+- A draft remembers the page its form was on, even if you leave the page straight after typing.
+- After signing in or reloading, any unsaved work whose form is not on screen is listed once at the top under "Unsaved changes on this device". It has **Open**, for new or edited documents, clients and services, or the page it came from, and **Discard**.
+
+- A save that reached the server but whose answer was lost (the connection dropped, or the power went) is not done twice. Its request key is kept on the device until the server answers, and kept with the draft for a module form's own key (`data-request-key`, `data-key`). Sending the restored draft again reuses the key, and the server returns the first result.
+
+**When a draft is removed**
+
+- Saving the form, or **Cancel**, Close or Esc on a dialog.
+- Signing out removes that user's drafts and kept request keys from the device.
+- Drafts expire after 7 days.
+
+**What is never kept**
+
+- Password, code and key fields.
+- File pickers and hidden fields.
+- The sign-in, password, MFA, integration-key and backup-key forms.
+
+**Offline**
+
+- A bar at the bottom says "You are offline…".
+- A save that cannot reach the server says "No connection. What you typed is kept on this device. Save again when you are back online."
+- Saving again reuses the same idempotency key, so a payment or document is never recorded twice.
+
+The browser-test server raises the sign-in limit (`loginLimit`), because every test signs in. Production keeps 10 attempts per address per 15 minutes, and a unit test covers that limit.
+
 ## Ten workflows
 
 1. Dashboard: separate invoiced value, collected payments, outstanding and overdue.
