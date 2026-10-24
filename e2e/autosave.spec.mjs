@@ -92,6 +92,40 @@ test("autosave: unsaved input survives a reload or a lost connection, and is res
   await page.locator('#modal [data-action="close-modal"]').first().click();
   expect(await drafts(page)).toEqual([]);
 
+  // A draft belongs to its parent record: a milestone typed under one project
+  // never opens under another, and comes back under its own.
+  const project = async (name) => {
+    await page.goto("/#/projects");
+    await page.click('[data-action="ops-project-new"]');
+    const form = page.locator('form[data-form="ops-project-save"]');
+    await form.locator("select[name=client_id]").selectOption({ label: client });
+    await form.locator("input[name=name]").fill(name);
+    await form.locator("button[type=submit]").click();
+    await expect(page.locator("main h1")).toHaveText(name);
+    expect(await drafts(page)).toEqual([]);
+    return page.url();
+  };
+  const projectA = await project(unique("Project A"));
+  const projectB = await project(unique("Project B"));
+  const milestone = page.locator('form[data-form="ops-ms-save"]');
+  await page.goto(projectA);
+  await page.click('[data-action="ops-ms-new"]');
+  await milestone.locator("input[name=name]").fill("Design sign-off");
+  await expect.poll(() => drafts(page)).toHaveLength(1);
+  await page.reload();
+  await page.goto(projectB);
+  await page.click('[data-action="ops-ms-new"]');
+  await expect(milestone.locator("input[name=name]")).toHaveValue("");
+  await expect(milestone.locator(".autosave-notice")).toHaveCount(0);
+  await page.locator('#modal [data-action="close-modal"]').first().click();
+  expect(await drafts(page)).toHaveLength(1);
+  await page.goto(projectA);
+  await page.click('[data-action="ops-ms-new"]');
+  await expect(milestone.locator(".autosave-notice")).toBeVisible();
+  await expect(milestone.locator("input[name=name]")).toHaveValue("Design sign-off");
+  await page.locator('#modal [data-action="close-modal"]').first().click();
+  expect(await drafts(page)).toEqual([]);
+
   // Rows added to a form that has no hook are not kept, rather than restored by half.
   await page.goto("/#/settings/documents");
   await page.click('[data-action="doc-field-add"]');

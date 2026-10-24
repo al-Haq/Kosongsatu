@@ -92,11 +92,28 @@ export function createAutosave({ user, extras = {}, canReopen = () => false, reo
     if (u) lastUser = u;
     return u ? encodeURIComponent(String(u).toLowerCase()) + ":" : null;
   };
+  // A form's data- attributes say which record it belongs to (data-id, and the
+  // parent: data-project, data-doc, data-client...), so they are all in the key
+  // and a draft never opens under another record. Read once, as the form was
+  // built: a request key added when it is sent must not move the draft.
+  const contexts = new WeakMap();
+  const contextOf = (form) => {
+    if (!contexts.has(form))
+      contexts.set(
+        form,
+        Object.entries(form.dataset)
+          .filter(([k, v]) => v !== "" && !["form", "key", "requestKey"].includes(k))
+          .sort(([a], [b]) => (a < b ? -1 : 1))
+          .map(([k, v]) => k + "=" + encodeURIComponent(v))
+          .join("&"),
+      );
+    return contexts.get(form);
+  };
   const keyOf = (form) => {
     const u = userPart();
     const name = form?.dataset?.form;
     if (!u || !name || SKIP_FORMS.has(name)) return null;
-    return PREFIX + u + [name, form.dataset.id || "", form.dataset.kind || ""].join(":");
+    return PREFIX + u + encodeURIComponent(name) + ":" + contextOf(form);
   };
   const fields = (form) => [...form.elements].filter((el) => el.name && !el.disabled && !skipField(el));
   function snapshot(form) {
