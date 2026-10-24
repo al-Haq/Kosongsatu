@@ -629,8 +629,9 @@ export function createApp({
               await assistant.run(session.owner_id, await body()),
             );
           }
+          // Every module reads the documents: they are worked out once per load.
           if (path === "/api/workspace" && method === "GET")
-            return send(200, {
+            return send(200, await store.cachedReads(async () => ({
               ...store.workspace(),
               finance: store.finance(),
               security: mfaStatus(store, session.owner_id),
@@ -660,7 +661,7 @@ export function createApp({
                   PLUGINS.filter((p) => p.workspace).map(async (p) => [p.name, await p.workspace(r)]),
                 ),
               ),
-            });
+            })));
           if (path === "/api/settings" && method === "PUT")
             return send(200, store.saveSettings(await body()));
           if (path === "/api/backup" && method === "GET")

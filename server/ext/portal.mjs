@@ -248,8 +248,10 @@ export default {
     const { store, mailer, appUrl } = r.ctx;
     const asOf = today();
     const invoices = new Map();
-    for (const row of store.db.prepare("SELECT * FROM documents WHERE kind='invoice' AND state='issued'").all()) {
-      const d = store.hydrate(row);
+    // The workspace's documents, worked out once for every module (store.cachedReads).
+    const documents = store.documents();
+    for (const d of documents) {
+      if (d.kind !== "invoice" || d.state !== "issued") continue;
       if (!invoices.has(d.client_id)) invoices.set(d.client_id, []);
       invoices.get(d.client_id).push(d);
     }
@@ -264,10 +266,8 @@ export default {
       .all())
       contacts[c.client_id]?.push(c);
     const drafts = {};
-    for (const row of store.db
-      .prepare(`SELECT * FROM documents WHERE state='draft' AND kind IN (${HELD_KINDS.map(() => "?").join(",")})`)
-      .all(...HELD_KINDS)) {
-      const d = store.hydrate(row);
+    for (const d of documents) {
+      if (d.state !== "draft" || !HELD_KINDS.includes(d.kind)) continue;
       const c = store.creditCheck(d, clients[d.client_id]);
       drafts[d.id] = {
         blocked: c.blocked,

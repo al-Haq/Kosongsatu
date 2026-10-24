@@ -91,6 +91,31 @@ export function instalmentSchedule(rows, value, paid) {
   };
 }
 
+// Documents made from this one (sales order, invoice, delivery order...), in
+// the order they were made. In bulk (rowsOf) they are grouped from the rows
+// already read, instead of one query per document.
+const LINK_COLUMNS = ["id", "kind", "number", "state", "source_role", "total", "currency"];
+function linkedChildren(store, row) {
+  const bulkRows = store._bulk?.get("documents");
+  if (!bulkRows)
+    return store.db
+      .prepare("SELECT id,kind,number,state,source_role,total,currency FROM documents WHERE source_id=? OR source_quote=? ORDER BY created,id")
+      .all(row.id, row.id);
+  let map = store._bulk.get("children");
+  if (!map) {
+    map = new Map();
+    const linked = [...bulkRows.values()]
+      .filter((r) => r.source_id || r.source_quote)
+      .sort((a, b) => (a.created < b.created ? -1 : a.created > b.created ? 1 : a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+    for (const r of linked)
+      for (const parent of new Set([r.source_id, r.source_quote].filter(Boolean))) {
+        if (!map.has(parent)) map.set(parent, []);
+        map.get(parent).push(Object.fromEntries(LINK_COLUMNS.map((k) => [k, r[k]])));
+      }
+    store._bulk.set("children", map);
+  }
+  return map.get(row.id) || [];
+}
 export function attachDocuments(Store) {
   const P = Store.prototype;
   const original = {
@@ -390,15 +415,17 @@ export function attachDocuments(Store) {
       const d = original.hydrate.call(this, row);
       bindPdf(d.business, this);
       if (row.business_snapshot) freezeBusiness(d.business);
-      const children = this.db
-        .prepare(
-          "SELECT id,kind,number,state,source_role,total,currency FROM documents WHERE source_id=? OR source_quote=? ORDER BY created,id",
-        )
-        .all(row.id, row.id);
+      const children = linkedChildren(this, row);
       const parentId = row.source_id || row.source_quote;
-      const source = parentId
-        ? this.db.prepare("SELECT id,kind,number,state FROM documents WHERE id=?").get(parentId) || null
-        : null;
+      const bulkRows = this._bulk?.get("documents");
+      const parent = parentId && bulkRows ? bulkRows.get(parentId) : null;
+      const source = !parentId
+        ? null
+        : bulkRows
+          ? parent
+            ? { id: parent.id, kind: parent.kind, number: parent.number, state: parent.state }
+            : null
+          : this.db.prepare("SELECT id,kind,number,state FROM documents WHERE id=?").get(parentId) || null;
       d.links = { source, source_role: row.source_role || (row.source_quote ? "conversion" : null), children };
       const active = children.filter((c) => c.state !== "void");
       if (["proforma", "sales_order", "delivery_order"].includes(d.kind)) {
@@ -423,9 +450,13 @@ export function attachDocuments(Store) {
       d.next_due_date = null;
       d.next_due_amount = 0;
       if (d.kind === "invoice") {
-        const rows = this.db
-          .prepare("SELECT seq,due_date,amount FROM document_instalments WHERE invoice_id=? ORDER BY seq")
-          .all(row.id);
+        const rows = this.rowsOf(
+          "instalments",
+          "invoice_id",
+          row.id,
+          () => this.db.prepare("SELECT seq,due_date,amount FROM document_instalments WHERE invoice_id=? ORDER BY seq").all(row.id),
+          "SELECT invoice_id,seq,due_date,amount FROM document_instalments ORDER BY seq",
+        ).map(({ seq, due_date, amount }) => ({ seq, due_date, amount }));
         const open = d.state === "issued" && d.balance > 0;
         if (rows.length) {
           const plan = instalmentSchedule(rows, d.adjusted_total ?? d.total, d.paid);
@@ -448,7 +479,13 @@ export function attachDocuments(Store) {
           d.next_due_amount = d.balance;
         }
       }
-      d.attachments = this.files("document", row.id, "attachment");
+      d.attachments = this.rowsOf(
+        "attachments",
+        "entity_id",
+        row.id,
+        () => this.files("document", row.id, "attachment"),
+        "SELECT id,entity_type,entity_id,purpose,name,mime,size,sha256,visibility,created_by,created FROM files WHERE entity_type='document' AND purpose='attachment' ORDER BY created,id",
+      );
       return d;
     },
     convert(idv) {
