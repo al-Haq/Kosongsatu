@@ -1,7 +1,7 @@
 import { test, expect } from "@playwright/test";
 import { signIn, watchErrors, unique, createClient } from "./helpers.mjs";
 
-test("overview: month comparisons, 12-week collections and aging; the menu marks the current page", async ({ page }) => {
+test("overview: month comparisons, 12-week chart, aging and instalment lateness; the menu marks the current page", async ({ page }) => {
   const errors = watchErrors(page);
   await signIn(page);
   await page.goto("/#/overview");
@@ -21,12 +21,9 @@ test("overview: month comparisons, 12-week collections and aging; the menu marks
   expect(await active.evaluate((a) => [getComputedStyle(a).backgroundColor, getComputedStyle(a).color])).toEqual(["rgb(0, 0, 0)", "rgb(255, 255, 255)"]);
   await page.goto("/#/invoices");
   await expect(page.locator('.sidebar nav a[aria-current="page"]')).toHaveText("Invoices");
-  expect(errors).toEqual([]);
-});
 
-test("overview: an invoice with a missed instalment counts as late from that instalment", async ({ page }) => {
-  const errors = watchErrors(page);
-  await signIn(page);
+  // An invoice with a missed instalment counts as late from that instalment.
+  // (One test, one sign-in: the suite stays within the sign-in rate limit.)
   const client = unique("Instalment Client");
   await createClient(page, client);
   const dmy = (days) => {
