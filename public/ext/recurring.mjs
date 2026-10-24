@@ -470,7 +470,26 @@ export default function recurringUI(h) {
     return policy ? `<div class="paper-notes"><h3>Late payment</h3><p>${E(policy)}</p></div>` : "";
   }
 
+  // Autosave: plan lines have no field names, so they are kept as a list.
+  const planRows = (form) =>
+    [...form.querySelectorAll(".rec-lines-body .rec-line")].map((row) =>
+      Object.fromEntries([...row.querySelectorAll("[data-field]")].map((el) => [el.dataset.field, el.value])),
+    );
   return {
+    // Actions that open these forms; the "unsaved changes" list may run them again.
+    autosaveOpeners: ["rec-plan-new", "rec-plan-edit"],
+    autosave: {
+      "rec-plan": {
+        capture: planRows,
+        restore: (form, rows) => {
+          if (!Array.isArray(rows) || !rows.length) return;
+          form.querySelector(".rec-lines-body").innerHTML = rows
+            .map((l) => lineRow({ ...l, rate: Math.round(Number(l.rate || 0) * 100), tax_rate: Number(l.tax_rate || 0) }))
+            .join("");
+          form.dispatchEvent(new Event("input", { bubbles: true }));
+        },
+      },
+    },
     nav: [{ key: "recurring", label: "Recurring", icon: "clock", group: "Sell" }],
     pages: {
       recurring: (tab) => (tab === "contracts" ? contractsPage() : plansPage()),

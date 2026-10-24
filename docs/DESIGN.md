@@ -34,7 +34,8 @@ What you type into a workspace form is kept on the device as you type (`public/a
 **What gets kept, and where**
 
 - Each form's unsaved input is saved in the browser's `localStorage` for the signed-in user, about half a second after the last keystroke, and again when the page is hidden or closed.
-- Invoice and quotation lines are kept too, including lines added with Custom item.
+- Lines are kept too, including lines added later: invoices and quotations, recurring plans, supplier bills and purchase orders. A module keeps its own lines through an `autosave` capture/restore hook, and lists the actions that open its forms in `autosaveOpeners`.
+- A draft is only kept if all of it can be put back. A form with line rows but no hook is not autosaved, and neither is a form where rows were added or removed. Such a form is never restored by half.
 
 **Getting it back**
 

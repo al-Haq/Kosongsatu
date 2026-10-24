@@ -28,6 +28,12 @@ const SKIP_FORMS = new Set([
   "assistant-chat",
 ]);
 const SKIP_NAME = /pass|secret|token|otp|key|^code$|^confirm$/i;
+// Controls with no name (rows of lines built by a module) can only be kept by a
+// capture hook; the date fields' hidden pickers are not input.
+const unnamedInput = (form) =>
+  [...form.querySelectorAll("input, select, textarea")].some(
+    (el) => !el.name && !el.disabled && el.getAttribute("aria-hidden") !== "true" && !["hidden", "file", "submit", "button", "reset", "image"].includes(el.type),
+  );
 const skipField = (el) =>
   ["password", "file", "hidden", "submit", "button", "reset", "image"].includes(el.type) ||
   el.autocomplete === "one-time-code" ||
@@ -104,6 +110,11 @@ export function createAutosave({ user, extras = {}, canReopen = () => false, reo
     return extra === undefined ? { fields: out } : { fields: out, extra };
   }
   const same = (a, b) => JSON.stringify(a.fields) === JSON.stringify(b.fields) && JSON.stringify(a.extra) === JSON.stringify(b.extra);
+  const shape = (snap) => Object.keys(snap.fields).sort().join("|");
+  // A draft is only kept when all of it can be put back: never half a form.
+  // Without a hook, unnamed row controls cannot be kept, and rows added or
+  // removed (the fields no longer line up) cannot be rebuilt.
+  const keepable = (form, snap, base) => !!extras[form.dataset.form] || (!unnamedInput(form) && (!base || shape(snap) === shape(base)));
   function apply(form, snap) {
     restoring = true;
     try {
@@ -137,7 +148,7 @@ export function createAutosave({ user, extras = {}, canReopen = () => false, reo
     if (!key || !form.isConnected) return;
     const snap = snapshot(form);
     const base = bases.get(form);
-    if (base && same(base, snap)) return storage.del(key);
+    if ((base && same(base, snap)) || !keepable(form, snap, base)) return storage.del(key);
     storage.set(key, {
       v: 1,
       at: Date.now(),
@@ -170,7 +181,7 @@ export function createAutosave({ user, extras = {}, canReopen = () => false, reo
     if (form.closest("dialog") && lastAction && Date.now() - lastAction.at < 3000) openers.set(form, { action: lastAction.action, id: lastAction.id, route: lastAction.route });
     const draft = storage.get(key);
     if (!draft || submitting.has(key)) return;
-    if (Date.now() - draft.at > TTL || same(bases.get(form), draft)) return storage.del(key);
+    if (Date.now() - draft.at > TTL || same(bases.get(form), draft) || !keepable(form, draft, bases.get(form))) return storage.del(key);
     if (draft.opener) openers.set(form, draft.opener);
     apply(form, draft);
     notice(form, draft);

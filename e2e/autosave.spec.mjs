@@ -71,6 +71,34 @@ test("autosave: unsaved input survives a reload or a lost connection, and is res
   await expect(company).toHaveValue(saved);
   expect(await drafts(page)).toEqual([]);
 
+  // A recurring plan's lines are kept too (a module hook), and Open brings the plan back.
+  await page.goto("/#/recurring");
+  await page.click('[data-action="rec-plan-new"]');
+  const plan = page.locator('form[data-form="rec-plan"]');
+  await plan.locator("select[name=client_id]").selectOption({ label: client });
+  await plan.locator("input[name=title]").fill("Hosting plan");
+  await plan.locator('.rec-line [data-field="description"]').first().fill("Hosting");
+  await plan.locator('.rec-line [data-field="rate"]').first().fill("150.00");
+  await page.click('[data-action="rec-line-add"]');
+  await plan.locator('.rec-line [data-field="description"]').nth(1).fill("Backups");
+  await expect.poll(() => drafts(page)).toHaveLength(1);
+  await page.reload();
+  await page.locator('.autosave-pending [data-autosave-pending="open"]').click();
+  await expect(plan.locator(".autosave-notice")).toBeVisible();
+  await expect(plan.locator("input[name=title]")).toHaveValue("Hosting plan");
+  await expect(plan.locator(".rec-lines-body .rec-line")).toHaveCount(2);
+  await expect(plan.locator('.rec-line [data-field="rate"]').first()).toHaveValue("150.00");
+  await expect(plan.locator('.rec-line [data-field="description"]').nth(1)).toHaveValue("Backups");
+  await page.locator('#modal [data-action="close-modal"]').first().click();
+  expect(await drafts(page)).toEqual([]);
+
+  // Rows added to a form that has no hook are not kept, rather than restored by half.
+  await page.goto("/#/settings/documents");
+  await page.click('[data-action="doc-field-add"]');
+  await page.locator(".custom-field-row input[name=label]").last().fill("Project code");
+  await page.waitForTimeout(700);
+  expect(await drafts(page)).toEqual([]);
+
   // Passwords are never kept.
   await page.goto("/#/settings/security");
   await page.locator('form[data-form="password"] input[name=current]').fill("Never-kept-password-1");

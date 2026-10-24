@@ -1743,10 +1743,16 @@ for (const p of plugins) Object.assign(icons, p.icons || {});
 // Esc closes a dialog like Cancel does.
 modal.addEventListener("cancel", () => autosave?.discardIn(modal));
 // Dialogs opened by these actions can be opened again from the "unsaved changes" list.
-const REOPEN = new Set(["new-invoice", "client-invoice", "new-quote", "new-proforma", "new-sales-order", "new-delivery-order", "edit-document", "new-client", "edit-client", "new-service", "edit-service"]);
+const REOPEN = new Set([
+  ...["new-invoice", "client-invoice", "new-quote", "new-proforma", "new-sales-order", "new-delivery-order", "edit-document"],
+  ...["new-client", "edit-client", "new-service", "edit-service"],
+  ...plugins.flatMap((p) => p.autosaveOpeners || []),
+]);
 autosave = createAutosave({
   user: () => session?.email || null,
   extras: {
+    // Modules keep their own line rows (recurring plans, supplier bills...).
+    ...Object.assign({}, ...plugins.map((p) => p.autosave || {})),
     // Invoice lines have no field names: kept as a list and rebuilt on restore.
     editor: {
       capture: (form) => editorData(form).items,

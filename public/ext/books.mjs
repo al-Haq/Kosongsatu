@@ -982,7 +982,18 @@ export default function booksUI(h) {
     return false;
   }
 
+  // Autosave: bill and order lines have no field names, so they are kept as a list.
+  const linesHook = {
+    capture: readLines,
+    restore: (form, rows) => {
+      if (!Array.isArray(rows) || !rows.length) return;
+      form.querySelector(".books-lines").innerHTML = rows.map((l) => lineRow({ ...l, rate: Math.round(Number(l.rate || 0) * 100) })).join("");
+      liveTotal();
+    },
+  };
   return {
+    autosave: { "books-bill": linesHook, "books-po": linesHook },
+    autosaveOpeners: ["books-new-bill", "books-edit-bill", "books-new-po", "books-edit-po"],
     nav: [
       { key: "expenses", label: "Expenses", icon: "receipt", group: "Books" },
       { key: "bills", label: "Bills", icon: "cart", group: "Books" },
