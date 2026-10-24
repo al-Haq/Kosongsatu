@@ -18,6 +18,7 @@
     "backup": "node --env-file-if-exists=.env server/cli.mjs backup",
     "restore": "node --env-file-if-exists=.env server/cli.mjs restore",
     "recover": "node --env-file-if-exists=.env server/cli.mjs recover",
+    "add-user": "node --env-file-if-exists=.env server/cli.mjs add-user",
     "mcp": "node --env-file-if-exists=.env server/mcp.mjs",
     "audit-verify": "node --env-file-if-exists=.env server/cli.mjs audit-verify",
     "audit-head": "node --env-file-if-exists=.env server/cli.mjs audit-head"

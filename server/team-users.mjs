@@ -106,6 +106,21 @@ export function attachUsers(Store) {
         return { user: this.teamUser(idv), token };
       });
     },
+    // Console only (node server/cli.mjs add-user): an active user with a
+    // password and no invitation, for when sharing a link is not practical.
+    async createUser(b, password, passwordHash) {
+      const email = normalEmail(b.email);
+      const r = role(b.role || "staff");
+      const name = text(b.name || "", 120);
+      check(!this.db.prepare("SELECT id FROM owners WHERE email=?").get(email), "A user with this email already exists.", 409);
+      const hashed = await passwordHash(password);
+      return this.tx(() => {
+        const info = this.db.prepare("INSERT INTO owners(email,password,role,name,joined) VALUES(?,?,?,?,?)").run(email, hashed, r, name, now());
+        const idv = Number(info.lastInsertRowid);
+        this.audit("user.created", String(idv), `${email} as ${r}`, null, { email, name, role: r });
+        return this.teamUser(idv);
+      });
+    },
     resendInvite(idv) {
       const u = this.teamUser(idv);
       check(u.invited && !u.joined && !u.disabled, "Only pending invitations can be sent again.", 409);

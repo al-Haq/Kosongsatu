@@ -149,9 +149,9 @@ if (mode === "setup") {
       }),
     );
 } else if (
-  ["audit-verify", "audit-head", "remote-backups", "fetch-backup"].includes(mode)
+  ["audit-verify", "audit-head", "remote-backups", "fetch-backup", "add-user"].includes(mode)
 ) {
-  // Audit chain and off-site backup commands (server/team-cli.mjs).
+  // Audit chain, off-site backup and add-user commands (server/team-cli.mjs).
   const { runTeamCli } = await import("./team-cli.mjs");
   process.exitCode = await runTeamCli(mode, process.argv.slice(3));
 } else {

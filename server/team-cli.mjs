@@ -3,7 +3,10 @@
 //   node server/cli.mjs audit-head                   print the current chain head
 //   node server/cli.mjs remote-backups               list off-site backup copies
 //   node server/cli.mjs fetch-backup <file> <out>    download one off-site copy
+//   node server/cli.mjs add-user <email> [owner|staff|accountant] [name]
+//                                                    add an active user with a generated password
 import { DatabaseSync } from "node:sqlite";
+import { randomBytes } from "node:crypto";
 import { existsSync } from "node:fs";
 import { verifyAuditChain, chainHead } from "./team-audit.mjs";
 import { RemoteBackups, saveDownloaded } from "./team-backup.mjs";
@@ -52,6 +55,29 @@ export async function runTeamCli(mode, args) {
 }
 
 async function run(mode, args) {
+  if (mode === "add-user") {
+    const [email, role = "staff", ...name] = args;
+    if (!email) throw new Error("Use: node server/cli.mjs add-user <email> [owner|staff|accountant] [name]");
+    if (!existsSync(databasePath())) throw new Error(`Database not found at ${databasePath()}. Set DATABASE_PATH.`);
+    const { openDatabase } = await import("./db.mjs");
+    const { passwordHash } = await import("./auth.mjs");
+    const { requestContext } = await import("./context.mjs");
+    const store = openDatabase(databasePath());
+    try {
+      // A generated password avoids terminal echo and shell history exposure.
+      const password = process.env.ADMIN_PASSWORD || randomBytes(18).toString("base64url");
+      const u = await requestContext.run({ actor: "local-console" }, () =>
+        store.createUser({ email, role, name: name.join(" ") }, password, passwordHash),
+      );
+      console.log(`User created: ${u.email} (${u.role}).`);
+      if (process.env.ADMIN_PASSWORD) console.log("(Password supplied through ADMIN_PASSWORD; not displayed.)");
+      else console.log("Password (shown once, save it privately):\n" + password);
+      console.log("Sign in, change the password and enable MFA.");
+      return 0;
+    } finally {
+      store.db.close();
+    }
+  }
   if (mode === "audit-verify" || mode === "audit-head") {
     const db = readOnly();
     try {

@@ -276,6 +276,22 @@ npm run recover
 
 Type the exact owner email when prompted. Recovery generates a new password, disables MFA, deletes recovery codes, revokes sessions and connector tokens, disables rules and records `local-console` in the audit. It is unavailable through HTTP. Sign in privately, change the generated password and re-enrol MFA. Console/volume access is a privileged capability; restrict it accordingly. If an obsolete MFA key file is invalid, preserve it for investigation, then install a valid new key after recovery before restarting.
 
+## Adding a user from the console
+
+Users are normally added from **Team → Invite user**, and choose their own password from the link. When that is not practical, an operator with server access can add an active user directly. With Docker (the installer's setup), run it in the app container from the install folder:
+
+```sh
+cd /opt/nawlogic
+sudo docker compose exec app node server/cli.mjs add-user person@example.com owner "Their Name"
+```
+
+Without Docker, run `npm run add-user -- person@example.com owner "Their Name"`. The role is `owner`, `staff` (the default) or `accountant`, and the name is optional.
+
+- A strong password is generated and **shown once**. Pass it to the person privately. They sign in, change it, and enable MFA.
+- To set the password yourself instead, add `-e ADMIN_PASSWORD='…'` after `exec`. It is never displayed, but it stays in the shell history.
+- An existing email, an unknown role or a password under 12 characters is refused, and nothing is changed.
+- The audit records `user.created` with the actor `local-console`.
+
 ## Financial corrections and reconciliation
 
 - Record each actual customer receipt once. Allocate its available funds across invoices for that customer.

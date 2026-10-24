@@ -33,6 +33,8 @@ Needs email (SMTP) configured on the server. The sign-in page has **Forgot passw
 - Setting the new password signs that person out everywhere. For an owner it also revokes all connector (MCP/n8n) tokens, as a normal password change does.
 - **MFA is still required** at the next sign-in. Disabled users and pending invitations cannot reset.
 
+An operator with server access can also add an active user directly, with a generated password: `node server/cli.mjs add-user <email> [owner|staff|accountant] [name]` (see "Adding a user from the console" in docs/DEPLOYMENT.md).
+
 Without email, **Forgot password?** explains the alternatives: members ask the owner for a reset link (Team → Reset password); the owner's server operator runs `npm run recover` on the server, which now asks for the account email (useful when there are several users).
 
 ## QR code for authenticator setup (74)
