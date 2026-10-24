@@ -18,6 +18,8 @@ test("code checks accept LHDN formats and reject the rest", () => {
   assert.ok(validIdNumber("NRIC", "900101-14-5678"));
   assert.ok(!validIdNumber("NRIC", "9001"));
   assert.ok(validIdNumber("PASSPORT", "A12345678"));
+  assert.ok(validIdNumber("PASSPORT", "A12345678901"), "12 characters");
+  assert.ok(!validIdNumber("PASSPORT", "A123456789012"), "LHDN takes at most 12");
   assert.equal(normalizePhone("03-1234 5678"), "+60312345678");
   assert.equal(normalizePhone("60123456789"), "+60123456789");
   assert.equal(normalizePhone("0065 6123 4567"), "+6561234567");
