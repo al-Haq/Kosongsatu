@@ -11,6 +11,7 @@ import {
 import { resolve, dirname, basename } from "node:path";
 import { encrypt, decrypt, readKey } from "./mfa.mjs";
 import { check, now } from "./domain.mjs";
+const FAILED = "The last backup failed. Check server storage and encryption configuration.";
 export class BackupManager {
   constructor(store, { directory, key, keep = 7 } = {}) {
     this.store = store;
@@ -18,8 +19,16 @@ export class BackupManager {
     this.key = key ? readKey(key, "BACKUP_KEY") : null;
     this.keep = keep;
     this.running = false;
+    // The last result survives a restart: both outcomes are in the audit log.
     this.lastSuccess = null;
     this.lastError = null;
+    try {
+      const last = (action) => store.db.prepare("SELECT id, created FROM audit WHERE action=? ORDER BY id DESC LIMIT 1").get(action);
+      const ok = last("backup.created"),
+        failed = last("backup.failed");
+      this.lastSuccess = ok?.created || null;
+      if (failed && (!ok || failed.id > ok.id)) this.lastError = FAILED;
+    } catch {}
   }
   status() {
     return {
@@ -63,8 +72,10 @@ export class BackupManager {
         created: this.lastSuccess,
       };
     } catch (e) {
-      this.lastError =
-        "Backup failed. Check server storage and encryption configuration.";
+      this.lastError = FAILED;
+      try {
+        this.store.audit("backup.failed", null, String(e?.message || "").slice(0, 200));
+      } catch {}
       throw e;
     } finally {
       if (tempDir) await rm(tempDir, { recursive: true, force: true });

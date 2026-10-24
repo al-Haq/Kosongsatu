@@ -109,7 +109,7 @@ main() {
     docker tag $PREVIOUS $IMAGE
     cd $APP_DIR && docker compose up -d --no-build
   Database changes are not undone by a rollback. Each schema change first
-  saves a private copy next to the database (*.pre-*.sqlite) and the backup
+  saves a private copy next to the database (*.pre-*.sqlite, kept for 30 days) and the backup
   from step 1 is in the backup folder; see docs/DEPLOYMENT.md before restoring.
 EOF
     exit 1

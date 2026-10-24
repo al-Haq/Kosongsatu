@@ -152,13 +152,34 @@ export default function teamUI(h) {
     const count = (r) => users.filter((u) => u.role === r && u.status !== "Disabled").length;
     return `<section class="panel mt22"><div class="panel-head"><div><h2>Team and access</h2><p>${count("owner")} owner(s), ${count("staff")} staff, ${count("accountant")} accountant(s)${users.some((u) => u.status === "Invited") ? " · invitations pending" : ""}</p></div><a href="#/team">Manage team →</a></div><div class="setting-line"><div><h3>Password reset by email</h3><p>${t.mail ? "“Forgot password?” on the sign-in page sends a one-time link (30 minutes)." : "Off until email is configured. Console recovery (npm run recover) still works."}</p></div>${badge(t.mail ? "Active" : "Not connected")}</div><div class="setting-line"><div><h3>Audit chain</h3><p>Entry ${E(t.audit?.id ?? 0)} · ${E(short(t.audit?.hash))}</p></div><a href="#/audit">Verify →</a></div></section>`;
   }
+  // On the overview, for owners: backups that are missing, failing, stale or
+  // kept only on this server, with a link to fix it.
+  function backupNotice() {
+    const b = team().backup;
+    if (!isOwner() || !b) return "";
+    const st = b.status || {},
+      rm = b.remote || {};
+    const stale = !st.lastSuccess || Date.now() - Date.parse(st.lastSuccess) > 2 * 86400000;
+    const text = !st.configured
+      ? "Backups are not set up. If this server fails, your records go with it."
+      : st.lastError
+        ? "The last backup failed."
+        : stale
+          ? "No backup in the last 2 days."
+          : !rm.configured
+            ? "Backups are kept on this server only. Add an off-site copy so a server failure cannot take them too."
+            : rm.lastAttempt?.status === "failed"
+              ? "The last off-site backup upload failed."
+              : "";
+    return text ? `<div class="notice warn mt22 backup-notice">${icon("shield")}<p>${E(text)}</p><a href="#/settings/security">Backups →</a></div>` : "";
+  }
   function backupSettings() {
     const b = team().backup;
     if (!b) return "";
     const st = b.status || {},
       rm = b.remote || {};
     const local = st.configured
-      ? `<p>${st.lastSuccess ? "Last backup: " + timeLabel(st.lastSuccess) : "No backup yet since the server started."}</p>${st.lastError ? `<p class="red-text">${E(st.lastError)}</p>` : ""}<div class="setting-line"><div><h3>Backup key</h3><p>${b.keySource === "app" ? "Generated in Settings and stored encrypted on this server. Keep your saved copy safe." : "Set on the server (BACKUP_KEY)."}</p></div>${badge("Configured")}</div><div class="setting-line"><div><h3>Backup folder</h3><p>${E(b.directory || "")}${b.directorySource === "default" ? " (default, inside the data folder)" : ""}</p></div></div><p class="field-hint">A backup runs when the server starts and every 24 hours. The newest 7 files are kept in the folder.</p>`
+      ? `<p>${st.lastSuccess ? "Last backup: " + timeLabel(st.lastSuccess) : "No backup yet."}</p>${st.lastError ? `<p class="red-text">${E(st.lastError)}</p>` : ""}<div class="setting-line"><div><h3>Backup key</h3><p>${b.keySource === "app" ? "Generated in Settings and stored encrypted on this server. Keep your saved copy safe." : "Set on the server (BACKUP_KEY)."}</p></div>${badge("Configured")}</div><div class="setting-line"><div><h3>Backup folder</h3><p>${E(b.directory || "")}${b.directorySource === "default" ? " (default, inside the data folder)" : ""}</p></div></div><p class="field-hint">A backup runs when the server starts and every 24 hours. The newest 7 files are kept in the folder.</p>`
       : `<p>${b.keySource ? "A backup key is set, but no backup folder is available. Set BACKUP_DIRECTORY on the server." : "No backup key yet. Generate one here, or set BACKUP_KEY (and optionally BACKUP_DIRECTORY) on the server."}</p>`;
     const last = rm.lastAttempt;
     const remote = rm.configured
@@ -248,6 +269,7 @@ export default function teamUI(h) {
         `<p class="team-forgot"><button type="button" class="link-button" data-action="team-forgot">Forgot password?</button></p>`,
       topbar: () => (isOwner() ? "" : `<span class="badge blue">${E(roleLabel(role()))}${role() === "accountant" ? " · read-only" : ""}</span>`),
       settings: () => (isOwner() ? teamSettings() + backupSettings() : ""),
+      overview: backupNotice,
     },
     async action(type, id) {
       switch (type) {
