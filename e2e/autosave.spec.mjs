@@ -4,6 +4,7 @@ import { signIn, watchErrors, unique, createClient } from "./helpers.mjs";
 const drafts = (page) => page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith("nawlogic.draft:")));
 
 test("autosave: unsaved input survives a reload or a lost connection, and is restored, discarded or saved", async ({ page, context }) => {
+  test.setTimeout(90000);
   const errors = watchErrors(page);
   await signIn(page);
   const client = unique("Autosave Client");
@@ -227,6 +228,43 @@ test("autosave: unsaved input survives a reload or a lost connection, and is res
   await expect(milestone.locator("input[name=name]")).toHaveValue("Design sign-off");
   await page.locator('#modal [data-action="close-modal"]').first().click();
   expect(await drafts(page)).toEqual([]);
+
+  // Ticks belong to the entries ticked, not to their places in the list: when
+  // the unbilled time comes back in another order, the draft is not restored.
+  const ago = (n) => new Date(Date.now() - n * 86400000).toISOString().slice(0, 10);
+  const call = (method, path, body) =>
+    page.evaluate(
+      async ({ method, path, body }) => {
+        const s = await (await fetch("/api/session")).json();
+        const r = await fetch("/api" + path, { method, headers: { "Content-Type": "application/json", "X-CSRF-Token": s.csrf }, body: body && JSON.stringify(body) });
+        return r.json();
+      },
+      { method, path, body },
+    );
+  const clientId = (await call("GET", "/workspace")).clients.find((c) => c.name === client).id;
+  const survey = await call("POST", "/ops/time", { client_id: clientId, entry_date: ago(10), hours: "2", rate: "150.00", description: "Site survey" });
+  const cabling = await call("POST", "/ops/time", { client_id: clientId, entry_date: ago(9), hours: "3", rate: "150.00", description: "Cabling" });
+  const openBilling = async () => {
+    await page.goto("/#/timesheets");
+    await page.reload();
+    await page.locator("main tr", { hasText: client }).locator('[data-action="ops-time-invoice"]').click();
+  };
+  const bill = page.locator('form[data-form="ops-time-invoice"]');
+  const tick = (e) => bill.locator(`input[name=entry][value="${e.id}"]`);
+  await openBilling();
+  await expect(bill.locator("input[name=entry]")).toHaveCount(2);
+  await tick(cabling).uncheck();
+  await expect.poll(() => drafts(page)).toHaveLength(1);
+  // Someone else dates Cabling before Site survey: the list order swaps.
+  await call("PUT", `/ops/time/${cabling.id}`, { client_id: clientId, entry_date: ago(11), hours: "3", rate: "150.00", description: "Cabling" });
+  await openBilling();
+  await expect(bill.locator("input[name=entry]")).toHaveCount(2);
+  await expect(bill.locator(".autosave-notice")).toHaveCount(0);
+  await expect(tick(survey)).toBeChecked();
+  await expect(tick(cabling)).toBeChecked();
+  expect(await drafts(page)).toEqual([]);
+  await page.locator('#modal [data-action="close-modal"]').first().click();
+  for (const e of [survey, cabling]) await call("DELETE", `/ops/time/${e.id}`);
 
   // Rows changed in a form that has no hook are not kept, rather than restored
   // into the wrong rows: a row added, or a saved row removed and a new one added.

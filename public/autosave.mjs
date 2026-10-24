@@ -144,7 +144,8 @@ export function createAutosave({ user, extras = {}, canReopen = () => false, reo
     for (const el of fields(form)) {
       const k = `${el.name}#${(count[el.name] = (count[el.name] ?? -1) + 1)}`;
       out[k] = valueOf(el);
-      rows.push(k + "@" + rowOf(el, form));
+      // A tick box or option names its record by its value (a time entry's id).
+      rows.push(k + "@" + rowOf(el, form) + (el.type === "checkbox" || el.type === "radio" ? "=" + el.value : ""));
     }
     const snap = { fields: out, shape: rows.join("|"), sent: sentKeys(form) };
     const extra = extras[form.dataset.form]?.capture(form);
