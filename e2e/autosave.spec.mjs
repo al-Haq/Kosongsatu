@@ -104,6 +104,42 @@ test("autosave: unsaved input survives a reload or a lost connection, and is res
   expect(await drafts(page)).toEqual([]);
   await page.click('[data-action="ops-inventory-off"]');
 
+  // A restored email keeps its edited subject and message: putting the language
+  // back does not load that language's template over them. (Mail is reported as
+  // set up so the email fields show; nothing is sent.)
+  await page.route("**/api/workspace", async (route) => {
+    const response = await route.fetch();
+    const json = await response.json();
+    await route.fulfill({ response, json: { ...json, mail: { ...json.mail, configured: true } } });
+  });
+  const openStatement = async () => {
+    await page.goto("/#/clients");
+    await page.locator('main tr[data-action="open-client"]', { hasText: client }).click();
+    await page.click('main [data-action="client-statement"]');
+  };
+  await openStatement();
+  const statement = page.locator('form[data-form="statement"]');
+  const subject = statement.locator("input[name=subject]");
+  const template = await subject.inputValue();
+  const other = (await statement.locator("select[name=language]").inputValue()) === "en" ? "ms" : "en";
+  await statement.locator("select[name=language]").selectOption(other);
+  await expect(subject).not.toHaveValue(template);
+  await subject.fill("Your statement, as promised");
+  await statement.locator("textarea[name=message]").fill("Hi, the statement we spoke about is attached.");
+  await expect.poll(() => drafts(page)).toHaveLength(1);
+  await page.reload();
+  const templateLoaded = page.waitForResponse((r) => r.url().includes("/api/comms/compose") && r.url().includes("language=" + other));
+  await openStatement();
+  await expect(statement.locator(".autosave-notice")).toBeVisible();
+  await templateLoaded;
+  await page.waitForTimeout(200);
+  await expect(statement.locator("select[name=language]")).toHaveValue(other);
+  await expect(subject).toHaveValue("Your statement, as promised");
+  await expect(statement.locator("textarea[name=message]")).toHaveValue("Hi, the statement we spoke about is attached.");
+  await page.locator('#modal [data-action="close-modal"]').first().click();
+  expect(await drafts(page)).toEqual([]);
+  await page.unroute("**/api/workspace");
+
   // Cancel means "do not keep it".
   await page.goto("/#/clients");
   await page.click('[data-action="new-client"]');

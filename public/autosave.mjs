@@ -130,6 +130,7 @@ export function createAutosave({ user, extras = {}, canReopen = () => false, reo
   // send reached the server but its answer was lost.
   const SENT = ["requestKey", "key"];
   const sentKeys = (form) => Object.fromEntries(SENT.filter((k) => form.dataset[k]).map((k) => [k, form.dataset[k]]));
+  const valueOf = (el) => (el.type === "checkbox" || el.type === "radio" ? el.checked : el.multiple ? [...el.selectedOptions].map((o) => o.value) : el.value);
   function rowOf(el, form) {
     const ids = [];
     for (let p = el.parentElement; p && p !== form; p = p.parentElement)
@@ -142,7 +143,7 @@ export function createAutosave({ user, extras = {}, canReopen = () => false, reo
       rows = [];
     for (const el of fields(form)) {
       const k = `${el.name}#${(count[el.name] = (count[el.name] ?? -1) + 1)}`;
-      out[k] = el.type === "checkbox" || el.type === "radio" ? el.checked : el.multiple ? [...el.selectedOptions].map((o) => o.value) : el.value;
+      out[k] = valueOf(el);
       rows.push(k + "@" + rowOf(el, form));
     }
     const snap = { fields: out, shape: rows.join("|"), sent: sentKeys(form) };
@@ -164,6 +165,10 @@ export function createAutosave({ user, extras = {}, canReopen = () => false, reo
         const k = `${el.name}#${(count[el.name] = (count[el.name] ?? -1) + 1)}`;
         if (!(k in snap.fields)) continue;
         const v = snap.fields[k];
+        // Only a field that changes is announced, as if typed: a module's
+        // handlers (a language's template, a client's terms) do not run for
+        // a field that already shows the kept value.
+        if (JSON.stringify(valueOf(el)) === JSON.stringify(el.type === "checkbox" || el.type === "radio" ? !!v : v)) continue;
         if (el.type === "checkbox" || el.type === "radio") el.checked = !!v;
         else if (el.multiple) for (const o of el.options) o.selected = Array.isArray(v) && v.includes(o.value);
         else el.value = v;

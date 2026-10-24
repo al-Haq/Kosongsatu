@@ -36,6 +36,7 @@ What you type into a workspace form is kept on the device as you type (`public/a
 - Each form's unsaved input is saved in the browser's `localStorage` for the signed-in user, about half a second after the last keystroke, and again when the page is hidden or closed.
 - Lines are kept too, including lines added later: invoices and quotations, recurring plans, supplier bills and purchase orders. A module keeps its own lines through an `autosave` capture/restore hook, and lists the actions that open its forms in `autosaveOpeners`.
 - A draft is only kept if all of it can be put back. A form with line rows but no hook is not autosaved. Neither is a form whose rows changed: a row added or removed, or one removed and a new one added in its place. A field's row is known from the `data-` attributes around it, such as a custom field row's `data-field`. A draft is never restored by half, or into the wrong rows.
+- Restoring a draft fires `input` and `change` only on fields whose value changes, as if typed. A module that fills fields when another changes, and does so after a wait (an email language's template), must not overwrite text typed or restored during that wait.
 - A draft belongs to its record and its parent. Every `data-` attribute on the form is part of the draft's key: the record (`data-id`) and the parent it is saved under (`data-project`, `data-doc`, `data-client`…). A milestone typed under one project never opens under another. Request keys are not part of the draft's key.
 
 **Getting it back**
