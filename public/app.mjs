@@ -1077,13 +1077,22 @@ async function runAction(action, id, el) {
     case "toggle-nav":
       $(".sidebar").classList.toggle("open");
       break;
-    case "set-design":
+    case "set-design": {
+      // Only the look changes: the page is not rebuilt, so unsaved form input stays.
       design = id === "soft" ? "soft" : "classic";
       try {
         localStorage.setItem(DESIGN_KEY, design);
       } catch {}
-      renderRoute();
+      applyDesign(true);
+      $$('.design-switch [data-action="set-design"]').forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.id === design)));
+      const item = $(".menu-design");
+      if (item) {
+        item.dataset.id = design === "soft" ? "classic" : "soft";
+        item.textContent = design === "soft" ? "Use the Classic design" : "Use the Soft design";
+      }
+      el.closest("details")?.removeAttribute("open");
       break;
+    }
     case "logout":
       await api("/logout", "POST", {});
       session = null;

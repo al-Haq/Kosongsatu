@@ -6,8 +6,13 @@ test("the Soft design is a per-browser choice; client links keep the classic loo
   await signIn(page);
   const html = page.locator("html");
   await expect(html).not.toHaveAttribute("data-design", "soft");
+  // Switching keeps what is typed in an unsaved form.
+  await page.goto("/#/settings");
+  const company = page.locator('form[data-form="settings"] input[name=company]');
+  await company.fill("Unsaved name Sdn Bhd");
   await page.click('.design-switch [data-id="soft"]');
   await expect(html).toHaveAttribute("data-design", "soft");
+  await expect(company).toHaveValue("Unsaved name Sdn Bhd");
   await expect(page.locator('.design-switch [data-id="soft"]')).toHaveAttribute("aria-pressed", "true");
   expect(await page.evaluate(() => getComputedStyle(document.body).fontFamily)).toContain("Plus Jakarta Sans");
   // The overview's comparisons and charts are there in either design.
