@@ -169,7 +169,8 @@ export function validIdNumber(type, value) {
   if (v === "NA") return true;
   if (type === "BRN") return /^\d{12}$/.test(v) || /^\d{1,7}-?[A-Z]$/i.test(v);
   if (type === "NRIC") return /^\d{12}$/.test(v.replace(/-/g, ""));
-  if (type === "PASSPORT") return /^[A-Z0-9]{5,15}$/i.test(v);
+  // LHDN takes passport numbers of at most 12 characters (from October 2026).
+  if (type === "PASSPORT") return /^[A-Z0-9]{5,12}$/i.test(v);
   if (type === "ARMY") return /^[A-Z0-9-]{4,20}$/i.test(v);
   return false;
 }

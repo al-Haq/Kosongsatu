@@ -525,6 +525,8 @@ export class EInvoices {
       if (!ref) fail(["the related invoice needs a valid e-Invoice first"]);
       sellerOfReference(ref);
       if (gaps.length) fail(gaps);
+      // A refund on a consolidated sale goes to the general public, as the
+      // consolidated e-Invoice did: LHDN accepts that buyer only with class 004.
       const buyer = ref.consolidated ? GENERAL_PUBLIC : buyerParty(receipt.client);
       if (!ref.consolidated) {
         const b = buyerGaps(receipt.client);
@@ -535,7 +537,7 @@ export class EInvoices {
         number: f.number,
         total: f.amount,
         invoiceId,
-        doc: { typeCode: "04", number: f.number, currency, fxRate: receipt.fx_rate, supplier, buyer, lines: [oneLine(f.reason, f.amount, 0, s.defaultClass || "022")], billing: [{ id: ref.code_number, uuid: ref.uuid }] },
+        doc: { typeCode: "04", number: f.number, currency, fxRate: receipt.fx_rate, supplier, buyer, lines: [oneLine(f.reason, f.amount, 0, ref.consolidated ? "004" : s.defaultClass || "022")], billing: [{ id: ref.code_number, uuid: ref.uuid }] },
       };
     }
     if (source === "consolidated") {
@@ -900,6 +902,10 @@ export function cleanSeller(b) {
   check(validPhone(seller.phone), "Enter the seller's phone with country code, e.g. +6591234567.");
   check(COUNTRY_CODES.has(seller.address.country), "Choose the seller's country.");
   check(STATE_CODES[seller.address.state], "Choose the seller's state (Not applicable outside Malaysia).");
-  if (seller.address.country === "MYS") check(/^\d{5}$/.test(seller.address.postcode), "Enter a 5-digit postcode.");
+  if (seller.address.country === "MYS") {
+    check(/^\d{5}$/.test(seller.address.postcode), "Enter a 5-digit postcode.");
+    // LHDN takes "Not applicable" only outside Malaysia (and on consolidated e-Invoices).
+    check(seller.address.state !== "17", "Choose the seller's state. Not applicable is only for a seller outside Malaysia.");
+  }
   return seller;
 }

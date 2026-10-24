@@ -77,6 +77,28 @@ test("B2C invoices of a month become one consolidated e-Invoice for the general 
   }
 });
 
+test("a refund on a consolidated sale goes to the general public with class 004, as LHDN requires", async () => {
+  const f = await setup();
+  try {
+    const b2c = f.store.saveClient({ name: "Walk-in customer", tax_fields: "1", tax_einvoice: "consolidate" });
+    const sale = invoice(f.store, b2c, { issue_date: lastMonth + "-10", items: [{ description: "Laptop repair", quantity: "1", rate: "250.00" }] });
+    f.store.recordPayment(sale.id, { amount: "250.00", paid_date: lastMonth + "-10", method: "Cash", reference: "CASH-1" });
+    const con = await f.json("/api/tax/consolidated", "POST", { month: lastMonth });
+    assert.equal((await f.json("/api/tax/einvoices", "POST", { source: "consolidated", id: con.id })).state, "valid");
+    f.store.adjustment(sale.id, { kind: "credit", amount: "50.00", reason: "Part returned" });
+    const receipt = f.store.receipts().find((r) => r.reference === "CASH-1");
+    const refund = f.store.refund(receipt.id, { amount: "50.00", paid_date: today(), reference: "RF-CASH-1", reason: "Part returned" });
+    const e = await f.json("/api/tax/einvoices", "POST", { source: "refund", id: refund.id, invoice_id: sale.id });
+    assert.equal(e.type_code, "04");
+    assert.equal(e.state, "valid");
+    const doc = lastDoc(f.fake);
+    assert.equal(doc.AccountingCustomerParty[0].Party[0].PartyIdentification[0].ID[0]._, "EI00000000010");
+    assert.equal(doc.InvoiceLine[0].Item[0].CommodityClassification[0].ItemClassificationCode[0]._, "004");
+  } finally {
+    await f.close();
+  }
+});
+
 test("a note on a consolidated sale names the same seller as the consolidated e-Invoice", async () => {
   const f = await setup();
   try {
@@ -162,6 +184,10 @@ test("self-billed e-Invoices are created from a simple form and submitted with t
     assert.equal(bad.status, 400);
     assert.equal((await f.auth("/api/tax/selfbilled", "POST", { supplier: foreignSeller, lines: [{ description: "Hosting", quantity: "1", rate: "500.00", class: "999" }] })).status, 400);
     assert.equal((await f.auth("/api/tax/selfbilled", "POST", { supplier: { ...foreignSeller, country: "MYS", state: "14", postcode: "" }, lines: [{ description: "x", quantity: "1", rate: "1.00", class: "036" }] })).status, 400);
+    // "Not applicable" is only for a seller outside Malaysia.
+    const noState = await f.auth("/api/tax/selfbilled", "POST", { supplier: { ...foreignSeller, country: "MYS", state: "17", postcode: "50450" }, lines: [{ description: "x", quantity: "1", rate: "1.00", class: "036" }] });
+    assert.equal(noState.status, 400);
+    assert.match((await noState.json()).error, /seller's state/);
     const sb = await f.json("/api/tax/selfbilled", "POST", {
       supplier: foreignSeller,
       issue_date: today(),
