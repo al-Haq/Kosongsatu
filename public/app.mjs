@@ -5,6 +5,7 @@ import { createAutosave } from "./autosave.mjs";
 import { UI_PLUGINS } from "./plugins.mjs";
 import { totals, toMYR, basisPoints, percentOf } from "./ext/documents-calc.mjs";
 import { labels, titleFor, statusLabel, formatDate } from "./ext/documents-i18n.mjs";
+import { navModule, overviewModule, hiddenSettings, moduleOff, ownCompany } from "./ext/setup-modules.mjs";
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
 const app = $("#app"),
@@ -12,8 +13,12 @@ const app = $("#app"),
 let advanced, workflow;
 // Feature modules loaded from public/ext (see docs/PLUGINS.md).
 let plugins = [];
+// Overview panels of modules turned off in Settings > Modules are left out.
 const slot = (name, ...args) =>
-  plugins.map((p) => p.slots?.[name]?.(...args) || "").join("");
+  plugins
+    .filter((p) => name !== "overview" || !moduleOff(S?.settings, overviewModule(p.name)))
+    .map((p) => p.slots?.[name]?.(...args) || "")
+    .join("");
 // Modules may hide navigation, pages and actions (e.g. by user role) with
 // can(kind, name) returning false. The server still enforces every permission.
 const allowed = (kind, name) =>
@@ -94,6 +99,31 @@ const icon = (n) =>
   `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${icons[n] || icons.doc}</svg>`;
 const logo = () =>
   '<img class="logo" src="/assets/nawlogic-logo.png" alt="Nawlogic">';
+// The business's own name and logo once set (Settings > Company and Documents),
+// the Nawlogic brand until then. Signed out, it comes from /api/guest/setup/branding.
+let guestBrand = null;
+const brandFrom = (s) => ({
+  company: ownCompany(s),
+  logo: s.logoFileId ? `/api/guest/setup/logo?v=${String(s.logoFileId).slice(0, 8)}` : "",
+});
+const brand = () =>
+  S
+    ? { company: ownCompany(S.settings), logo: S.settings.logoFileId ? `/api/files/${S.settings.logoFileId}` : "" }
+    : guestBrand || { company: "", logo: "" };
+const brandMark = (b = brand()) =>
+  b.logo
+    ? `<img class="logo brand-logo" src="${E(b.logo)}" alt="${E(b.company || "Business logo")}">`
+    : b.company
+      ? `<span class="brand-name">${E(b.company)}</span>`
+      : logo();
+async function loadBrand() {
+  try {
+    const response = await fetch("/api/guest/setup/branding");
+    if (response.ok) guestBrand = await response.json();
+  } catch {
+    // The Nawlogic brand is shown instead.
+  }
+}
 const badge = (s, label = s) =>
   `<span class="badge ${{ Paid: "green", Accepted: "green", Active: "green", "Part-paid": "orange", "Pending review": "orange", Overdue: "red", Void: "red", Declined: "red", Viewed: "blue", Issued: "blue", Expired: "orange", Archived: "orange", Sent: "green", Failed: "red", Sending: "blue", Connected: "green", Opened: "green", Delivered: "green", Read: "green", Bounced: "red", "Spam complaint": "red", "Soft bounce": "orange", "Partly sent": "orange", Pending: "orange", Edited: "blue", Received: "blue", Converted: "green", Invoiced: "green", Delivered: "green", Completed: "green" }[s] || ""}"><span class="dot"></span>${E(label)}</span>`;
 const button = (label, action, id = "", primary = false, iconName = "") =>
@@ -156,6 +186,8 @@ async function api(path, method = "GET", body) {
 }
 async function refresh() {
   S = await api("/workspace");
+  // Kept for the sign-in page after signing out.
+  guestBrand = brandFrom(S.settings);
 }
 function showModal(title, body, wide = false) {
   autosave?.flush();
@@ -212,7 +244,9 @@ const confirmModal = (title, message, action, id, label) =>
   );
 function renderLogin() {
   autosave?.flush();
-  app.innerHTML = `<div class="login-screen"><section class="login-brand"><span class="eyebrow">NAWLOGIC / BILLING WORKSPACE</span><h1>Good work deserves<br><span class="accent">a clear invoice.</span></h1><p>From the first quotation to the final receipt. A quieter way to keep your business moving.</p><div class="login-points"><span>${icon("doc")}Create with confidence</span><span>${icon("wallet")}Track every payment</span><span>${icon("shield")}Your private workspace</span></div></section><section class="login-form"><div class="login-inner">${logo()}<h2>Welcome back.</h2><p>Sign in to your Nawlogic workspace.</p><form data-form="login">${input("Email address", "email", "", "email", true, 'autocomplete="username" maxlength="160"')}${input("Password", "password", "", "password", true, 'autocomplete="current-password" maxlength="256"')}<details class="mfa"><summary>Use an authenticator or recovery code</summary>${input("Authenticator or recovery code", "code", "", "text", false, 'autocomplete="one-time-code" maxlength="40"')}</details>${errorBlock()}<button class="btn primary" type="submit">Sign in ${icon("arrow")}</button></form>${slot("login")}<div class="login-footer">${icon("shield")} Team access only. Customer invoices use a separate private link.</div></div></section></div>`;
+  const { company } = brand();
+  document.title = company ? `Sign in · ${company}` : "Nawlogic Invoice";
+  app.innerHTML = `<div class="login-screen"><section class="login-brand"><span class="eyebrow">${company ? E(company) : "NAWLOGIC"} / BILLING WORKSPACE</span><h1>Good work deserves<br><span class="accent">a clear invoice.</span></h1><p>From the first quotation to the final receipt. A quieter way to keep your business moving.</p><div class="login-points"><span>${icon("doc")}Create with confidence</span><span>${icon("wallet")}Track every payment</span><span>${icon("shield")}Your private workspace</span></div></section><section class="login-form"><div class="login-inner">${brandMark()}<h2>Welcome back.</h2><p>${company ? `Sign in to the ${E(company)} workspace.` : "Sign in to your Nawlogic workspace."}</p><form data-form="login">${input("Email address", "email", "", "email", true, 'autocomplete="username" maxlength="160"')}${input("Password", "password", "", "password", true, 'autocomplete="current-password" maxlength="256"')}<details class="mfa"><summary>Use an authenticator or recovery code</summary>${input("Authenticator or recovery code", "code", "", "text", false, 'autocomplete="one-time-code" maxlength="40"')}</details>${errorBlock()}<button class="btn primary" type="submit">Sign in ${icon("arrow")}</button></form>${slot("login")}<div class="login-footer">${icon("shield")} Team access only. Customer invoices use a separate private link.</div></div></section></div>`;
 }
 const NAV_GROUPS = ["Sell", "Get paid", "Records", "Books", "Operations", "Workspace"];
 const navItems = [
@@ -231,11 +265,12 @@ const navItems = [
   ["automation", "Automation", "shield", "Workspace"],
   ["settings", "Settings", "settings", "Workspace"],
 ];
-// Modules add entries as { key, label, icon, group, hidden?() }.
+// Modules add entries as { key, label, icon, group, hidden?(), module? }. Entries
+// of a module turned off in Settings > Modules are left out (public/ext/setup-modules.mjs).
 function allNav() {
   const extra = plugins.flatMap((p) => p.nav || []).filter((n) => !n.hidden?.());
-  const list = [...navItems.map(([key, label, ic, group]) => ({ key, label, icon: ic, group })), ...extra].filter((n) =>
-    allowed("nav", n.key),
+  const list = [...navItems.map(([key, label, ic, group]) => ({ key, label, icon: ic, group })), ...extra].filter(
+    (n) => allowed("nav", n.key) && !moduleOff(S?.settings, n.module || navModule(n.key)),
   );
   const groups = [...NAV_GROUPS, ...new Set(extra.map((n) => n.group).filter((g) => !NAV_GROUPS.includes(g)))];
   return groups
@@ -250,18 +285,21 @@ const initials = (email = "") => {
 };
 function renderShell(html, active) {
   const items = allNav().flatMap(([, list]) => list);
-  const title = items.find((n) => n.key === active)?.label || "Nawlogic";
+  const own = brand().company;
+  const label = items.find((n) => n.key === active)?.label;
+  const title = label || own || "Nawlogic";
+  document.title = (label ? label + " · " : "") + (own || "Nawlogic Invoice");
   const accountLink = items.some((n) => n.key === "account")
     ? '<a href="#/account">My account</a>'
     : items.some((n) => n.key === "settings")
       ? '<a href="#/settings">Settings</a>'
       : "";
-  app.innerHTML = `<div class="shell"><aside class="sidebar">${logo()}<nav aria-label="Main navigation">${allNav()
+  app.innerHTML = `<div class="shell"><aside class="sidebar">${brandMark()}<nav aria-label="Main navigation">${allNav()
     .map(
       ([group, items]) =>
         `<span class="nav-group">${E(group)}</span>${items.map((n) => `<a href="#/${n.key}" class="${n.key === active ? "active" : ""}" ${n.key === active ? 'aria-current="page"' : ""}>${icon(n.icon)}${E(n.label)}</a>`).join("")}`,
     )
-    .join("")}</nav><div class="owner-box"><strong>NAWLOGIC</strong><small>${E(session.email)}</small></div></aside><div class="workspace"><header class="topbar"><div class="top-left"><button class="btn ghost mobile-toggle" data-action="toggle-nav" aria-label="Toggle navigation">${icon("menu")}</button><span class="top-title">${E(title)}</span></div><div class="right">${slot("topbar")}${S.settings.demo ? '<span class="badge orange">DEMO DATA</span>' : ""}<details class="dropdown avatar-menu"><summary class="avatar" aria-label="Account menu">${E(initials(session.email))}</summary><div class="menu"><small>${E(session.email)}</small>${accountLink}<button type="button" data-action="logout">Sign out</button></div></details></div></header><main class="content">${S.settings.demo ? '<div class="notice"><p>Demo workspace. All clients, documents and payments are examples.</p></div>' : ""}${html}</main></div></div>`;
+    .join("")}</nav><div class="owner-box"><strong>${E(own || "Nawlogic")}</strong><small>${E(session.email)}</small></div></aside><div class="workspace"><header class="topbar"><div class="top-left"><button class="btn ghost mobile-toggle" data-action="toggle-nav" aria-label="Toggle navigation">${icon("menu")}</button><span class="top-title">${E(title)}</span></div><div class="right">${slot("topbar")}${S.settings.demo ? '<span class="badge orange">DEMO DATA</span>' : ""}<details class="dropdown avatar-menu"><summary class="avatar" aria-label="Account menu">${E(initials(session.email))}</summary><div class="menu"><small>${E(session.email)}</small>${accountLink}<button type="button" data-action="logout">Sign out</button></div></details></div></header><main class="content">${S.settings.demo ? '<div class="notice"><p>Demo workspace. All clients, documents and payments are examples.</p></div>' : ""}${html}</main></div></div>`;
 }
 const heading = (title, sub, actions = "") =>
   `<div class="heading"><div><h1>${E(title)}</h1>${sub ? `<p>${E(sub)}</p>` : ""}</div><div class="actions">${actions}</div></div>`;
@@ -411,15 +449,18 @@ function overview() {
     { label: "Overdue", icon: "trend", value: sums[3], foot: overdue.length ? `${overdue.length} overdue, oldest ${oldest} day${oldest === 1 ? "" : "s"} late` : "Nothing overdue", cls: "red-text" },
   ];
   const agingTotal = buckets.reduce((t, b) => t + b.amount, 0);
+  // The setup checklist (public/ext/setup.mjs) covers the company and bank details while it shows.
+  const top = slot("overviewTop");
   return (
     heading(
       "Overview",
       "",
       button("New invoice", "new-invoice", "", true, "plus"),
     ) +
-    (!S.settings.bankAccount
-      ? `<div class="notice info">${icon("settings")}<p>Add your company details and payment instructions before sharing a real invoice.</p><a href="#/settings">Open settings →</a></div>`
-      : "") +
+    (top ||
+      (!S.settings.bankAccount
+        ? `<div class="notice info">${icon("settings")}<p>Add your company details and payment instructions before sharing a real invoice.</p><a href="#/settings">Open settings →</a></div>`
+        : "")) +
     `<div class="metrics">${cards.map((c) => `<div class="metric"><span class="metric-icon">${icon(c.icon)}</span><div class="label">${c.label}</div><div class="value ${c.cls || ""}">${money(c.value)}</div><div class="hint">${c.foot}</div>${c.chart || ""}</div>`).join("")}</div><div class="grid-2"><section class="panel"><div class="panel-head"><div><h2>Collections</h2><p>Last 12 weeks · MYR</p></div><div class="legend"><span class="key now">Last 12 weeks</span><span class="key before">12 weeks before</span></div></div><div class="trend-total"><strong>${money(total12)}</strong>${deltaLine(total12, totalBefore, "vs the 12 weeks before")}</div>${trendChart(collected, before)}<div class="trend-axis"><span>${dateLabel(collected[0].start).slice(0, 6)}</span><span>${dateLabel(collected[6].start).slice(0, 6)}</span><span>Today</span></div></section><section class="panel"><div class="panel-head"><div><h2>Needs attention</h2><p>Oldest due first</p></div><a href="#/invoices">View all →</a></div>${
       [...outstanding]
         .sort((a, b) => dueOf(a).localeCompare(dueOf(b)))
@@ -578,7 +619,7 @@ function settings() {
   const b = S.settings;
   return (
     heading("Settings", "") +
-    `<section class="panel mt22"><div class="panel-head"><h2>Company</h2></div>${logo()}<p class="field-hint">Brand colours on your documents and logo.</p><div class="palette"><div class="swatch teal-bg"><span></span>Teal #0EA5A4</div><div class="swatch orange-bg"><span></span>Orange #F97316</div><div class="swatch ink-bg"><span></span>Ink #0F172A</div></div><form data-form="settings"><div class="form-grid">${input("Registered business name", "company", b.company, "text", true, 'maxlength="180"')}${input("Registration number", "registration", b.registration, "text", false, 'maxlength="80"')}${input("Tax identification number (TIN)", "tin", b.tin || "", "text", false, 'maxlength="20"')}${input("SST registration number", "sstNumber", b.sstNumber || "", "text", false, 'maxlength="40"')}${input("Billing email", "email", b.email, "email", false, 'maxlength="160"')}${input("Phone", "phone", b.phone, "text", false, 'maxlength="60"')}<div class="span-2">${area("Business address", "address", b.address, 600)}</div>${input("Invoice prefix", "invoicePrefix", b.invoicePrefix, "text", true, 'pattern="[A-Z][A-Z0-9-]{0,11}" maxlength="12"')}${input("Quotation prefix", "quotePrefix", b.quotePrefix, "text", true, 'pattern="[A-Z][A-Z0-9-]{0,11}" maxlength="12"')}<div class="span-2">${area("Default terms", "paymentTerms", b.paymentTerms)}</div>${input("Bank name", "bankName", b.bankName, "text", false, 'maxlength="100"')}${input("Account number", "bankAccount", b.bankAccount, "text", false, 'maxlength="60"')}<div class="span-2">${input("Account holder", "bankHolder", b.bankHolder, "text", false, 'maxlength="180"')}</div></div>${errorBlock()}<p class="field-hint">Issued documents keep a snapshot of the company and client details. SST is charged only after you add your SST registration number.</p><div class="form-actions"><button class="btn primary" type="submit">Save settings</button></div></form></section><section class="panel mt22"><div class="panel-head"><h2>Connections</h2></div><div class="setting-line"><div><h3>Owner access</h3><p>${E(session.email)}</p></div>${badge("Password protected")}</div><div class="setting-line"><div><h3>Client invoice links</h3><p>Document only / 1–90 days / revocable</p></div>${badge("Enabled")}</div><div class="setting-line"><div><h3>LHDN MyInvois</h3><p>${S.ext?.tax?.status?.configured ? `e-Invoice via MyInvois (${E(S.ext.tax.status.env)})` : "Add MyInvois keys under Integration keys"}</p></div>${badge(S.ext?.tax?.status?.configured ? "Connected" : "Not connected")}</div><div class="setting-line"><div><h3>Online payment</h3><p>${S.gateway?.configured ? E(S.gateway.label) + (S.gateway.sandbox ? " / test mode" : " / live") : "Choose a provider under Online payments below"}</p></div>${badge(S.gateway?.configured ? "Connected" : "Not connected")}</div><div class="setting-line"><div><h3>Email and scheduled reminders</h3><p>${S.mail?.configured ? "Sending from " + E(S.mail.from) : "Add SMTP settings under Integration keys"}</p></div>${badge(S.mail?.configured ? "Connected" : "Not connected")}</div></section><section class="panel mt22"><div class="panel-head"><h2>Account password</h2></div><form data-form="password">${input("Current password", "current", "", "password", true, 'autocomplete="current-password"')}${input("New password (at least 12 characters)", "password", "", "password", true, 'minlength="12" maxlength="256" autocomplete="new-password"')}${S.security.enabled ? input("Authenticator or recovery code", "code", "", "text", true, 'autocomplete="one-time-code"') : ""}${errorBlock()}<button type="submit" class="btn">Change password and sign out</button></form></section><section class="panel mt22"><div class="panel-head"><h2>Your business data</h2></div><p>Download a business data export, including documents, payments and audit history. Store it privately.</p><div class="actions mt22"><a class="btn" href="/api/backup">${icon("download")} Export JSON</a><a class="btn" href="/api/invoices.csv">Export CSV</a></div><p class="field-hint">For full disaster recovery, use the encrypted backup and restore procedure in the deployment guide.</p></section>`
+    `<section class="panel mt22"><div class="panel-head"><h2>Company</h2></div>${logo()}<p class="field-hint">Brand colours on your documents and logo.</p><div class="palette"><div class="swatch teal-bg"><span></span>Teal #0EA5A4</div><div class="swatch orange-bg"><span></span>Orange #F97316</div><div class="swatch ink-bg"><span></span>Ink #0F172A</div></div><form data-form="settings"><div class="form-grid">${input("Registered business name", "company", b.company, "text", true, 'maxlength="180"')}${input("Registration number", "registration", b.registration, "text", false, 'maxlength="80"')}${input("Tax identification number (TIN)", "tin", b.tin || "", "text", false, 'maxlength="20"')}${input("SST registration number", "sstNumber", b.sstNumber || "", "text", false, 'maxlength="40"')}${input("Billing email", "email", b.email, "email", false, 'maxlength="160"')}${input("Phone", "phone", b.phone, "text", false, 'maxlength="60"')}<div class="span-2">${area("Business address", "address", b.address, 600)}</div>${input("Invoice prefix", "invoicePrefix", b.invoicePrefix, "text", true, 'pattern="[A-Z][A-Z0-9\\-]{0,11}" maxlength="12"')}${input("Quotation prefix", "quotePrefix", b.quotePrefix, "text", true, 'pattern="[A-Z][A-Z0-9\\-]{0,11}" maxlength="12"')}<div class="span-2">${area("Default terms", "paymentTerms", b.paymentTerms)}</div>${input("Bank name", "bankName", b.bankName, "text", false, 'maxlength="100"')}${input("Account number", "bankAccount", b.bankAccount, "text", false, 'maxlength="60"')}<div class="span-2">${input("Account holder", "bankHolder", b.bankHolder, "text", false, 'maxlength="180"')}</div></div>${errorBlock()}<p class="field-hint">Issued documents keep a snapshot of the company and client details. SST is charged only after you add your SST registration number.</p><div class="form-actions"><button class="btn primary" type="submit">Save settings</button></div></form></section><section class="panel mt22"><div class="panel-head"><h2>Connections</h2></div><div class="setting-line"><div><h3>Owner access</h3><p>${E(session.email)}</p></div>${badge("Password protected")}</div><div class="setting-line"><div><h3>Client invoice links</h3><p>Document only / 1–90 days / revocable</p></div>${badge("Enabled")}</div><div class="setting-line"><div><h3>LHDN MyInvois</h3><p>${S.ext?.tax?.status?.configured ? `e-Invoice via MyInvois (${E(S.ext.tax.status.env)})` : "Add MyInvois keys under Integration keys"}</p></div>${badge(S.ext?.tax?.status?.configured ? "Connected" : "Not connected")}</div><div class="setting-line"><div><h3>Online payment</h3><p>${S.gateway?.configured ? E(S.gateway.label) + (S.gateway.sandbox ? " / test mode" : " / live") : "Choose a provider under Online payments below"}</p></div>${badge(S.gateway?.configured ? "Connected" : "Not connected")}</div><div class="setting-line"><div><h3>Email and scheduled reminders</h3><p>${S.mail?.configured ? "Sending from " + E(S.mail.from) : "Add SMTP settings under Integration keys"}</p></div>${badge(S.mail?.configured ? "Connected" : "Not connected")}</div></section><section class="panel mt22"><div class="panel-head"><h2>Account password</h2></div><form data-form="password">${input("Current password", "current", "", "password", true, 'autocomplete="current-password"')}${input("New password (at least 12 characters)", "password", "", "password", true, 'minlength="12" maxlength="256" autocomplete="new-password"')}${S.security.enabled ? input("Authenticator or recovery code", "code", "", "text", true, 'autocomplete="one-time-code"') : ""}${errorBlock()}<button type="submit" class="btn">Change password and sign out</button></form></section><section class="panel mt22"><div class="panel-head"><h2>Your business data</h2></div><p>Download a business data export, including documents, payments and audit history. Store it privately.</p><div class="actions mt22"><a class="btn" href="/api/backup">${icon("download")} Export JSON</a><a class="btn" href="/api/invoices.csv">Export CSV</a></div><p class="field-hint">For full disaster recovery, use the encrypted backup and restore procedure in the deployment guide.</p></section>`
   );
 }
 // Labels, columns and money on the paper follow the document's language and currency.
@@ -777,6 +818,7 @@ function documentView(id) {
 // modules keep adding panels through the settings slot without knowing the tabs.
 const SETTINGS_TABS = [
   ["company", "Company", ["Company", "Your business data", "SST summary", "Tax", "Books", "Operations"]],
+  ["modules", "Modules", ["Modules"]],
   ["documents", "Documents", ["Document template", "Custom fields", "Late payment fees", "Monthly accountant pack", "Client portal and feedback"]],
   ["payments", "Payments", ["Online payments", "DuitNow QR"]],
   ["messages", "Messages", ["Email reminders", "Email delivery", "Email templates", "WhatsApp Business", "Owner notifications", "Collection follow-ups"]],
@@ -785,12 +827,13 @@ const SETTINGS_TABS = [
 ];
 function settingsTabs(wanted) {
   const content = $("main.content");
+  const titleOf = (panel) => panel.querySelector("h2")?.textContent.trim() || "";
+  // Sections of modules turned off in Settings > Modules.
+  const hidden = hiddenSettings(S.settings);
+  for (const panel of $$(":scope > section.panel", content)) if (hidden.has(titleOf(panel))) panel.remove();
   const panels = $$(":scope > section.panel", content);
   if (!panels.length) return;
-  const tabOf = (panel) => {
-    const title = panel.querySelector("h2")?.textContent.trim() || "";
-    return SETTINGS_TABS.find(([, , titles]) => titles.includes(title))?.[0] || "integrations";
-  };
+  const tabOf = (panel) => SETTINGS_TABS.find(([, , titles]) => titles.includes(titleOf(panel)))?.[0] || "integrations";
   const keys = panels.map(tabOf);
   const active = keys.includes(wanted) ? wanted : SETTINGS_TABS.find(([k]) => keys.includes(k))[0];
   panels.forEach((panel, n) => (panel.hidden = keys[n] !== active));
@@ -1674,8 +1717,11 @@ async function boot() {
     renderRoute();
     autosave?.showPending($("main.content"));
   } catch (e) {
-    if (e.message === "Please sign in.") renderLogin();
-    else {
+    if (e.message === "Please sign in.") {
+      // The business's own name and logo on the sign-in page, when set.
+      await loadBrand();
+      renderLogin();
+    } else {
       app.innerHTML = `<main class="error-page">${logo()}<h1>Workspace unavailable.</h1><p>${E(e.message)}</p><button class="btn" data-action="reload">Retry</button></main>`;
     }
   }

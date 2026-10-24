@@ -93,8 +93,9 @@ export function safeDoc(d) {
       address: d.client.address,
       contact: d.client.contact,
     },
-    // Custom field definitions may name internal-only fields, so they stay out.
-    business: { ...d.business, customFields: undefined },
+    // Custom field definitions may name internal-only fields, so they stay out,
+    // as do the owner's module choices and setup checklist (server/ext/setup.mjs).
+    business: { ...d.business, customFields: undefined, modules: undefined, setup: undefined },
     accepted_name: d.accepted_name,
     proofs: d.proofs.map((p) => ({
       reference: p.reference,

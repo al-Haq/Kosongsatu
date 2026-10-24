@@ -4,7 +4,9 @@ Kosongsatu's core (documents, finance, banking, sales, automation) lives in `ser
 
 A module can add tables, Store methods, routes, background jobs, Settings keys, PDF blocks and screens without editing core files. Edit a core file only when a feature changes core behaviour, and keep that change small.
 
-Modules: `documents`, `recurring`, `tax`, `payments`, `comms`, `portal`, `books`, `ops`, `team`, `platform`, `trash`.
+Modules: `documents`, `recurring`, `tax`, `payments`, `comms`, `portal`, `books`, `ops`, `team`, `platform`, `setup`, `trash`.
+
+The owner can turn optional modules off in Settings > Modules (`setup`). To make yours optional, add it to `MODULES` in `public/ext/setup-modules.mjs` with its nav keys, the browser module whose `overview` slot it owns and its Settings section headings. While it is off those are hidden; its routes, jobs and data keep working.
 
 ## Server module
 
@@ -87,7 +89,8 @@ The request object `r`: `{ req, res, url, path, method, ip, body(), rawBody(limi
 // public/ext/example.mjs
 export default function exampleUI(h) {
   return {
-    nav: [{ key: "things", label: "Things", icon: "box", group: "Operations" }],
+    // module: hide the entry while that optional module is off (Settings > Modules).
+    nav: [{ key: "things", label: "Things", icon: "box", group: "Operations", module: "ops" }],
     pages: { things: (id) => h.heading("Things", "…") + "…" },
     activeFor: { thing: "things" },          // detail page → highlighted nav entry
     icons: { gear: '<path d="…"/>' },        // extra 24px stroke icons
@@ -100,6 +103,7 @@ export default function exampleUI(h) {
     slots: {
       login: () => "",                       // under the sign-in form (e.g. "Forgot password?")
       topbar: () => "",                      // small items in the top bar (e.g. a bell)
+      overviewTop: () => "",                 // a panel at the top of the overview (the setup checklist)
       overview: () => "",                    // panels on the overview page
       documentActions: (d) => "",            // buttons on a document
       documentPanels: (d) => "",             // side panels on a document
