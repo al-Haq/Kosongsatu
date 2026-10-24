@@ -49,6 +49,61 @@ test("autosave: unsaved input survives a reload or a lost connection, and is res
   await expect(page.locator("main")).toContainText("Training day");
   expect(await drafts(page)).toEqual([]);
 
+  // A save that reached the server but whose answer was lost is not done twice
+  // when the restored draft is sent again after a reload: its request key is kept.
+  const answerLost = (pattern) =>
+    page.route(
+      pattern,
+      async (route) => {
+        await route.fetch();
+        await route.abort("internetdisconnected");
+      },
+      { times: 1 },
+    );
+  const once = unique("Answer Lost Client");
+  await page.goto("/#/clients");
+  await page.click('[data-action="new-client"]');
+  const clientForm = page.locator('form[data-form="client"]');
+  await clientForm.locator("input[name=name]").fill(once);
+  await answerLost("**/api/clients");
+  await clientForm.locator("button[type=submit]").click();
+  await expect(clientForm.locator(".form-error")).toContainText("No connection");
+  await page.reload();
+  await page.locator('.autosave-pending [data-autosave-pending="open"]').click();
+  await expect(clientForm.locator("input[name=name]")).toHaveValue(once);
+  await clientForm.locator("button[type=submit]").click();
+  await expect(page.locator("#toast")).toContainText("saved");
+  expect(await page.evaluate(async (name) => (await (await fetch("/api/workspace")).json()).clients.filter((c) => c.name === name).length, once)).toBe(1);
+  expect(await drafts(page)).toEqual([]);
+
+  // The same for a module form with its own request key: a stock adjustment.
+  await page.goto("/#/inventory");
+  if (await page.locator('[data-action="ops-inventory-on"]').count()) await page.click('[data-action="ops-inventory-on"]');
+  await page.click('main [data-action="ops-stock-track"]');
+  const track = page.locator('form[data-form="ops-stock-track"]');
+  const item = (await track.locator("select[name=service_id] option:checked").textContent()).replace(/ \([^)]*\)$/, "");
+  await track.locator("input[name=opening]").fill("10");
+  await track.locator("button[type=submit]").click();
+  const stockRow = page.locator("main tr", { hasText: item });
+  await expect(stockRow.locator("td").nth(2)).toHaveText("10");
+  await stockRow.locator('[data-action="ops-stock-adjust"]').click();
+  const move = page.locator('form[data-form="ops-stock-move"]');
+  await move.locator("input[name=quantity]").fill("-2");
+  await move.locator("input[name=reason]").fill("Damaged in transit");
+  await answerLost("**/api/ops/stock/*/movements");
+  await move.locator("button[type=submit]").click();
+  await expect(move.locator(".form-error")).not.toBeEmpty();
+  await page.reload();
+  await expect(stockRow.locator("td").nth(2)).toHaveText("8");
+  await stockRow.locator('[data-action="ops-stock-adjust"]').click();
+  await expect(move.locator(".autosave-notice")).toBeVisible();
+  await expect(move.locator("input[name=reason]")).toHaveValue("Damaged in transit");
+  await move.locator("button[type=submit]").click();
+  await expect(page.locator("#toast")).toContainText("Stock updated");
+  await expect(stockRow.locator("td").nth(2)).toHaveText("8");
+  expect(await drafts(page)).toEqual([]);
+  await page.click('[data-action="ops-inventory-off"]');
+
   // Cancel means "do not keep it".
   await page.goto("/#/clients");
   await page.click('[data-action="new-client"]');

@@ -44,10 +44,12 @@ What you type into a workspace form is kept on the device as you type (`public/a
 - A draft remembers the page its form was on, even if you leave the page straight after typing.
 - After signing in or reloading, any unsaved work whose form is not on screen is listed once at the top under "Unsaved changes on this device". It has **Open**, for new or edited documents, clients and services, or the page it came from, and **Discard**.
 
+- A save that reached the server but whose answer was lost (the connection dropped, or the power went) is not done twice. Its request key is kept on the device until the server answers, and kept with the draft for a module form's own key (`data-request-key`, `data-key`). Sending the restored draft again reuses the key, and the server returns the first result.
+
 **When a draft is removed**
 
 - Saving the form, or **Cancel**, Close or Esc on a dialog.
-- Signing out removes that user's drafts from the device.
+- Signing out removes that user's drafts and kept request keys from the device.
 - Drafts expire after 7 days.
 
 **What is never kept**

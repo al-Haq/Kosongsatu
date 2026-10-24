@@ -8,6 +8,7 @@
 // code and key fields, file pickers, hidden fields and the sign-in, password,
 // MFA and key forms are never kept.
 const PREFIX = "nawlogic.draft:";
+const REQUEST = "nawlogic.request:";
 const TTL = 7 * 86400000;
 const SAVE_DELAY = 400;
 const SKIP_FORMS = new Set([
@@ -58,9 +59,9 @@ const storage = {
       localStorage.removeItem(k);
     } catch {}
   },
-  keys() {
+  keys(prefix = PREFIX) {
     try {
-      return Object.keys(localStorage).filter((k) => k.startsWith(PREFIX));
+      return Object.keys(localStorage).filter((k) => k.startsWith(prefix));
     } catch {
       return [];
     }
@@ -83,7 +84,9 @@ export function createAutosave({ user, extras = {}, canReopen = () => false, reo
     seen = new WeakSet(),
     // Drafts whose form is being saved right now: not restored into the page the
     // save renders (it shows the saved values), and dropped once the save succeeds.
-    submitting = new Set();
+    submitting = new Set(),
+    // Request keys when nobody is signed in (not kept on the device).
+    memory = new Map();
   let restoring = false,
     lastAction = null,
     pendingShown = false,
@@ -122,6 +125,11 @@ export function createAutosave({ user, extras = {}, canReopen = () => false, reo
   // Which row a field is in: the data- attributes of the elements around it, up
   // to the form (a custom field row's data-field, a line's data-id...).
   const RUNTIME = new Set(["key", "requestKey", "booksW", "booksH", "booksBusy", "touched", "ink"]);
+  // A form's own idempotency key (data-request-key, data-key). Kept with the
+  // draft, so sending a restored draft again is not done twice when the first
+  // send reached the server but its answer was lost.
+  const SENT = ["requestKey", "key"];
+  const sentKeys = (form) => Object.fromEntries(SENT.filter((k) => form.dataset[k]).map((k) => [k, form.dataset[k]]));
   function rowOf(el, form) {
     const ids = [];
     for (let p = el.parentElement; p && p !== form; p = p.parentElement)
@@ -137,7 +145,7 @@ export function createAutosave({ user, extras = {}, canReopen = () => false, reo
       out[k] = el.type === "checkbox" || el.type === "radio" ? el.checked : el.multiple ? [...el.selectedOptions].map((o) => o.value) : el.value;
       rows.push(k + "@" + rowOf(el, form));
     }
-    const snap = { fields: out, shape: rows.join("|") };
+    const snap = { fields: out, shape: rows.join("|"), sent: sentKeys(form) };
     const extra = extras[form.dataset.form]?.capture(form);
     if (extra !== undefined) snap.extra = extra;
     return snap;
@@ -163,6 +171,7 @@ export function createAutosave({ user, extras = {}, canReopen = () => false, reo
         el.dispatchEvent(new Event("change", { bubbles: true }));
       }
       if (snap.extra !== undefined) extras[form.dataset.form]?.restore(form, snap.extra);
+      if (snap.sent) for (const k of SENT) snap.sent[k] ? (form.dataset[k] = snap.sent[k]) : delete form.dataset[k];
     } finally {
       restoring = false;
     }
@@ -328,9 +337,31 @@ export function createAutosave({ user, extras = {}, canReopen = () => false, reo
       storage.del(key);
       if (form) settle(form);
     },
-    // After the save failed: the draft stays for another try.
-    failed(key) {
-      if (key) submitting.delete(key);
+    // After the save failed: the draft stays for another try, with the request
+    // key made while sending it.
+    failed(form, key) {
+      if (!key) return;
+      submitting.delete(key);
+      if (form?.isConnected && storage.get(key)) save(form);
+    },
+    // The idempotency key for a request (method, path and body), kept until it
+    // is answered. Sending the same thing again, even after a reload or a power
+    // cut, reuses it, so the server does it once.
+    requestKey(id) {
+      const u = userPart();
+      if (!u) return (memory.has(id) || memory.set(id, crypto.randomUUID()), memory.get(id));
+      const k = REQUEST + u + id,
+        old = storage.get(k);
+      if (old && Date.now() - old.at < TTL) return old.key;
+      const key = crypto.randomUUID();
+      storage.set(k, { key, at: Date.now() });
+      return key;
+    },
+    // The server answered: the request is done, or was refused and can be sent anew.
+    answered(id) {
+      memory.delete(id);
+      const u = userPart();
+      if (u) storage.del(REQUEST + u + id);
     },
     // Cancel or Close on a dialog: the user chose not to keep what they typed.
     discardIn(root) {
@@ -338,15 +369,20 @@ export function createAutosave({ user, extras = {}, canReopen = () => false, reo
     },
     // Before the page is rebuilt: save what was typed in the last moment.
     flush,
-    // Signing out removes this user's drafts from the device.
+    // Signing out removes this user's drafts and kept request keys from the device.
     clearUser() {
       for (const d of mine()) storage.del(d.key);
+      const u = userPart();
+      if (u) for (const k of storage.keys(REQUEST + u)) storage.del(k);
+      memory.clear();
       lastUser = null;
     },
     // Once per page load: drafts whose form is not on screen, with Open and Discard.
     showPending(container) {
       if (pendingShown || !container) return;
       pendingShown = true;
+      const u = userPart();
+      if (u) for (const k of storage.keys(REQUEST + u)) if (!(Date.now() - (storage.get(k)?.at || 0) < TTL)) storage.del(k);
       queueMicrotask(() => {
         const list = mine().filter((d) => !isOnScreen(d.key));
         if (!list.length) return;

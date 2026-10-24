@@ -18,7 +18,6 @@ const slot = (name, ...args) =>
 // can(kind, name) returning false. The server still enforces every permission.
 const allowed = (kind, name) =>
   plugins.every((p) => p.can?.(kind, name) !== false);
-const requestKeys = new Map();
 // Keeps unsaved form input on this device (see autosave.mjs); set up before boot.
 let autosave = null;
 let S = null,
@@ -117,14 +116,14 @@ async function api(path, method = "GET", body) {
     method === "POST" &&
     /^\/(documents|receipts|bank|clients|services|schedules|sales)/.test(path);
   const requestId = method + ":" + path + ":" + JSON.stringify(body);
-  if (retryable && !requestKeys.has(requestId))
-    requestKeys.set(requestId, crypto.randomUUID());
+  // Kept on this device until the server answers (see autosave.mjs).
+  const requestKey = retryable ? autosave?.requestKey(requestId) || crypto.randomUUID() : null;
   let response;
   try {
     response = await fetch("/api" + path, {
       method,
       headers: {
-        ...(retryable ? { "Idempotency-Key": requestKeys.get(requestId) } : {}),
+        ...(requestKey ? { "Idempotency-Key": requestKey } : {}),
         ...(body ? { "Content-Type": "application/json" } : {}),
         ...(method !== "GET" && session ? { "X-CSRF-Token": session.csrf } : {}),
       },
@@ -135,7 +134,7 @@ async function api(path, method = "GET", body) {
     // device), and saving again reuses the same idempotency key, so it is not doubled.
     throw new Error("No connection. What you typed is kept on this device. Save again when you are back online.");
   }
-  if (response.ok || response.status < 500) requestKeys.delete(requestId);
+  if (requestKey && (response.ok || response.status < 500)) autosave?.answered(requestId);
   const bin = response.ok && response.headers.get("X-Bin-Entry");
   if (bin) undoBin = { id: bin, at: Date.now() };
   let data;
@@ -1601,7 +1600,7 @@ document.addEventListener("submit", async (event) => {
     await submitForm(form);
     autosave?.saved(form, draftKey);
   } catch (e) {
-    autosave?.failed(draftKey);
+    autosave?.failed(form, draftKey);
     if (error && error.isConnected) error.textContent = e.message;
     else toast(e.message, true);
     if (form.dataset.form === "login" && /code/i.test(e.message)) $("details.mfa", form)?.setAttribute("open", "");
