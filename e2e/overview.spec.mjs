@@ -10,6 +10,9 @@ test("overview: month comparisons, 12-week chart, aging and instalment lateness;
   await expect(cards.locator(".metric")).toHaveCount(4);
   await expect(cards.locator("svg.spark")).toHaveCount(2);
   await expect(cards.locator("svg.mini-aging")).toHaveCount(1);
+  // The test server has no backups set up: the owner is told, with a link to fix it.
+  await expect(page.locator(".backup-notice")).toContainText("Backups are not set up");
+  await expect(page.locator('.backup-notice a[href="#/settings/security"]')).toBeVisible();
   await expect(page.locator("svg.trend")).toBeVisible();
   // One tooltip target per week.
   await expect(page.locator("svg.trend rect.hit")).toHaveCount(12);

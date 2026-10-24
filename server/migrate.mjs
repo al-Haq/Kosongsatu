@@ -1,4 +1,19 @@
-import { chmodSync } from "node:fs";
+import { chmodSync, readdirSync, unlinkSync } from "node:fs";
+import { basename, dirname, join } from "node:path";
+
+// Private copies made before schema changes (<db>.pre-<migration>-<ms>.sqlite).
+// They are plain SQLite, so they don't pile up: copies older than 30 days are
+// deleted, but the newest 3 always stay. One upgrade can make several copies
+// (one per batch), and all of a recent upgrade's copies are kept.
+export function pruneMigrationCopies(path, { keep = 3, maxAgeDays = 30, now = Date.now() } = {}) {
+  const prefix = basename(path) + ".pre-";
+  const stamp = (f) => Number(f.match(/-(\d+)\.sqlite$/)[1]);
+  const copies = readdirSync(dirname(path))
+    .filter((f) => f.startsWith(prefix) && /-\d+\.sqlite$/.test(f))
+    .sort((a, b) => stamp(a) - stamp(b));
+  for (const old of copies.slice(0, Math.max(0, copies.length - keep)))
+    if (stamp(old) < now - maxAgeDays * 86400000) unlinkSync(join(dirname(path), old));
+}
 // Named migrations for feature modules. Each migration runs once, in order,
 // inside its own transaction, and is recorded by name in schema_migrations.
 // Unlike PRAGMA user_version, independent modules never compete for a number.
@@ -23,6 +38,7 @@ export function runMigrations(db, path, migrations) {
     names.add(m.name);
   }
   // One private, recoverable snapshot precedes a batch of data migrations.
+  let copied = false;
   if (
     path !== ":memory:" &&
     db.prepare("SELECT count(*) n FROM documents").get().n
@@ -30,6 +46,7 @@ export function runMigrations(db, path, migrations) {
     const snapshot = `${path}.pre-${pending[0].name}-${Date.now()}.sqlite`;
     db.prepare("VACUUM INTO ?").run(snapshot);
     chmodSync(snapshot, 0o600);
+    copied = true;
   }
   for (const m of pending) {
     if (m.foreignKeysOff) db.exec("PRAGMA foreign_keys=OFF");
@@ -54,5 +71,10 @@ export function runMigrations(db, path, migrations) {
       if (m.foreignKeysOff) db.exec("PRAGMA foreign_keys=ON");
     }
   }
+  // The upgrade worked: older copies go, the newest few stay.
+  if (copied)
+    try {
+      pruneMigrationCopies(path);
+    } catch {}
   return pending.map((m) => m.name);
 }

@@ -131,6 +131,7 @@ export function createApp({
   trustProxy = 0,
   // Sign-in attempts per address per 15 minutes. Only the browser-test server raises it.
   loginLimit = 10,
+  limitKeys = 5000,
   backupConfig = {
     directory: process.env.BACKUP_DIRECTORY,
     key: process.env.BACKUP_KEY,
@@ -138,7 +139,8 @@ export function createApp({
 } = {}) {
   check(store, "Store required.");
   const allowedOrigin = new URL(appUrl).origin;
-  const limits = new Map();
+  const limits = new Map(),
+    LIMIT_KEYS = limitKeys;
   const ipOf = (req) => {
     const peer = req.socket.remoteAddress;
     if (!trustProxy) return peer;
@@ -176,16 +178,22 @@ export function createApp({
     services: {},
   };
   for (const p of PLUGINS) p.init?.(ctx);
+  // Counters per key (address, account...). When there are too many, expired
+  // ones go first, then the longest untouched: a flood of new addresses can
+  // never lock everyone else out of signing in, client links or callbacks.
   const allow = (key, max, ms) => {
     const t = Date.now();
-    if (limits.size > 5000) {
+    if (limits.size >= LIMIT_KEYS) {
       for (const [k, v] of limits) if (v.until < t) limits.delete(k);
-      if (limits.size > 5000)
-        throw new AppError("Server busy. Try again shortly.", 429);
+      for (const k of limits.keys()) {
+        if (limits.size < LIMIT_KEYS) break;
+        limits.delete(k);
+      }
     }
     let e = limits.get(key);
     if (!e || e.until < t) e = { count: 0, until: t + ms };
     e.count++;
+    limits.delete(key);
     limits.set(key, e);
     check(e.count <= max, "Too many attempts. Try again later.", 429);
   };

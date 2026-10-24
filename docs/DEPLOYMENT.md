@@ -93,7 +93,7 @@ cd /opt/nawlogic
 sudo ./scripts/update.sh
 ```
 
-The update script first makes an encrypted backup with the version that is running (and stops if that fails), then runs `git pull --ff-only`, keeps the running image as `nawlogic-invoice:<project>-previous` (for the first install, `nawlogic-invoice:nawlogic-previous`), rebuilds, restarts and waits for the health check. If the new version does not become healthy it prints the rollback commands. Database changes run forward only; each one first saves a private copy of the database next to it (`*.pre-*.sqlite`), and the backup from the first step is in the backup folder. Use `SKIP_PULL=1` when you copied the new code yourself.
+The update script first makes an encrypted backup with the version that is running (and stops if that fails), then runs `git pull --ff-only`, keeps the running image as `nawlogic-invoice:<project>-previous` (for the first install, `nawlogic-invoice:nawlogic-previous`), rebuilds, restarts and waits for the health check. If the new version does not become healthy it prints the rollback commands. Database changes run forward only; each one first saves a private copy of the database next to it (`*.pre-*.sqlite`, readable only by the app; because they are not encrypted, a successful upgrade deletes copies older than 30 days, always keeping the newest 3), and the backup from the first step is in the backup folder. Use `SKIP_PULL=1` when you copied the new code yourself.
 
 ### Alternative: systemd and nginx
 

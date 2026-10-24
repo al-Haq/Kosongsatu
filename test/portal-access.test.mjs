@@ -358,6 +358,13 @@ test("online payment from the portal returns to the portal and settles only this
     const other = issued(f.store, b.client, { rate: "99.00" });
     const g = await signedIn(f, a.email);
     assert.equal((await g.json(`/documents/${invoice.id}`)).online_payment, true);
+    // Same rule as the client link: MYR only, and at least the provider's minimum (RM 1 for Billplz).
+    const usd = f.store.issue(
+      f.store.saveDocument({ kind: "invoice", client_id: a.client.id, issue_date: today(), due_date: today(), currency: "USD", fx_rate: "4.5", items: [{ description: "Work", quantity: 1, rate: "50.00" }] }).id,
+    );
+    assert.equal((await g.json(`/documents/${usd.id}`)).online_payment, false, "not MYR");
+    const tiny = issued(f.store, a.client, { rate: "0.50" });
+    assert.equal((await g.json(`/documents/${tiny.id}`)).online_payment, false, "below the provider's minimum");
     const { url } = await g.json(`/documents/${invoice.id}/checkout`, "POST", {});
     assert.match(url, /^https:\/\//);
     assert.equal(bills.get("pbill1").redirect_url, `http://localhost/portal/d/${invoice.id}`, "back to the portal page");

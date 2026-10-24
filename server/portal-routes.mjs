@@ -40,12 +40,9 @@ async function documentExtras(d, r) {
   }
   return out;
 }
-const onlinePayment = (r, d) =>
-  r.ctx.gateway.status().configured &&
-  d.kind === "invoice" &&
-  d.state === "issued" &&
-  d.balance > 0 &&
-  !!(d.client.email || d.client.phone || r.ctx.store.settings().email);
+// The same rule as the client link: a MYR invoice with a balance the provider
+// accepts (at least its minimum), and a contact the provider needs.
+const onlinePayment = (r, d) => r.ctx.gateway.canPay(d);
 
 // Sign-in emails go out after the response, so the answer and its timing are
 // the same whether or not the address has portal access.
