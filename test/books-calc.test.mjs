@@ -154,6 +154,26 @@ test("profit and loss: accrual vs cash, SST outside income, bills paid through e
   assert.equal(r.cash.expenses.total, 170000);
 });
 
+test("notes carry their own SST, and a later credit note leaves an earlier period alone", () => {
+  const s = workspace({ sstNumber: "W10-1234-56789012" });
+  const c = s.saveClient({ name: "Echo" });
+  const early = addDays(T, -10);
+  const d = invoice(s, c, [{ description: "Support", quantity: 1, rate: "1000.00", tax_rate: 8 }], { issue: early, due: early });
+  pay(s, d, "1080.00", early);
+  s.adjustment(d.id, { kind: "credit", amount: "108.00", reason: "Fewer hours", issue_date: early });
+  const range = { from: early, to: early };
+  const sales = s.salesReport(range);
+  const pnl = s.profitAndLoss(range);
+  assert.equal(sales.totals.sst, 8000 - 800, "the credit note takes its RM 8 of SST off");
+  assert.equal(pnl.accrual.sst.total, 8000 - 800);
+  assert.equal(pnl.accrual.income.total, 100000 - 10000, "income excludes the note's SST too");
+  assert.equal(sales.items.find((i) => i.label === "Support").collected, 108000 - 10800);
+  // A second credit note today moves more of the payment to customer funds.
+  s.adjustment(d.id, { kind: "credit", amount: "54.00", reason: "Rate corrected", issue_date: T });
+  assert.deepEqual(s.salesReport(range), sales);
+  assert.deepEqual(s.profitAndLoss(range), pnl);
+});
+
 test("tax summary maps categories to Form B lines and adds back non-deductible costs", () => {
   const s = workspace();
   const c = s.saveClient({ name: "Epsilon" });

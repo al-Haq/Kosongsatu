@@ -78,8 +78,8 @@ The model must be able to read images. Images are sent as a `data:` URL in an `i
 Reports > Sales, for any period (quick buttons for this month, last month, this year, last year and the last 12 months):
 
 - **By client**, **by service / item** and **by month**, each with invoiced and collected amounts and simple bars.
-- **Invoiced** = issued invoices by issue date, plus debit notes and less credit notes by note date, including SST (the SST column shows how much).
-- **Collected** = money received less refunds, by date (the same figure as "Net customer cash" on the Overview).
+- **Invoiced** = issued invoices by issue date, plus debit notes and less credit notes by note date, including SST (the SST column shows how much). A note's SST is the split stored on it, the same figure as SST-02.
+- **Collected** = money received less refunds, by date (the same figure as "Net customer cash" on the Overview). By client and item, a payment counts as it stood at the end of the period, so a later credit note does not change an earlier period.
 - Services are grouped by the line's SKU or catalog service when it has one, otherwise by the catalog service whose name matches the description, otherwise by description (a trailing ` - 2026-10` period from recurring drafts is ignored).
 - Credit/debit notes and payments are shared across an invoice's lines in proportion. Money received but not applied to an invoice (customer funds, refunds) is shown on its own row, so every view adds up to the same totals.
 - **CSV** downloads the view you are looking at.
@@ -88,7 +88,7 @@ Reports > Sales, for any period (quick buttons for this month, last month, this 
 
 Reports > Profit & loss shows both bases side by side, by category and by month:
 
-- **Accrual**: issued invoices by issue date and credit/debit notes by note date, **excluding SST** (SST is owed to customs and shown as a memo line); expenses by expense date; supplier bills by bill date.
+- **Accrual**: issued invoices by issue date and credit/debit notes by note date, **excluding SST** (SST is owed to customs and shown as a memo line; a note's own SST counts there too); expenses by expense date; supplier bills by bill date.
 - **Cash**: money received less refunds; expenses and bill payments on the date they were paid (including SST paid). Its result is labelled **net cash** (money in less money out), not profit: it includes SST and ignores timing.
 
 Download it as **PDF** or **CSV**. It is clearly marked as a **management report, not audited accounts**. Equipment bought is shown as a cost here; your accountant may capitalise it.
