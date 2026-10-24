@@ -12,6 +12,24 @@ Based on the 10-page Nawlogic invoice UI/UX concept approved in this conversatio
 
 Reusable fields, tables, status badges, dialogs and panels share one stylesheet. Navigation becomes a drawer on narrow displays. The client portal deliberately omits owner navigation and presents the balance, due date, PDF and payment reference action first.
 
+## Classic and Soft designs
+
+The workspace has two looks, switched with **Classic / Soft** in the top bar (in the account menu on a phone). The choice is kept in that browser only.
+
+- **Classic** (default): black ink on white, hairlines, one red for attention.
+- **Soft**: a warm canvas (`#F3F1ED`), white cards without hairlines and with a soft shadow, large radii, pill buttons and tabs, tinted status chips (green, amber, red, blue) and Plus Jakarta Sans (SIL OFL, bundled). It lives in `public/design-soft.css`, and every rule there applies only under `<html data-design="soft">`.
+
+Client links, the client portal and PDFs always use the classic look. The document preview inside the workspace keeps its paper look in both designs.
+
+The Overview, in both designs, shows:
+
+- **Invoiced** and **collected** this month, each against the same days last month, with a 12-week sparkline.
+- **Outstanding**, with an aging bar.
+- **Overdue**, with how late the oldest invoice is.
+- **Collections** for the last 12 weeks against the 12 weeks before. Hover a week for its figures.
+- **Needs attention**, with days late.
+- **Aging**: open invoices by days past due.
+
 ## Ten workflows
 
 1. Dashboard: separate invoiced value, collected payments, outstanding and overdue.

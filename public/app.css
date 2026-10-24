@@ -2226,3 +2226,227 @@ textarea:focus {
 .login-brand .eyebrow {
   color: rgba(255, 255, 255, 0.6);
 }
+
+/* ---- Overview: comparisons, sparklines, the 12-week chart and aging ---- */
+.delta {
+  font-weight: 700;
+  color: var(--ink);
+  white-space: nowrap;
+}
+.delta.down {
+  color: var(--red);
+}
+.delta-note {
+  color: var(--muted);
+}
+.spark {
+  display: block;
+  width: 100%;
+  height: 30px;
+  margin-top: 14px;
+}
+.spark-line {
+  fill: none;
+  stroke: var(--ink);
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+}
+.spark-area {
+  fill: var(--ink);
+  opacity: 0.06;
+}
+.mini-aging {
+  display: block;
+  width: 100%;
+  height: 6px;
+  margin-top: 26px;
+  border-radius: 3px;
+  overflow: hidden;
+}
+.legend {
+  display: flex;
+  gap: 14px;
+  font-size: 11px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.legend .key::before {
+  content: "";
+  display: inline-block;
+  width: 14px;
+  margin-right: 6px;
+  vertical-align: middle;
+  border-top: 2px solid var(--ink);
+}
+.legend .key.before::before {
+  border-top-style: dashed;
+  border-color: var(--muted);
+}
+.trend-total {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: -8px 0 14px;
+  font-size: 11px;
+}
+.trend-total strong {
+  font-size: 24px;
+  letter-spacing: -0.5px;
+  font-variant-numeric: tabular-nums;
+}
+.trend {
+  display: block;
+  width: 100%;
+  height: 190px;
+  flex: 1;
+}
+.trend .grid {
+  stroke: var(--line);
+  stroke-width: 1;
+}
+.trend-area {
+  fill: var(--ink);
+  opacity: 0.05;
+}
+.trend-line {
+  fill: none;
+  stroke: var(--ink);
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+.trend-prev {
+  fill: none;
+  stroke: var(--muted);
+  stroke-width: 1.5;
+  stroke-dasharray: 5 5;
+}
+.trend .hit {
+  fill: transparent;
+}
+.trend .hit:hover {
+  fill: var(--ink);
+  fill-opacity: 0.05;
+}
+.trend-axis {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 8px;
+  font-size: 10.5px;
+  color: var(--muted);
+}
+.late-chip {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--red);
+}
+.aging-total {
+  font-size: 18px;
+  font-variant-numeric: tabular-nums;
+}
+.aging-bar {
+  display: block;
+  width: 100%;
+  height: 10px;
+  margin-bottom: 18px;
+  border-radius: 5px;
+  overflow: hidden;
+}
+.aging-tiles {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 12px;
+}
+.aging-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+.aging-tile strong {
+  font-size: 16px;
+  font-variant-numeric: tabular-nums;
+}
+.age-key {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.age-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+/* Darker as an invoice gets later; red past 90 days. */
+.age-0 {
+  fill: #d9d9d9;
+  background: #d9d9d9;
+}
+.age-1 {
+  fill: #9a9a9a;
+  background: #9a9a9a;
+}
+.age-2 {
+  fill: #555555;
+  background: #555555;
+}
+.age-3 {
+  fill: #000000;
+  background: #000000;
+}
+.age-4 {
+  fill: var(--red);
+  background: var(--red);
+}
+.age-empty {
+  fill: var(--soft);
+}
+/* The Classic / Soft switch in the top bar (in the account menu on phones). */
+.design-switch {
+  display: inline-flex;
+  padding: 3px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  background: #fff;
+}
+.design-switch button {
+  border: 0;
+  background: none;
+  padding: 5px 11px;
+  border-radius: var(--radius-pill);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+}
+.design-switch button[aria-pressed="true"] {
+  background: var(--ink);
+  color: #fff;
+}
+.avatar-menu .menu .menu-design {
+  display: none;
+}
+@media (max-width: 1150px) {
+  .aging-tiles {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+@media (max-width: 640px) {
+  .aging-tiles {
+    grid-template-columns: 1fr 1fr;
+  }
+  .legend {
+    display: none;
+  }
+  .design-switch {
+    display: none;
+  }
+  .avatar-menu .menu .menu-design {
+    display: block;
+  }
+}

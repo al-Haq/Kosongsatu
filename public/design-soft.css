@@ -1,0 +1,432 @@
+/* Soft design: a warm canvas, white cards without hairlines, rounded shapes and
+   pill controls. Chosen per browser from the Classic / Soft switch in the top bar;
+   every rule here applies only under <html data-design="soft">, so the Classic
+   design and the client pages are unchanged.
+   Plus Jakarta Sans (SIL OFL, see assets/fonts/OFL-PlusJakartaSans.txt). */
+@font-face {
+  font-family: "Plus Jakarta Sans";
+  src: url("/assets/fonts/PlusJakartaSans-latin.woff2") format("woff2");
+  font-weight: 400 700;
+  font-display: swap;
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "Plus Jakarta Sans";
+  src: url("/assets/fonts/PlusJakartaSans-latin-ext.woff2") format("woff2");
+  font-weight: 400 700;
+  font-display: swap;
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+:root[data-design="soft"] {
+  --ink: #17161a;
+  --teal: #17161a;
+  --action: #17161a;
+  --orange: #e8590c;
+  --bg: #f3f1ed;
+  --line: #e8e4de;
+  --muted: #6b6762;
+  --soft: #f4f2ee;
+  --red: #d92d20;
+  --radius: 12px;
+  --radius-lg: 22px;
+  --card: #ffffff;
+  --card-shadow: 0 1px 2px rgba(23, 22, 26, 0.04), 0 12px 32px -14px rgba(23, 22, 26, 0.12);
+  --green: #1e7a47;
+  --green-bg: #e7f4ec;
+  --amber: #b54708;
+  --amber-bg: #fff1e6;
+  --blue: #2459f2;
+  --blue-bg: #eaf0fe;
+  --red-bg: #fdecea;
+  --track: #ebe8e3;
+}
+[data-design="soft"] body {
+  background: var(--bg);
+  font-family: "Plus Jakarta Sans", Archivo, system-ui, sans-serif;
+  letter-spacing: -0.005em;
+}
+[data-design="soft"] h1 {
+  font-size: 32px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+}
+[data-design="soft"] h2 {
+  font-weight: 700;
+  letter-spacing: -0.015em;
+}
+
+/* ---- Frame: sidebar and top bar sit on the canvas ---- */
+[data-design="soft"] .sidebar {
+  background: var(--bg);
+  border-right: 0;
+}
+[data-design="soft"] nav a {
+  border-radius: 12px;
+  color: #3a3834;
+  font-weight: 500;
+}
+[data-design="soft"] nav a:hover {
+  background: rgba(23, 22, 26, 0.05);
+}
+[data-design="soft"] nav a.active {
+  background: var(--ink);
+  color: #fff;
+  font-weight: 600;
+  box-shadow: 0 8px 18px -10px rgba(23, 22, 26, 0.6);
+}
+[data-design="soft"] nav a.active svg {
+  color: #fff;
+}
+[data-design="soft"] .nav-group,
+[data-design="soft"] .owner-box strong,
+[data-design="soft"] .eyebrow {
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 11px;
+  font-weight: 600;
+}
+[data-design="soft"] .owner-box {
+  border-top-color: var(--line);
+}
+[data-design="soft"] .topbar {
+  background: var(--bg);
+  border-bottom: 0;
+}
+[data-design="soft"] .avatar {
+  background: var(--card);
+  box-shadow: var(--card-shadow);
+}
+[data-design="soft"] .design-switch {
+  border: 0;
+  background: var(--track);
+}
+[data-design="soft"] .design-switch button[aria-pressed="true"] {
+  background: var(--card);
+  color: var(--ink);
+  box-shadow: 0 1px 3px rgba(23, 22, 26, 0.14);
+}
+
+/* ---- Cards ---- */
+[data-design="soft"] .panel,
+[data-design="soft"] .metric,
+[data-design="soft"] .invoice-paper {
+  background: var(--card);
+  border: 0;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--card-shadow);
+}
+[data-design="soft"] .panel {
+  padding: 26px;
+}
+[data-design="soft"] .notice {
+  border: 0;
+  border-radius: 16px;
+  background: var(--card);
+  box-shadow: var(--card-shadow);
+}
+[data-design="soft"] .notice.warn {
+  background: var(--amber-bg);
+  box-shadow: none;
+}
+[data-design="soft"] .notice.error {
+  background: var(--red-bg);
+  box-shadow: none;
+}
+[data-design="soft"] dialog {
+  border: 0;
+  border-radius: 24px;
+  box-shadow: 0 30px 80px -24px rgba(23, 22, 26, 0.4);
+}
+[data-design="soft"] .dropdown .menu {
+  border: 0;
+  border-radius: 16px;
+  box-shadow: 0 18px 44px -16px rgba(23, 22, 26, 0.3);
+}
+[data-design="soft"] #toast {
+  border-radius: 999px;
+}
+
+/* ---- Buttons, tabs and chips: pills ---- */
+[data-design="soft"] .btn {
+  border-color: var(--line);
+  border-radius: 999px;
+  background: var(--card);
+  padding: 10px 18px;
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgba(23, 22, 26, 0.05);
+}
+[data-design="soft"] .btn:hover {
+  background: #faf9f7;
+  border-color: #d6d1c9;
+}
+[data-design="soft"] .btn.primary {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: #fff;
+  box-shadow: 0 8px 18px -10px rgba(23, 22, 26, 0.6);
+}
+[data-design="soft"] .btn.primary:hover {
+  background: #2d2b31;
+}
+[data-design="soft"] .btn.ghost {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
+[data-design="soft"] .btn.danger {
+  border-color: #f2c7c2;
+  color: var(--red);
+}
+[data-design="soft"] .btn.small {
+  padding: 7px 13px;
+}
+[data-design="soft"] .btn.icon-only {
+  padding: 9px;
+}
+[data-design="soft"] .dropdown .menu .btn {
+  border-radius: 10px;
+  background: none;
+  box-shadow: none;
+}
+[data-design="soft"] .dropdown .menu .btn:hover {
+  background: var(--soft);
+}
+[data-design="soft"] .tabs {
+  width: fit-content;
+  max-width: 100%;
+  gap: 2px;
+  padding: 4px;
+  border-radius: 20px;
+  background: var(--track);
+}
+[data-design="soft"] .tab {
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  padding: 7px 14px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted);
+}
+[data-design="soft"] .tab.active {
+  background: var(--card);
+  color: var(--ink);
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(23, 22, 26, 0.14);
+}
+[data-design="soft"] .badge {
+  border: 0;
+  background: #f1eee9;
+  color: #3f3c38;
+  padding: 5px 10px;
+  font-size: 10.5px;
+  font-weight: 600;
+}
+[data-design="soft"] .badge.green {
+  background: var(--green-bg);
+  color: var(--green);
+}
+[data-design="soft"] .badge.orange {
+  background: var(--amber-bg);
+  color: var(--amber);
+}
+[data-design="soft"] .badge.red {
+  background: var(--red-bg);
+  color: var(--red);
+}
+[data-design="soft"] .badge.blue {
+  background: var(--blue-bg);
+  color: var(--blue);
+}
+
+/* ---- Forms ---- */
+[data-design="soft"] input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="color"]),
+[data-design="soft"] select,
+[data-design="soft"] textarea,
+[data-design="soft"] .date-field {
+  border-color: var(--line);
+  border-radius: 12px;
+}
+[data-design="soft"] .search input {
+  border-radius: 999px;
+}
+[data-design="soft"] input:focus,
+[data-design="soft"] select:focus,
+[data-design="soft"] textarea:focus,
+[data-design="soft"] .date-field:focus-within {
+  outline: 3px solid rgba(23, 22, 26, 0.1);
+  outline-offset: 0;
+  border-color: var(--ink);
+}
+[data-design="soft"] .date-field input[data-date]:focus {
+  outline: none;
+}
+[data-design="soft"] label {
+  font-size: 11px;
+  font-weight: 600;
+}
+
+/* ---- Tables in lists (the document preview keeps its paper look) ---- */
+[data-design="soft"] .table-wrap th {
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  background: var(--soft);
+  border-bottom: 0;
+}
+[data-design="soft"] .table-wrap th:first-child {
+  border-radius: 12px 0 0 12px;
+}
+[data-design="soft"] .table-wrap th:last-child {
+  border-radius: 0 12px 12px 0;
+}
+[data-design="soft"] .table-wrap td {
+  border-bottom-color: #efebe5;
+}
+[data-design="soft"] tr.row-link:hover td {
+  background: #faf8f5;
+}
+
+/* ---- Overview ---- */
+[data-design="soft"] .metric {
+  padding: 22px;
+}
+[data-design="soft"] .metric .label {
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 12.5px;
+  font-weight: 500;
+}
+[data-design="soft"] .metric .value {
+  font-size: 30px;
+  letter-spacing: -0.03em;
+}
+[data-design="soft"] .metric .value.teal {
+  color: var(--ink);
+}
+[data-design="soft"] .metric.hero {
+  background: var(--ink);
+  color: #fff;
+  box-shadow: 0 22px 44px -22px rgba(23, 22, 26, 0.7);
+}
+[data-design="soft"] .metric.hero .value {
+  color: #fff;
+}
+[data-design="soft"] .metric.hero .label,
+[data-design="soft"] .metric.hero .hint,
+[data-design="soft"] .metric.hero .metric-icon {
+  color: rgba(255, 255, 255, 0.72);
+}
+[data-design="soft"] .metric.hero .age-2 {
+  fill: #ffffff;
+}
+[data-design="soft"] .delta {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--green-bg);
+  color: var(--green);
+}
+[data-design="soft"] .delta.down {
+  background: var(--red-bg);
+  color: var(--red);
+}
+[data-design="soft"] .delta.flat {
+  background: #f1eee9;
+  color: var(--muted);
+}
+[data-design="soft"] .trend-line {
+  stroke-width: 2.5;
+}
+[data-design="soft"] .trend-area {
+  opacity: 0.07;
+}
+[data-design="soft"] .late-chip {
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--amber-bg);
+  color: var(--amber);
+  font-weight: 600;
+}
+[data-design="soft"] .aging-tile {
+  border: 0;
+  border-radius: 16px;
+  background: var(--soft);
+}
+[data-design="soft"] .age-0 {
+  fill: var(--blue);
+  background: var(--blue);
+}
+[data-design="soft"] .age-1 {
+  fill: #9db6ff;
+  background: #9db6ff;
+}
+[data-design="soft"] .age-2 {
+  fill: var(--ink);
+  background: var(--ink);
+}
+[data-design="soft"] .age-3 {
+  fill: #f08c3a;
+  background: #f08c3a;
+}
+[data-design="soft"] .age-4 {
+  fill: #e5484d;
+  background: #e5484d;
+}
+[data-design="soft"] .empty svg {
+  color: var(--ink);
+}
+
+/* The logo image has a white ground; on the canvas it blends in. */
+[data-design="soft"] .logo {
+  mix-blend-mode: multiply;
+}
+/* The document preview stays like the PDF it stands for. */
+[data-design="soft"] .invoice-paper .table-wrap th {
+  background: transparent;
+  color: var(--ink);
+  border-bottom: 1px solid var(--ink);
+  border-radius: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 10.5px;
+}
+[data-design="soft"] .invoice-paper .eyebrow {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 10.5px;
+}
+[data-design="soft"] .invoice-paper .notice {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--soft);
+  box-shadow: none;
+}
+
+/* A running timer keeps its highlight. */
+[data-design="soft"] .ops-timer.is-running {
+  background: var(--soft);
+  box-shadow: inset 0 0 0 2px var(--ink);
+}
+
+/* ---- Phones: the sidebar slides over the page ---- */
+@media (max-width: 640px) {
+  /* The floating Quick invoice button stays dark. */
+  [data-design="soft"] .pq-top {
+    background: var(--ink);
+    border-color: var(--ink);
+    color: #fff;
+    box-shadow: 0 12px 28px -10px rgba(23, 22, 26, 0.6);
+  }
+  [data-design="soft"] .sidebar.open {
+    box-shadow: 0 0 60px rgba(23, 22, 26, 0.25);
+  }
+  [data-design="soft"] .panel {
+    padding: 18px;
+  }
+  [data-design="soft"] .metric .value {
+    font-size: 22px;
+  }
+}
