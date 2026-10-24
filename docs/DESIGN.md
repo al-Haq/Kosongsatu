@@ -27,6 +27,40 @@ The Overview shows:
 
 The charts are SVG built from attributes only, because the CSP allows no inline styles.
 
+## Autosave and offline
+
+What you type into a workspace form is kept on the device as you type (`public/autosave.mjs`). Nothing is lost if the computer or phone switches off, the tab closes or the connection drops before you press Save.
+
+**What gets kept, and where**
+
+- Each form's unsaved input is saved in the browser's `localStorage` for the signed-in user, about half a second after the last keystroke, and again when the page is hidden or closed.
+- Invoice and quotation lines are kept too, including lines added with Custom item.
+
+**Getting it back**
+
+- Opening the same form again restores what was typed, with the note "Restored what you typed on … It is not saved yet." and a **Discard** button. A form on a page, such as Settings, is restored when you go back to that page.
+- After signing in or reloading, any unsaved work whose form is not on screen is listed once at the top under "Unsaved changes on this device". It has **Open**, for new or edited documents, clients and services, or the page it came from, and **Discard**.
+
+**When a draft is removed**
+
+- Saving the form, or **Cancel**, Close or Esc on a dialog.
+- Signing out removes that user's drafts from the device.
+- Drafts expire after 7 days.
+
+**What is never kept**
+
+- Password, code and key fields.
+- File pickers and hidden fields.
+- The sign-in, password, MFA, integration-key and backup-key forms.
+
+**Offline**
+
+- A bar at the bottom says "You are offline…".
+- A save that cannot reach the server says "No connection. What you typed is kept on this device. Save again when you are back online."
+- Saving again reuses the same idempotency key, so a payment or document is never recorded twice.
+
+The browser-test server raises the sign-in limit (`loginLimit`), because every test signs in. Production keeps 10 attempts per address per 15 minutes, and a unit test covers that limit.
+
 ## Ten workflows
 
 1. Dashboard: separate invoiced value, collected payments, outstanding and overdue.

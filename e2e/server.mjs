@@ -22,6 +22,9 @@ const server = createApp({
   mailConfig: null,
   gatewayConfig: null,
   assistantConfig: null,
+  // Every browser test signs in; the production limit of 10 per 15 minutes would
+  // stop the suite part-way. The limit itself is covered by the unit tests.
+  loginLimit: 1000,
 });
 server.listen(port, "127.0.0.1", () => console.log(`E2E workspace on http://localhost:${port}`));
 for (const signal of ["SIGINT", "SIGTERM"]) process.on(signal, () => server.close(() => process.exit(0)));

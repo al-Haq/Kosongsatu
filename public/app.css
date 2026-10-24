@@ -2422,3 +2422,38 @@ textarea:focus {
     display: none;
   }
 }
+
+/* ---- Autosave and offline ---- */
+.autosave-notice {
+  justify-content: space-between;
+  margin-bottom: 18px;
+}
+.autosave-pending > div {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.autosave-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.autosave-row .actions {
+  gap: 8px;
+}
+#offline-banner {
+  position: fixed;
+  left: 50%;
+  bottom: 18px;
+  transform: translateX(-50%);
+  z-index: 200;
+  max-width: calc(100% - 32px);
+  padding: 10px 16px;
+  border-radius: var(--radius-pill);
+  background: var(--ink);
+  color: #fff;
+  font-size: 12px;
+  text-align: center;
+}

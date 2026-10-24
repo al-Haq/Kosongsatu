@@ -26,6 +26,21 @@ import {
 } from "../server/mfa.mjs";
 import { BackupManager, restoreBackup } from "../server/recovery.mjs";
 import { today } from "../server/domain.mjs";
+import { fixture, password } from "./helpers.mjs";
+
+test("sign-in is limited to 10 attempts per address in 15 minutes, right or wrong", async () => {
+  const f = await fixture(); // its own sign-in is attempt 1
+  try {
+    const attempt = (pw) =>
+      f.request("/api/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email: "owner@example.com", password: pw }) });
+    for (let i = 2; i <= 10; i++) assert.notEqual((await attempt("Wrong-password-" + i)).status, 429, `attempt ${i}`);
+    const blocked = await attempt(password);
+    assert.equal(blocked.status, 429, "the 11th attempt is refused even with the right password");
+    assert.match((await blocked.json()).error, /Too many attempts/);
+  } finally {
+    await f.close();
+  }
+});
 
 test("TOTP matches RFC 6238 vectors; window and replay protection are enforced", () => {
   const secret = base32(Buffer.from("12345678901234567890"));
