@@ -278,6 +278,82 @@ function invoiceTable(docs) {
     );
   return `<div class="table-wrap"><table class="table-cards"><caption class="sr-only">Billing documents</caption><thead><tr><th>Document</th><th>Client</th><th>Due / valid until</th><th class="num">Total</th><th class="num">Balance</th><th class="status">Status</th></tr></thead><tbody>${docs.map((d) => `<tr class="row-link" data-action="open-document" data-id="${d.id}"><td class="card-title"><button class="link-button" data-action="open-document" data-id="${d.id}">${E(d.number || "Draft")} ${!d.number ? "<small>" + d.id.slice(0, 8) + "</small>" : ""}</button>${d.kind !== "invoice" ? `<small>${E(kindLabel(d.kind))}</small>` : ""}</td><td data-label="Client">${E(d.client.name)}</td><td data-label="Due">${dateLabel(d.due_date)}</td><td class="num" data-label="Total">${d.kind === "delivery_order" ? "—" : money(d.adjusted_total ?? d.total, d.currency)}</td><td class="num" data-label="Balance">${d.kind !== "invoice" || d.state === "void" ? "—" : money(d.balance, d.currency)}</td><td class="status" data-label="Status">${badge(d.status)}</td></tr>`).join("")}</tbody></table></div>`;
 }
+// ---- Overview charts: SVG drawn from attributes only (the CSP allows no inline styles) ----
+const sumBetween = (list, from, to) => list.reduce((t, x) => (x.date >= from && x.date <= to ? t + x.amount : t), 0);
+// The same day one month earlier (31 Mar -> 28 Feb), for month-to-date comparisons.
+const monthEarlier = (day) => {
+  const [y, m, d] = day.split("-").map(Number);
+  const first = new Date(Date.UTC(y, m - 2, 1));
+  const last = new Date(Date.UTC(first.getUTCFullYear(), first.getUTCMonth() + 1, 0)).getUTCDate();
+  return `${first.toISOString().slice(0, 8)}${String(Math.min(d, last)).padStart(2, "0")}`;
+};
+// Twelve weeks ending today, oldest first; "back" moves the window further back.
+const weekly = (list, back = 0) =>
+  Array.from({ length: 12 }, (_, i) => {
+    const end = addDays(S.today, -(11 - i) * 7 - back),
+      start = addDays(end, -6);
+    return { start, end, value: sumBetween(list, start, end) };
+  });
+function deltaLine(cur, prev, note) {
+  if (!prev) return "";
+  const pct = Math.round(((cur - prev) / Math.abs(prev)) * 100);
+  const dir = pct > 0 ? "up" : pct < 0 ? "down" : "flat";
+  return `<span class="delta ${dir}">${{ up: "↑", down: "↓", flat: "→" }[dir]} ${Math.abs(pct)}%</span> <span class="delta-note">${E(note)}</span>`;
+}
+function scaleY(values, height, pad = 2) {
+  const max = Math.max(0, ...values),
+    min = Math.min(0, ...values);
+  const span = max - min || 1;
+  return (v) => (pad + (height - 2 * pad) * (1 - (v - min) / span)).toFixed(1);
+}
+function sparkline(values) {
+  const y = scaleY(values, 32),
+    step = 120 / (values.length - 1 || 1);
+  const pts = values.map((v, i) => `${(i * step).toFixed(1)},${y(v)}`).join(" ");
+  return `<svg class="spark" viewBox="0 0 120 32" preserveAspectRatio="none" aria-hidden="true"><polygon class="spark-area" points="0,32 ${pts} 120,32"/><polyline class="spark-line" points="${pts}" vector-effect="non-scaling-stroke"/></svg>`;
+}
+function trendChart(current, previous) {
+  const W = 600,
+    H = 190,
+    step = W / (current.length - 1);
+  const y = scaleY([...current, ...previous].map((w) => w.value), H, 8);
+  const line = (ws) => ws.map((w, i) => `${(i * step).toFixed(1)},${y(w.value)}`).join(" ");
+  const grid = [0.25, 0.5, 0.75].map((f) => `<line class="grid" x1="0" x2="${W}" y1="${(H * f).toFixed(1)}" y2="${(H * f).toFixed(1)}" vector-effect="non-scaling-stroke"/>`).join("");
+  const hits = current
+    .map((w, i) => {
+      const x = Math.max(0, i * step - step / 2);
+      return `<rect class="hit" x="${x.toFixed(1)}" y="0" width="${(i === 0 || i === current.length - 1 ? step / 2 : step).toFixed(1)}" height="${H}"><title>${E(`${dateLabel(w.start).slice(0, 6)} – ${dateLabel(w.end).slice(0, 6)}: ${money(w.value)} (12 weeks before: ${money(previous[i].value)})`)}</title></rect>`;
+    })
+    .join("");
+  return `<svg class="trend" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="${E(`Collections per week for the last 12 weeks, ${money(current.reduce((t, w) => t + w.value, 0))} in total`)}">${grid}<polygon class="trend-area" points="0,${H} ${line(current)} ${W},${H}"/><polyline class="trend-prev" points="${line(previous)}" vector-effect="non-scaling-stroke"/><polyline class="trend-line" points="${line(current)}" vector-effect="non-scaling-stroke"/>${hits}</svg>`;
+}
+const AGING = ["Current", "1–30 days", "31–60 days", "61–90 days", "Over 90 days"];
+// When an invoice is due now: its next instalment if it has a plan, as its status uses.
+const dueOf = (d) => d.next_due_date || d.due_date;
+const lateDays = (d) => Math.round((Date.parse(S.today + "T00:00:00Z") - Date.parse(dueOf(d) + "T00:00:00Z")) / 86400000);
+function agingBuckets(open) {
+  const b = AGING.map((label) => ({ label, amount: 0, count: 0 }));
+  for (const d of open) {
+    const late = lateDays(d);
+    const i = late <= 0 ? 0 : late <= 30 ? 1 : late <= 60 ? 2 : late <= 90 ? 3 : 4;
+    b[i].amount += myr(d.balance, d);
+    b[i].count++;
+  }
+  return b;
+}
+function agingBar(buckets, cls = "aging-bar") {
+  const total = buckets.reduce((t, x) => t + x.amount, 0) || 1;
+  let x = 0;
+  const rects = buckets
+    .map((b, i) => {
+      const w = (b.amount / total) * 100;
+      const r = w > 0 ? `<rect class="age-${i}" x="${x.toFixed(2)}" y="0" width="${w.toFixed(2)}" height="10"/>` : "";
+      x += w;
+      return r;
+    })
+    .join("");
+  return `<svg class="${cls}" viewBox="0 0 100 10" preserveAspectRatio="none" aria-hidden="true">${rects || '<rect class="age-empty" x="0" y="0" width="100" height="10"/>'}</svg>`;
+}
 function overview() {
   const invoices = S.documents.filter(
       (d) => d.kind === "invoice" && d.state === "issued",
@@ -289,40 +365,41 @@ function overview() {
       r.voided
         ? []
         : [
-            { paid_date: r.paid_date, amount: myr(r.amount, r) },
-            ...r.refunds.map((f) => ({
-              paid_date: f.paid_date,
-              amount: -myr(f.amount, r),
-            })),
+            { date: r.paid_date, amount: myr(r.amount, r) },
+            ...r.refunds.map((f) => ({ date: f.paid_date, amount: -myr(f.amount, r) })),
           ],
-    );
+    ),
+    // Invoices by issue date and notes by note date, as "Invoiced this month".
+    billed = [
+      ...invoices.map((d) => ({ date: d.issue_date, amount: myr(d.total, d) })),
+      ...S.finance.adjustments.map((a) => {
+        const value = myr(a.amount, S.documents.find((d) => d.id === a.invoice_id));
+        return { date: a.issue_date, amount: a.kind === "credit" ? -value : value };
+      }),
+    ];
+  const from = month + "-01",
+    prevTo = monthEarlier(S.today),
+    prevFrom = prevTo.slice(0, 8) + "01";
   const sums = [
-    invoices
-      .filter((d) => d.issue_date.startsWith(month))
-      .reduce((s, d) => s + myr(d.total, d), 0) +
-      S.finance.adjustments
-        .filter((a) => a.issue_date.startsWith(month))
-        .reduce((sum, a) => {
-          const value = myr(a.amount, S.documents.find((d) => d.id === a.invoice_id));
-          return sum + (a.kind === "credit" ? -value : value);
-        }, 0),
-    payments
-      .filter((p) => p.paid_date.startsWith(month))
-      .reduce((s, p) => s + p.amount, 0),
+    sumBetween(billed, from, S.today),
+    sumBetween(payments, from, S.today),
     outstanding.reduce((s, d) => s + myr(d.balance, d), 0),
     overdue.reduce((s, d) => s + myr(d.balance, d), 0),
   ];
-  const weeks = [3, 2, 1, 0].map((n) => {
-    const start = addDays(S.today, -n * 7 - 6),
-      end = addDays(S.today, -n * 7);
-    return {
-      label: dateLabel(start).slice(0, 6),
-      value: payments
-        .filter((p) => p.paid_date >= start && p.paid_date <= end)
-        .reduce((s, p) => s + p.amount, 0),
-    };
-  });
-  const max = Math.max(1, ...weeks.map((w) => Math.abs(w.value)));
+  const prev = [sumBetween(billed, prevFrom, prevTo), sumBetween(payments, prevFrom, prevTo)];
+  const buckets = agingBuckets(outstanding);
+  const oldest = Math.max(0, ...overdue.map(lateDays));
+  const collected = weekly(payments),
+    before = weekly(payments, 84);
+  const total12 = collected.reduce((t, w) => t + w.value, 0),
+    totalBefore = before.reduce((t, w) => t + w.value, 0);
+  const cards = [
+    { label: "Invoiced this month", icon: "doc", value: sums[0], foot: deltaLine(sums[0], prev[0], "vs same days last month") || "Invoices and notes", chart: sparkline(weekly(billed).map((w) => w.value)) },
+    { label: "Collected this month", icon: "wallet", value: sums[1], foot: deltaLine(sums[1], prev[1], "vs same days last month") || "Receipts minus refunds", chart: sparkline(collected.map((w) => w.value)), cls: "teal" },
+    { label: "Outstanding", icon: "clock", value: sums[2], foot: `${outstanding.length} unpaid invoice${outstanding.length === 1 ? "" : "s"}`, chart: agingBar(buckets, "mini-aging") },
+    { label: "Overdue", icon: "trend", value: sums[3], foot: overdue.length ? `${overdue.length} overdue, oldest ${oldest} day${oldest === 1 ? "" : "s"} late` : "Nothing overdue", cls: "red-text" },
+  ];
+  const agingTotal = buckets.reduce((t, b) => t + b.amount, 0);
   return (
     heading(
       "Overview",
@@ -332,16 +409,16 @@ function overview() {
     (!S.settings.bankAccount
       ? `<div class="notice info">${icon("settings")}<p>Add your company details and payment instructions before sharing a real invoice.</p><a href="#/settings">Open settings →</a></div>`
       : "") +
-    `<div class="metrics">${["Invoiced this month", "Collected this month", "Outstanding", "Overdue"].map((label, i) => `<div class="metric"><span class="metric-icon">${icon(["doc", "wallet", "clock", "trend"][i])}</span><div class="label">${label}</div><div class="value ${i === 1 ? "teal" : i === 3 ? "red-text" : ""}">${money(sums[i])}</div><div class="hint">${["Invoices and notes", "Receipts minus refunds", `${outstanding.length} unpaid invoices`, `${overdue.length} overdue`][i]}</div></div>`).join("")}</div><div class="grid-2"><section class="panel"><div class="panel-head"><div><h2>Collections</h2><p>Last four weeks · MYR</p></div></div><div class="chart">${weeks.map((w) => `<div class="bar-col">${w.value ? `<strong>${money(w.value)}</strong>` : ""}<div class="bar ${w.value < 0 ? "outflow" : ""}" data-height="${w.value ? Math.max(3, Math.round((Math.abs(w.value) / max) * 100)) + "%" : "0"}"></div><span>${w.label}</span></div>`).join("")}</div></section><section class="panel"><div class="panel-head"><div><h2>Needs attention</h2><p>Oldest due first</p></div><a href="#/invoices">View all →</a></div>${
+    `<div class="metrics">${cards.map((c) => `<div class="metric"><span class="metric-icon">${icon(c.icon)}</span><div class="label">${c.label}</div><div class="value ${c.cls || ""}">${money(c.value)}</div><div class="hint">${c.foot}</div>${c.chart || ""}</div>`).join("")}</div><div class="grid-2"><section class="panel"><div class="panel-head"><div><h2>Collections</h2><p>Last 12 weeks · MYR</p></div><div class="legend"><span class="key now">Last 12 weeks</span><span class="key before">12 weeks before</span></div></div><div class="trend-total"><strong>${money(total12)}</strong>${deltaLine(total12, totalBefore, "vs the 12 weeks before")}</div>${trendChart(collected, before)}<div class="trend-axis"><span>${dateLabel(collected[0].start).slice(0, 6)}</span><span>${dateLabel(collected[6].start).slice(0, 6)}</span><span>Today</span></div></section><section class="panel"><div class="panel-head"><div><h2>Needs attention</h2><p>Oldest due first</p></div><a href="#/invoices">View all →</a></div>${
       [...outstanding]
-        .sort((a, b) => a.due_date.localeCompare(b.due_date))
+        .sort((a, b) => dueOf(a).localeCompare(dueOf(b)))
         .slice(0, 4)
-        .map(
-          (d) =>
-            `<button type="button" class="attention" data-action="open-document" data-id="${d.id}"><span><strong>${E(d.number)}</strong><small>${E(d.client.name)}</small></span><span class="attention-right"><strong>${money(d.balance, d.currency)}</strong>${badge(d.status)}</span></button>`,
-        )
+        .map((d) => {
+          const late = lateDays(d);
+          return `<button type="button" class="attention" data-action="open-document" data-id="${d.id}"><span><strong>${E(d.number)}</strong><small>${E(d.client.name)}</small></span><span class="attention-right">${late > 0 ? `<span class="late-chip">${late} day${late === 1 ? "" : "s"} late</span>` : ""}<strong>${money(d.balance, d.currency)}</strong>${badge(d.status)}</span></button>`;
+        })
         .join("") || empty("All caught up", "No outstanding issued invoices.")
-    }</section></div>${slot("overview")}<section class="panel mt22"><div class="panel-head"><h2>Recent documents</h2><a href="#/invoices">View invoices →</a></div>${invoiceTable(S.documents.slice(0, 5))}</section>`
+    }</section></div><section class="panel mt22 aging-panel"><div class="panel-head"><div><h2>Aging</h2><p>Open invoices by days past due · MYR</p></div><strong class="aging-total">${money(agingTotal)}</strong></div>${agingTotal ? `${agingBar(buckets)}<div class="aging-tiles">${buckets.map((b, i) => `<div class="aging-tile"><span class="age-key"><span class="age-dot age-${i}"></span>${b.label}</span><strong>${money(b.amount)}</strong><small>${b.count} invoice${b.count === 1 ? "" : "s"} · ${Math.round((b.amount / agingTotal) * 100)}%</small></div>`).join("")}</div>` : "<p>No money is owed to you right now.</p>"}</section>${slot("overview")}<section class="panel mt22"><div class="panel-head"><h2>Recent documents</h2><a href="#/invoices">View invoices →</a></div>${invoiceTable(S.documents.slice(0, 5))}</section>`
   );
 }
 // Screens per document kind. Only invoices carry money owed.

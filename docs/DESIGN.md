@@ -12,6 +12,21 @@ Based on the 10-page Nawlogic invoice UI/UX concept approved in this conversatio
 
 Reusable fields, tables, status badges, dialogs and panels share one stylesheet. Navigation becomes a drawer on narrow displays. The client portal deliberately omits owner navigation and presents the balance, due date, PDF and payment reference action first.
 
+## Left menu and Overview
+
+In the left menu, the current page is a black pill with white text, and the group names (Sell, Get paid, Records...) are in plain case.
+
+The Overview shows:
+
+- **Invoiced** and **collected** this month, each against the same days last month, with a 12-week sparkline.
+- **Outstanding**, with an aging bar.
+- **Overdue**, with how late the oldest invoice is.
+- **Collections** for the last 12 weeks against the 12 weeks before. Hover a week for its figures.
+- **Needs attention**, with days late.
+- **Aging**: open invoices by days past due, in MYR at each invoice's rate.
+
+The charts are SVG built from attributes only, because the CSP allows no inline styles.
+
 ## Ten workflows
 
 1. Dashboard: separate invoiced value, collected payments, outstanding and overdue.
