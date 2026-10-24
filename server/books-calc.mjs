@@ -14,6 +14,7 @@
 import { addDays, allocateDiscount, nextMonth } from "./domain.mjs";
 import { planOf, planAmounts } from "./recurring-plans.mjs";
 import { stepPeriod } from "./recurring-dates.mjs";
+import { noteLines } from "./tax-sst.mjs";
 
 // Typical Malaysian Form B / Form P "financial particulars" expense lines.
 export const FORM_LINES = [
@@ -144,12 +145,14 @@ export function invoiceFacts(d) {
     .sort((a, b) => (a.paid_date === b.paid_date ? a.created.localeCompare(b.created) : a.paid_date.localeCompare(b.paid_date)));
   const notes = (d.adjustments || []).map((a) => {
     const sign = a.kind === "credit" ? -1 : 1;
+    // A note's SST is its stored split by rate, the figure SST-02 uses.
+    const tax = a.tax ?? (d.items ? noteLines(d, a).reduce((s, l) => s + l.tax, 0) : 0);
     return {
       kind: a.kind,
       number: a.number,
       issue_date: a.issue_date,
       amountMyr: sign * toMyr(a.amount, rate),
-      taxMyr: sign * toMyr(a.tax || 0, rate),
+      taxMyr: sign * toMyr(tax, rate),
     };
   });
   const adjusted = d.adjusted_total ?? d.total;
@@ -185,6 +188,10 @@ export function receiptRate(r, docsById) {
   ];
   return rates.length === 1 ? rates[0] : "1";
 }
+// What a payment had applied to its invoice at the end of a day: money a later
+// credit note moved to customer funds was still on the invoice then.
+export const appliedAt = (p, day) =>
+  p.releases ? p.amount - p.releases.filter((r) => r.date <= day).reduce((s, r) => s + r.amount, 0) : (p.applied ?? p.amount);
 // Money from customers by date: receipts in, refunds out (MYR).
 export function customerCash(receipts, docsById) {
   const out = [];
@@ -245,9 +252,9 @@ export function salesReport({ docs, receipts, services = [], from, to }) {
         m.sst += n.taxMyr;
         spread(n.amountMyr, "invoiced");
       }
-    const paid = f.payments
-      .filter((p) => inRange(p.paid_date, from, to))
-      .reduce((s, p) => s + toMyr(p.applied, f.rate), 0);
+    const paid = (d.payments || [])
+      .filter((p) => !p.reversed && inRange(p.paid_date, from, to))
+      .reduce((s, p) => s + toMyr(appliedAt(p, to), f.rate), 0);
     if (paid) {
       applied += paid;
       spread(paid, "collected");
