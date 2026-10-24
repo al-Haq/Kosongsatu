@@ -328,7 +328,9 @@ function trendChart(current, previous) {
   return `<svg class="trend" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="${E(`Collections per week for the last 12 weeks, ${money(current.reduce((t, w) => t + w.value, 0))} in total`)}">${grid}<polygon class="trend-area" points="0,${H} ${line(current)} ${W},${H}"/><polyline class="trend-prev" points="${line(previous)}" vector-effect="non-scaling-stroke"/><polyline class="trend-line" points="${line(current)}" vector-effect="non-scaling-stroke"/>${hits}</svg>`;
 }
 const AGING = ["Current", "1–30 days", "31–60 days", "61–90 days", "Over 90 days"];
-const lateDays = (d) => Math.round((Date.parse(S.today + "T00:00:00Z") - Date.parse(d.due_date + "T00:00:00Z")) / 86400000);
+// When an invoice is due now: its next instalment if it has a plan, as its status uses.
+const dueOf = (d) => d.next_due_date || d.due_date;
+const lateDays = (d) => Math.round((Date.parse(S.today + "T00:00:00Z") - Date.parse(dueOf(d) + "T00:00:00Z")) / 86400000);
 function agingBuckets(open) {
   const b = AGING.map((label) => ({ label, amount: 0, count: 0 }));
   for (const d of open) {
@@ -409,7 +411,7 @@ function overview() {
       : "") +
     `<div class="metrics">${cards.map((c) => `<div class="metric"><span class="metric-icon">${icon(c.icon)}</span><div class="label">${c.label}</div><div class="value ${c.cls || ""}">${money(c.value)}</div><div class="hint">${c.foot}</div>${c.chart || ""}</div>`).join("")}</div><div class="grid-2"><section class="panel"><div class="panel-head"><div><h2>Collections</h2><p>Last 12 weeks · MYR</p></div><div class="legend"><span class="key now">Last 12 weeks</span><span class="key before">12 weeks before</span></div></div><div class="trend-total"><strong>${money(total12)}</strong>${deltaLine(total12, totalBefore, "vs the 12 weeks before")}</div>${trendChart(collected, before)}<div class="trend-axis"><span>${dateLabel(collected[0].start).slice(0, 6)}</span><span>${dateLabel(collected[6].start).slice(0, 6)}</span><span>Today</span></div></section><section class="panel"><div class="panel-head"><div><h2>Needs attention</h2><p>Oldest due first</p></div><a href="#/invoices">View all →</a></div>${
       [...outstanding]
-        .sort((a, b) => a.due_date.localeCompare(b.due_date))
+        .sort((a, b) => dueOf(a).localeCompare(dueOf(b)))
         .slice(0, 4)
         .map((d) => {
           const late = lateDays(d);
