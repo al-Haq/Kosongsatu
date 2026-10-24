@@ -27,6 +27,34 @@ The Overview shows:
 
 The charts are SVG built from attributes only, because the CSP allows no inline styles.
 
+## Setup checklist, modules and the business's own brand
+
+Built by the `setup` module (`server/ext/setup.mjs`, `public/ext/setup.mjs`). Owner guide: [features/setup.md](features/setup.md).
+
+**Setup checklist.** Until every step is done or the owner hides it, the top of the Overview shows "Set up your workspace" with "N of 9 done", a progress bar, and the open steps. Each step has one line on why it matters and a button to the exact place to fix it: the Settings tab opens with the field focused or the section in view. Done steps fold away under "Done".
+
+1. Company details: business name, registration number, address, email and phone.
+2. Business logo (Settings > Documents).
+3. Bank details for transfers.
+4. SST registration. Optional: **Not registered** marks it done.
+5. Email sending (SMTP, under Integration keys).
+6. Online payments. Optional: **Not now**.
+7. Encrypted backups with an off-site copy.
+8. Two-step sign-in (MFA) for the owner.
+9. First client and first issued invoice.
+
+The steps are worked out in the browser from the workspace data it already has. **Hide** is saved in Settings, so the checklist stays hidden on every device; **Show again** is under Settings > Modules. Staff and accountants never see it. It takes the place of the older "add your company details" notice while it shows.
+
+**Modules.** Settings > Modules has a switch for each optional module: sales pipeline, proforma invoices, sales and delivery orders, recurring billing, bank matching, expenses/bills/reports, tax and e-Invoice, projects/timesheets/inventory, client portal and feedback, automation and assistant, and webhooks. Turning one off hides its menu entries, its Overview panels and its Settings sections, and nothing else: records, pages opened by link, server routes, background jobs and client links keep working, and turning it back on brings everything back. Overview, quotations and invoices, clients, services, payments, Settings and team cannot be turned off. Every module starts on, so an upgrade changes nothing. Only the owner can change this.
+
+- The list is `MODULES` in `public/ext/setup-modules.mjs`, shared by the browser and the server. Each module names its menu entries (nav keys, from the core menu or a module's `nav`), the browser modules whose `overview` panels it owns, and the headings of its Settings sections.
+- `public/app.mjs` leaves those out in three places: `allNav()`, `slot("overview")` and the Settings tabs.
+- Settings stores only what is off (`modules: { books: false }`), so a missing key means on. `PUT /api/ext/setup` (owner only) changes it, with `dismissed` and `skipped` for the checklist; unknown modules and required steps are refused, and each change is audited.
+
+**The business's own brand.** Once the business name differs from the default ("NAWLOGIC SYSTEMS SOLUTION"), the sidebar and the sign-in page show it instead of Nawlogic, with the logo from Settings > Documents when there is one. The browser tab reads "Invoices · Kedai Aminah Sdn Bhd" or "Sign in · Kedai Aminah Sdn Bhd". With neither set, the Nawlogic logo and name stay.
+
+Before sign-in the page calls `GET /api/guest/setup/branding`, which returns only `{ company, logo }`: the name (or null) and the logo's address (or null). `GET /api/guest/setup/logo` serves that one image without a session, and only while it is set. No other setting or file becomes public, and client links do not carry the module or checklist settings.
+
 ## Autosave and offline
 
 What you type into a workspace form is kept on the device as you type (`public/autosave.mjs`). Nothing is lost if the computer or phone switches off, the tab closes or the connection drops before you press Save.

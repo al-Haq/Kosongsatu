@@ -1,0 +1,267 @@
+/* Setup: the Overview checklist, Settings > Modules, and the business's own
+   name and logo in the sidebar and on the sign-in page. */
+
+/* ---- Checklist ---- */
+.setup-panel {
+  margin-bottom: 22px;
+}
+.setup-panel .panel-head {
+  margin-bottom: 14px;
+}
+.setup-bar {
+  display: block;
+  width: 100%;
+  height: 6px;
+  border-radius: var(--radius-pill);
+  overflow: hidden;
+  margin-bottom: 6px;
+}
+.setup-bar-track {
+  fill: var(--soft);
+}
+.setup-bar-fill {
+  fill: var(--ink);
+}
+.setup-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.setup-step {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 11px 0;
+  border-bottom: 1px solid var(--line);
+}
+.setup-mark {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 1.5px solid var(--line);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.setup-step.done .setup-mark {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: #fff;
+}
+.setup-mark svg {
+  width: 12px;
+  height: 12px;
+  stroke-width: 2.4;
+}
+.setup-text {
+  min-width: 0;
+}
+.setup-text strong {
+  display: block;
+  font-size: 12.5px;
+}
+.setup-text small {
+  display: block;
+  margin-top: 3px;
+  font-size: 11.5px;
+  color: var(--muted);
+}
+.setup-text .setup-missing {
+  color: var(--ink);
+}
+.setup-optional {
+  margin-left: 6px;
+  font-size: 10.5px;
+  font-weight: 500;
+  color: var(--muted);
+}
+.setup-step.done .setup-text strong {
+  color: var(--muted);
+  font-weight: 600;
+}
+.setup-do {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+.setup-note {
+  font-size: 11px;
+  color: var(--muted);
+}
+.setup-do .link-button {
+  font-size: 11px;
+}
+.setup-done summary {
+  cursor: pointer;
+  padding: 12px 0 4px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--muted);
+}
+.setup-done[open] summary {
+  color: var(--ink);
+}
+.setup-done .setup-step:last-child {
+  border-bottom: 0;
+}
+.setup-foot {
+  margin-top: 12px;
+  font-size: 11.5px;
+  color: var(--muted);
+}
+.setup-foot a {
+  font-weight: 700;
+}
+/* The field or section a checklist link opened. */
+.setup-flash {
+  animation: setup-flash 2s ease-out;
+}
+@keyframes setup-flash {
+  0%,
+  60% {
+    box-shadow: 0 0 0 3px var(--ink);
+  }
+  100% {
+    box-shadow: 0 0 0 3px transparent;
+  }
+}
+
+/* ---- Settings > Modules ---- */
+.setup-modules {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 32px;
+}
+.setup-module {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 0;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--ink);
+  cursor: pointer;
+}
+.setup-module-text {
+  min-width: 0;
+}
+.setup-module-text strong {
+  display: block;
+  font-size: 12.5px;
+}
+.setup-module-text small {
+  display: block;
+  margin-top: 3px;
+  font-size: 11.5px;
+  color: var(--muted);
+}
+.setup-switch {
+  appearance: none;
+  flex: none;
+  position: relative;
+  width: 38px;
+  height: 22px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--line);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.setup-switch::before {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+  transition: transform 0.15s;
+}
+.setup-switch:checked {
+  background: var(--ink);
+}
+.setup-switch:checked::before {
+  transform: translateX(16px);
+}
+.setup-switch:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+.setup-switch:disabled {
+  opacity: 0.5;
+  cursor: wait;
+}
+.setup-modules + .field-hint {
+  margin-top: 14px;
+}
+
+/* ---- The business's own brand ---- */
+.brand-logo {
+  width: auto;
+  height: auto;
+  object-fit: contain;
+}
+.brand-name {
+  display: block;
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1.25;
+  letter-spacing: -0.2px;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+/* The sidebar is a column that can overflow with a long menu: the brand keeps its size. */
+.sidebar .brand-logo,
+.sidebar .brand-name {
+  flex: none;
+}
+.sidebar .brand-logo {
+  width: auto;
+  max-width: 150px;
+  max-height: 52px;
+}
+.sidebar .brand-name {
+  margin: 6px 12px 26px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.login-inner .brand-logo {
+  width: auto;
+  max-width: 200px;
+  max-height: 80px;
+}
+.login-inner .brand-name {
+  margin-bottom: 32px;
+  font-size: 20px;
+}
+
+@media (max-width: 850px) {
+  .setup-modules {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 640px) {
+  .setup-step {
+    grid-template-columns: 22px minmax(0, 1fr);
+    align-items: start;
+  }
+  .setup-do {
+    grid-column: 2;
+    justify-content: flex-start;
+  }
+  .setup-do:empty {
+    display: none;
+  }
+}

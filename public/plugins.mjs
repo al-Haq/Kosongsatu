@@ -9,6 +9,7 @@ import books from "./ext/books.mjs";
 import ops from "./ext/ops.mjs";
 import team from "./ext/team.mjs";
 import platform from "./ext/platform.mjs";
+import setup from "./ext/setup.mjs";
 import trash from "./ext/trash.mjs";
 export const UI_PLUGINS = [
   ["documents", documents],
@@ -21,5 +22,6 @@ export const UI_PLUGINS = [
   ["ops", ops],
   ["team", team],
   ["platform", platform],
+  ["setup", setup],
   ["trash", trash],
 ];
