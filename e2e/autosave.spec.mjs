@@ -71,6 +71,17 @@ test("autosave: unsaved input survives a reload or a lost connection, and is res
   await expect(company).toHaveValue(saved);
   expect(await drafts(page)).toEqual([]);
 
+  // Leaving the page straight after typing still files the draft under Settings.
+  await company.fill("Typed then left");
+  await page.click('.sidebar a[href="#/invoices"]');
+  await expect(page.locator("main h1")).toHaveText("Invoices");
+  await page.reload();
+  await page.locator('.autosave-pending [data-autosave-pending="open"]').click();
+  await expect(page.locator('form[data-form="settings"] .autosave-notice')).toBeVisible();
+  await expect(company).toHaveValue("Typed then left");
+  await page.click('form[data-form="settings"] [data-autosave-discard]');
+  expect(await drafts(page)).toEqual([]);
+
   // A recurring plan's lines are kept too (a module hook), and Open brings the plan back.
   await page.goto("/#/recurring");
   await page.click('[data-action="rec-plan-new"]');
@@ -126,12 +137,28 @@ test("autosave: unsaved input survives a reload or a lost connection, and is res
   await page.locator('#modal [data-action="close-modal"]').first().click();
   expect(await drafts(page)).toEqual([]);
 
-  // Rows added to a form that has no hook are not kept, rather than restored by half.
+  // Rows changed in a form that has no hook are not kept, rather than restored
+  // into the wrong rows: a row added, or a saved row removed and a new one added.
   await page.goto("/#/settings/documents");
+  const fieldRows = page.locator('form[data-form="doc-custom-fields"] .custom-field-row');
+  const label = unique("Field");
   await page.click('[data-action="doc-field-add"]');
-  await page.locator(".custom-field-row input[name=label]").last().fill("Project code");
+  await fieldRows.last().locator("input[name=label]").fill(label);
   await page.waitForTimeout(700);
   expect(await drafts(page)).toEqual([]);
+  await page.locator('form[data-form="doc-custom-fields"] button[type=submit]').click();
+  await expect(page.locator("#toast")).toBeVisible();
+  const kept = await fieldRows.count();
+  await fieldRows.filter({ has: page.locator(`input[name=label][value="${label}"]`) }).locator('[data-action="doc-field-remove"]').click();
+  await page.click('[data-action="doc-field-add"]');
+  await fieldRows.last().locator("input[name=label]").fill("PO number");
+  await expect(fieldRows).toHaveCount(kept);
+  await page.waitForTimeout(700);
+  expect(await drafts(page)).toEqual([]);
+  // Put the workspace back for the other tests.
+  await fieldRows.last().locator('[data-action="doc-field-remove"]').click();
+  await page.locator('form[data-form="doc-custom-fields"] button[type=submit]').click();
+  await expect(fieldRows).toHaveCount(kept - 1);
 
   // Passwords are never kept.
   await page.goto("/#/settings/security");

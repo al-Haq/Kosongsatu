@@ -76,6 +76,9 @@ const when = (t) =>
 export function createAutosave({ user, extras = {}, canReopen = () => false, reopen = async () => {} }) {
   const bases = new WeakMap(),
     openers = new WeakMap(),
+    // The page each form is on, read when it appears: by the time a form is
+    // saved on the way out, the address already shows the next page.
+    routes = new WeakMap(),
     timers = new Map(),
     seen = new WeakSet(),
     // Drafts whose form is being saved right now: not restored into the page the
@@ -116,22 +119,35 @@ export function createAutosave({ user, extras = {}, canReopen = () => false, reo
     return PREFIX + u + encodeURIComponent(name) + ":" + contextOf(form);
   };
   const fields = (form) => [...form.elements].filter((el) => el.name && !el.disabled && !skipField(el));
+  // Which row a field is in: the data- attributes of the elements around it, up
+  // to the form (a custom field row's data-field, a line's data-id...).
+  const RUNTIME = new Set(["key", "requestKey", "booksW", "booksH", "booksBusy", "touched", "ink"]);
+  function rowOf(el, form) {
+    const ids = [];
+    for (let p = el.parentElement; p && p !== form; p = p.parentElement)
+      for (const [k, v] of Object.entries(p.dataset)) if (!RUNTIME.has(k)) ids.push(k + "=" + v);
+    return ids.join(",");
+  }
   function snapshot(form) {
     const out = {},
-      count = {};
+      count = {},
+      rows = [];
     for (const el of fields(form)) {
       const k = `${el.name}#${(count[el.name] = (count[el.name] ?? -1) + 1)}`;
       out[k] = el.type === "checkbox" || el.type === "radio" ? el.checked : el.multiple ? [...el.selectedOptions].map((o) => o.value) : el.value;
+      rows.push(k + "@" + rowOf(el, form));
     }
+    const snap = { fields: out, shape: rows.join("|") };
     const extra = extras[form.dataset.form]?.capture(form);
-    return extra === undefined ? { fields: out } : { fields: out, extra };
+    if (extra !== undefined) snap.extra = extra;
+    return snap;
   }
   const same = (a, b) => JSON.stringify(a.fields) === JSON.stringify(b.fields) && JSON.stringify(a.extra) === JSON.stringify(b.extra);
-  const shape = (snap) => Object.keys(snap.fields).sort().join("|");
   // A draft is only kept when all of it can be put back: never half a form.
-  // Without a hook, unnamed row controls cannot be kept, and rows added or
-  // removed (the fields no longer line up) cannot be rebuilt.
-  const keepable = (form, snap, base) => !!extras[form.dataset.form] || (!unnamedInput(form) && (!base || shape(snap) === shape(base)));
+  // Without a hook, unnamed row controls cannot be kept, and a form whose rows
+  // changed cannot be rebuilt: rows added or removed, or one removed and
+  // another added in its place (the same fields, but not the same rows).
+  const keepable = (form, snap, base) => !!extras[form.dataset.form] || (!unnamedInput(form) && (!base || snap.shape === base.shape));
   function apply(form, snap) {
     restoring = true;
     try {
@@ -170,7 +186,7 @@ export function createAutosave({ user, extras = {}, canReopen = () => false, reo
       v: 1,
       at: Date.now(),
       title: titleOf(form),
-      route: location.hash || "#/",
+      route: routes.get(form) || location.hash || "#/",
       opener: openers.get(form) || null,
       ...snap,
     });
@@ -195,6 +211,7 @@ export function createAutosave({ user, extras = {}, canReopen = () => false, reo
     const key = keyOf(form);
     if (!key) return;
     bases.set(form, snapshot(form));
+    routes.set(form, location.hash || "#/");
     if (form.closest("dialog") && lastAction && Date.now() - lastAction.at < 3000) openers.set(form, { action: lastAction.action, id: lastAction.id, route: lastAction.route });
     const draft = storage.get(key);
     if (!draft || submitting.has(key)) return;
