@@ -18,17 +18,6 @@ const slot = (name, ...args) =>
 const allowed = (kind, name) =>
   plugins.every((p) => p.can?.(kind, name) !== false);
 const requestKeys = new Map();
-// The workspace look: "classic" (default) or "soft". A per-browser choice;
-// client links and portal pages always use the classic look.
-const DESIGN_KEY = "nawlogic.design";
-let design = "classic";
-try {
-  if (localStorage.getItem(DESIGN_KEY) === "soft") design = "soft";
-} catch {}
-const applyDesign = (workspace) => {
-  if (workspace && design === "soft") document.documentElement.dataset.design = "soft";
-  else delete document.documentElement.dataset.design;
-};
 let S = null,
   publicDoc = null,
   session = null,
@@ -212,7 +201,6 @@ const confirmModal = (title, message, action, id, label) =>
     `<p>${E(message)}</p><div class="form-error" role="alert"></div><div class="form-actions">${button("Cancel", "close-modal")}${button(label, action, id, true)}</div>`,
   );
 function renderLogin() {
-  applyDesign(true);
   app.innerHTML = `<div class="login-screen"><section class="login-brand"><span class="eyebrow">NAWLOGIC / BILLING WORKSPACE</span><h1>Good work deserves<br><span class="accent">a clear invoice.</span></h1><p>From the first quotation to the final receipt. A quieter way to keep your business moving.</p><div class="login-points"><span>${icon("doc")}Create with confidence</span><span>${icon("wallet")}Track every payment</span><span>${icon("shield")}Your private workspace</span></div></section><section class="login-form"><div class="login-inner">${logo()}<h2>Welcome back.</h2><p>Sign in to your Nawlogic workspace.</p><form data-form="login">${input("Email address", "email", "", "email", true, 'autocomplete="username" maxlength="160"')}${input("Password", "password", "", "password", true, 'autocomplete="current-password" maxlength="256"')}<details class="mfa"><summary>Use an authenticator or recovery code</summary>${input("Authenticator or recovery code", "code", "", "text", false, 'autocomplete="one-time-code" maxlength="40"')}</details>${errorBlock()}<button class="btn primary" type="submit">Sign in ${icon("arrow")}</button></form>${slot("login")}<div class="login-footer">${icon("shield")} Team access only. Customer invoices use a separate private link.</div></div></section></div>`;
 }
 const NAV_GROUPS = ["Sell", "Get paid", "Records", "Books", "Operations", "Workspace"];
@@ -250,7 +238,6 @@ const initials = (email = "") => {
   return (parts.length > 1 ? parts[0][0] + parts[1][0] : local.slice(0, 2)).toUpperCase() || "?";
 };
 function renderShell(html, active) {
-  applyDesign(true);
   const items = allNav().flatMap(([, list]) => list);
   const title = items.find((n) => n.key === active)?.label || "Nawlogic";
   const accountLink = items.some((n) => n.key === "account")
@@ -263,7 +250,7 @@ function renderShell(html, active) {
       ([group, items]) =>
         `<span class="nav-group">${E(group)}</span>${items.map((n) => `<a href="#/${n.key}" class="${n.key === active ? "active" : ""}" ${n.key === active ? 'aria-current="page"' : ""}>${icon(n.icon)}${E(n.label)}</a>`).join("")}`,
     )
-    .join("")}</nav><div class="owner-box"><strong>NAWLOGIC</strong><small>${E(session.email)}</small></div></aside><div class="workspace"><header class="topbar"><div class="top-left"><button class="btn ghost mobile-toggle" data-action="toggle-nav" aria-label="Toggle navigation">${icon("menu")}</button><span class="top-title">${E(title)}</span></div><div class="right"><div class="design-switch" role="group" aria-label="Design">${["classic", "soft"].map((d) => `<button type="button" data-action="set-design" data-id="${d}" aria-pressed="${design === d}">${d === "soft" ? "Soft" : "Classic"}</button>`).join("")}</div>${slot("topbar")}${S.settings.demo ? '<span class="badge orange">DEMO DATA</span>' : ""}<details class="dropdown avatar-menu"><summary class="avatar" aria-label="Account menu">${E(initials(session.email))}</summary><div class="menu"><small>${E(session.email)}</small>${accountLink}<button type="button" class="menu-design" data-action="set-design" data-id="${design === "soft" ? "classic" : "soft"}">${design === "soft" ? "Use the Classic design" : "Use the Soft design"}</button><button type="button" data-action="logout">Sign out</button></div></details></div></header><main class="content">${S.settings.demo ? '<div class="notice"><p>Demo workspace. All clients, documents and payments are examples.</p></div>' : ""}${html}</main></div></div>`;
+    .join("")}</nav><div class="owner-box"><strong>NAWLOGIC</strong><small>${E(session.email)}</small></div></aside><div class="workspace"><header class="topbar"><div class="top-left"><button class="btn ghost mobile-toggle" data-action="toggle-nav" aria-label="Toggle navigation">${icon("menu")}</button><span class="top-title">${E(title)}</span></div><div class="right">${slot("topbar")}${S.settings.demo ? '<span class="badge orange">DEMO DATA</span>' : ""}<details class="dropdown avatar-menu"><summary class="avatar" aria-label="Account menu">${E(initials(session.email))}</summary><div class="menu"><small>${E(session.email)}</small>${accountLink}<button type="button" data-action="logout">Sign out</button></div></details></div></header><main class="content">${S.settings.demo ? '<div class="notice"><p>Demo workspace. All clients, documents and payments are examples.</p></div>' : ""}${html}</main></div></div>`;
 }
 const heading = (title, sub, actions = "") =>
   `<div class="heading"><div><h1>${E(title)}</h1>${sub ? `<p>${E(sub)}</p>` : ""}</div><div class="actions">${actions}</div></div>`;
@@ -407,7 +394,7 @@ function overview() {
   const cards = [
     { label: "Invoiced this month", icon: "doc", value: sums[0], foot: deltaLine(sums[0], prev[0], "vs same days last month") || "Invoices and notes", chart: sparkline(weekly(billed).map((w) => w.value)) },
     { label: "Collected this month", icon: "wallet", value: sums[1], foot: deltaLine(sums[1], prev[1], "vs same days last month") || "Receipts minus refunds", chart: sparkline(collected.map((w) => w.value)), cls: "teal" },
-    { label: "Outstanding", icon: "clock", value: sums[2], foot: `${outstanding.length} unpaid invoice${outstanding.length === 1 ? "" : "s"}`, chart: agingBar(buckets, "mini-aging"), hero: true },
+    { label: "Outstanding", icon: "clock", value: sums[2], foot: `${outstanding.length} unpaid invoice${outstanding.length === 1 ? "" : "s"}`, chart: agingBar(buckets, "mini-aging") },
     { label: "Overdue", icon: "trend", value: sums[3], foot: overdue.length ? `${overdue.length} overdue, oldest ${oldest} day${oldest === 1 ? "" : "s"} late` : "Nothing overdue", cls: "red-text" },
   ];
   const agingTotal = buckets.reduce((t, b) => t + b.amount, 0);
@@ -420,7 +407,7 @@ function overview() {
     (!S.settings.bankAccount
       ? `<div class="notice info">${icon("settings")}<p>Add your company details and payment instructions before sharing a real invoice.</p><a href="#/settings">Open settings →</a></div>`
       : "") +
-    `<div class="metrics">${cards.map((c) => `<div class="metric${c.hero ? " hero" : ""}"><span class="metric-icon">${icon(c.icon)}</span><div class="label">${c.label}</div><div class="value ${c.cls || ""}">${money(c.value)}</div><div class="hint">${c.foot}</div>${c.chart || ""}</div>`).join("")}</div><div class="grid-2"><section class="panel"><div class="panel-head"><div><h2>Collections</h2><p>Last 12 weeks · MYR</p></div><div class="legend"><span class="key now">Last 12 weeks</span><span class="key before">12 weeks before</span></div></div><div class="trend-total"><strong>${money(total12)}</strong>${deltaLine(total12, totalBefore, "vs the 12 weeks before")}</div>${trendChart(collected, before)}<div class="trend-axis"><span>${dateLabel(collected[0].start).slice(0, 6)}</span><span>${dateLabel(collected[6].start).slice(0, 6)}</span><span>Today</span></div></section><section class="panel"><div class="panel-head"><div><h2>Needs attention</h2><p>Oldest due first</p></div><a href="#/invoices">View all →</a></div>${
+    `<div class="metrics">${cards.map((c) => `<div class="metric"><span class="metric-icon">${icon(c.icon)}</span><div class="label">${c.label}</div><div class="value ${c.cls || ""}">${money(c.value)}</div><div class="hint">${c.foot}</div>${c.chart || ""}</div>`).join("")}</div><div class="grid-2"><section class="panel"><div class="panel-head"><div><h2>Collections</h2><p>Last 12 weeks · MYR</p></div><div class="legend"><span class="key now">Last 12 weeks</span><span class="key before">12 weeks before</span></div></div><div class="trend-total"><strong>${money(total12)}</strong>${deltaLine(total12, totalBefore, "vs the 12 weeks before")}</div>${trendChart(collected, before)}<div class="trend-axis"><span>${dateLabel(collected[0].start).slice(0, 6)}</span><span>${dateLabel(collected[6].start).slice(0, 6)}</span><span>Today</span></div></section><section class="panel"><div class="panel-head"><div><h2>Needs attention</h2><p>Oldest due first</p></div><a href="#/invoices">View all →</a></div>${
       [...outstanding]
         .sort((a, b) => a.due_date.localeCompare(b.due_date))
         .slice(0, 4)
@@ -1077,22 +1064,6 @@ async function runAction(action, id, el) {
     case "toggle-nav":
       $(".sidebar").classList.toggle("open");
       break;
-    case "set-design": {
-      // Only the look changes: the page is not rebuilt, so unsaved form input stays.
-      design = id === "soft" ? "soft" : "classic";
-      try {
-        localStorage.setItem(DESIGN_KEY, design);
-      } catch {}
-      applyDesign(true);
-      $$('.design-switch [data-action="set-design"]').forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.id === design)));
-      const item = $(".menu-design");
-      if (item) {
-        item.dataset.id = design === "soft" ? "classic" : "soft";
-        item.textContent = design === "soft" ? "Use the Classic design" : "Use the Soft design";
-      }
-      el.closest("details")?.removeAttribute("open");
-      break;
-    }
     case "logout":
       await api("/logout", "POST", {});
       session = null;
@@ -1672,7 +1643,6 @@ window.addEventListener("hashchange", () => {
   window.scrollTo(0, 0);
 });
 async function boot() {
-  applyDesign(false);
   // Guest pages from modules (client portal, password reset, feedback...).
   for (const p of plugins) if (await p.guestPage?.(location)) return;
   if (publicToken()) return renderPublic();

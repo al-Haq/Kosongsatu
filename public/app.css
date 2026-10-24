@@ -230,11 +230,9 @@ nav {
 }
 .nav-group {
   margin: 20px 12px 6px;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 600;
-  letter-spacing: 0.08em;
   color: var(--muted);
-  text-transform: uppercase;
 }
 .nav-group:first-child {
   margin-top: 0;
@@ -245,7 +243,7 @@ nav a {
   gap: 11px;
   padding: 9px 12px;
   color: #3d3d3d;
-  border-radius: var(--radius);
+  border-radius: 12px;
   font-size: 12.5px;
   font-weight: 500;
   line-height: 1.4;
@@ -259,14 +257,18 @@ nav a:hover {
   background: var(--soft);
   color: var(--ink);
 }
-nav a.active {
+nav a:hover svg {
   color: var(--ink);
-  background: var(--soft);
-  font-weight: 700;
 }
-nav a:hover svg,
+/* The current page: a black pill. */
+nav a.active,
+nav a.active:hover {
+  color: #fff;
+  background: var(--ink);
+  font-weight: 600;
+}
 nav a.active svg {
-  color: var(--ink);
+  color: #fff;
 }
 .owner-box {
   margin-top: auto;
@@ -2407,30 +2409,6 @@ textarea:focus {
 .age-empty {
   fill: var(--soft);
 }
-/* The Classic / Soft switch in the top bar (in the account menu on phones). */
-.design-switch {
-  display: inline-flex;
-  padding: 3px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-pill);
-  background: #fff;
-}
-.design-switch button {
-  border: 0;
-  background: none;
-  padding: 5px 11px;
-  border-radius: var(--radius-pill);
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--muted);
-}
-.design-switch button[aria-pressed="true"] {
-  background: var(--ink);
-  color: #fff;
-}
-.avatar-menu .menu .menu-design {
-  display: none;
-}
 @media (max-width: 1150px) {
   .aging-tiles {
     grid-template-columns: repeat(3, 1fr);
@@ -2442,11 +2420,5 @@ textarea:focus {
   }
   .legend {
     display: none;
-  }
-  .design-switch {
-    display: none;
-  }
-  .avatar-menu .menu .menu-design {
-    display: block;
   }
 }
