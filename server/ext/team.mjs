@@ -245,8 +245,9 @@ export default {
           store.updateUser(uid, await r.body(), r.session.owner_id);
           return sendJson(200, store.teamUsers().find((x) => x.id === Number(uid)));
         }
+        // A pending invitation is cancelled; anyone else is removed for good.
         if (!action && method === "DELETE") {
-          store.cancelInvite(uid);
+          store.removeUser(uid, r.session.owner_id);
           return sendJson(200, { ok: true });
         }
         if (method === "POST" && (action === "disable" || action === "enable")) {

@@ -146,7 +146,7 @@ test("invitations are one-time links; email is sent when configured, otherwise t
   }
 });
 
-test("without email the owner copies the link; resending replaces it; pending invitations can be removed", async () => {
+test("without email the owner copies the link; resending replaces it; invitations and users can be removed", async () => {
   const f = await fixture();
   try {
     const first = await f.json("/api/team/users", "POST", { email: "later@example.com", role: "staff" });
@@ -162,9 +162,26 @@ test("without email the owner copies the link; resending replaces it; pending in
     assert.equal((await f.request("/api/guest/team/invite/not-a-token")).status, 404);
     assert.equal((await f.auth(`/api/team/users/${first.user.id}`, "DELETE")).status, 200);
     assert.equal(f.store.db.prepare("SELECT count(*) n FROM owners WHERE email='later@example.com'").get().n, 0);
-    // Active users are disabled, not removed, so their history keeps its meaning.
+    // An active user can be removed for good: signed out at once, links void,
+    // their name kept in the audit trail, and the email free to invite again.
     const active = await member(f, "staff");
-    assert.equal((await f.auth(`/api/team/users/${active.id}`, "DELETE")).status, 409);
+    assert.equal((await active.auth("/api/workspace")).status, 200);
+    assert.equal((await f.auth(`/api/team/users/${active.id}`, "DELETE")).status, 200);
+    assert.equal((await active.auth("/api/workspace")).status, 401, "their session ended");
+    assert.equal(f.store.db.prepare("SELECT count(*) n FROM owners WHERE email=?").get(active.email).n, 0);
+    assert.equal(f.store.db.prepare("SELECT count(*) n FROM sessions s JOIN owners o ON o.id=s.owner_id WHERE o.email=?").get(active.email).n, 0);
+    const removed = f.store.db.prepare("SELECT detail,before_data FROM audit WHERE action='user.removed' ORDER BY rowid DESC").get();
+    assert.match(removed.detail, new RegExp(`^${active.email}; removed for good`));
+    assert.equal(JSON.parse(removed.before_data).role, "staff");
+    const again = await f.json("/api/team/users", "POST", { email: active.email, role: "accountant" });
+    assert.equal(again.user.role, "accountant");
+    // Never yourself, never the last owner who can sign in.
+    const me = (await f.json("/api/team/me")).id;
+    assert.equal((await f.auth(`/api/team/users/${me}`, "DELETE")).status, 409);
+    const other = await member(f, "owner");
+    assert.equal((await f.auth(`/api/team/users/${other.id}`, "DELETE")).status, 200, "a second owner can go while one remains");
+    assert.equal((await f.auth(`/api/team/users/${me}`, "DELETE")).status, 409);
+    assert.equal((await f.auth("/api/team/users/999999", "DELETE")).status, 404);
   } finally {
     await f.close();
   }

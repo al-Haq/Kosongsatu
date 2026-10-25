@@ -93,7 +93,8 @@ export default function teamUI(h) {
               : (self || lastOwner ? "" : button("Edit", "team-edit", u.id)) +
                 (self ? "" : u.disabled ? button("Enable", "team-enable", u.id) : lastOwner ? "" : button("Disable", "team-disable", u.id)) +
                 (!self && !u.disabled ? button("Reset password", "team-reset-link", u.id) : "") +
-                (!self && u.mfa ? button("Reset MFA", "team-reset-mfa", u.id) : "");
+                (!self && u.mfa ? button("Reset MFA", "team-reset-mfa", u.id) : "") +
+                (self || lastOwner ? "" : button("Remove permanently", "team-remove", u.id));
           return `<tr><td><strong>${E(u.name || u.email)}${self ? " (you)" : ""}</strong>${u.name ? `<small>${E(u.email)}</small>` : ""}</td><td>${E(roleLabel(u.role))}${lastOwner ? "<small>Last owner</small>" : ""}</td><td>${statusBadge(u.status)}${u.status === "Invited" && u.invited ? `<small>Invited ${timeLabel(u.invited)}</small>` : ""}</td>${showMfa ? `<td>${u.mfa ? badge("Enabled") : '<span class="muted">Not set up</span>'}</td>` : ""}<td>${u.last_sign_in ? timeLabel(u.last_sign_in) : '<span class="muted">Never</span>'}</td><td><div class="actions">${actions}</div></td></tr>`;
         })
         .join("")}</tbody></table></div></section><section class="panel mt22"><details><summary><strong>What each role can do</strong></summary><div class="team-roles mt22">${Object.entries(t.roles || {})
@@ -307,8 +308,15 @@ export default function teamUI(h) {
         case "team-disable":
         case "team-enable": {
           const u = (team().users || []).find((x) => String(x.id) === String(id));
+          const pending = u?.status === "Invited";
           const text = {
-            "team-remove": ["Remove invitation?", "The invitation link stops working and the pending user is removed.", "Remove"],
+            "team-remove": pending
+              ? ["Remove invitation?", "The invitation link stops working and the pending user is removed.", "Remove"]
+              : [
+                  "Remove user permanently?",
+                  `${u?.email} loses access for good: signed out everywhere, and their invitation and reset links stop working. Documents, payments and the audit trail keep their name. This cannot be undone. To keep their access for later, use Disable instead.`,
+                  "Remove permanently",
+                ],
             "team-disable": ["Disable user?", `${u?.email} is signed out everywhere and cannot sign in until you enable the account again. Their history stays in the audit trail.`, "Disable"],
             "team-enable": ["Enable user?", `${u?.email} can sign in again with their existing password.`, "Enable"],
           }[type];
@@ -326,7 +334,8 @@ export default function teamUI(h) {
             modal.querySelector(".form-error").innerHTML = errorHtml(e);
             return true;
           }
-          await done({ remove: "Invitation removed.", disable: "User disabled and signed out.", enable: "User enabled." }[what]);
+          const wasPending = (team().users || []).find((x) => String(x.id) === String(id))?.status === "Invited";
+          await done({ remove: wasPending ? "Invitation removed." : "User removed.", disable: "User disabled and signed out.", enable: "User enabled." }[what]);
           return true;
         }
         case "team-reset-mfa": {

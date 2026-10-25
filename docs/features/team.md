@@ -8,13 +8,14 @@ The person who ran `npm run setup` is the first **owner**. Open **Team** (Worksp
 
 | Role | Can | Cannot |
 |---|---|---|
-| **Owner** | Everything. | Remove, demote or disable the last active owner. |
+| **Owner** | Everything. | Remove, demote or disable the last active owner, or remove themselves. |
 | **Staff** | Day-to-day billing: clients and services (add, edit, archive), drafts (create, edit, delete), issue, client links, email documents and statements, record payments and receipts, allocate receipts, bank import and matching, recurring schedules, sales and customer POs, upload files. | Settings, integration keys, users, connectors, AI assistant and automation, backups, voids, credit/debit notes, refunds, payment reversals, deleting clients/services/schedules, the JSON export, other people's MFA. |
 | **Accountant** | Read-only: see documents, payments and reports, download PDFs, invoice and SST CSVs, the JSON business export and statements; verify the audit chain. | Any change, except their own password and authenticator. The activity history (who changed what). |
 
 - **Invite:** Team → **Invite user** → email, name, role. With email configured, the invitation is emailed; you can also copy the link. Without email, copy the one-time link and send it yourself (WhatsApp, etc.). The link lets them choose a password, works once and expires after 7 days. **Send again** replaces the link; **Remove** cancels a pending invitation.
 - **Change role / name:** **Edit**. A new role applies to the person's next click; they don't need to sign in again.
-- **Disable:** signs the person out everywhere at once and blocks sign-in. **Enable** restores access with their old password. Active users are disabled rather than deleted, so the audit trail keeps its meaning.
+- **Disable:** signs the person out everywhere at once and blocks sign-in. **Enable** restores access with their old password. Use it for someone who may come back.
+- **Remove permanently:** deletes the account for good: signed out everywhere, invitation and reset links void, authenticator and recovery codes gone. Documents, payments and audit entries keep the person's name as text, and the removal itself is recorded (`user.removed`). You cannot remove yourself or the last active owner. The same email can be invited again later as a new account.
 - **Last sign-in** is shown for each user.
 - **Reset password:** for a member who forgot theirs. With email it goes straight to them (you never see it); without email you get a 30-minute one-time link to pass on, and creating it is recorded in the audit trail.
 - **Reset MFA:** clears a member's authenticator and recovery codes (lost phone) and signs them out. Needs your password (and your code if you use MFA).

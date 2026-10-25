@@ -141,6 +141,28 @@ export function attachUsers(Store) {
         this.audit("user.invite_cancelled", String(u.id), u.email, { email: u.email, role: u.role }, null);
       });
     },
+    // Removes a person for good: their sign-in, links, codes and assistant
+    // history go; documents, payments and audit entries keep their name as
+    // text. Not yourself, and never the last owner who can sign in.
+    removeUser(idv, actorId) {
+      const u = this.teamUser(idv);
+      check(u.id !== Number(actorId), "You cannot remove your own account.", 409);
+      if (u.role === "owner" && !u.disabled && (!u.invited || u.joined))
+        check(this.activeOwners() > 1, "The workspace needs at least one owner. Make someone else an owner first.", 409);
+      this.tx(() => {
+        for (const t of ["team_tokens", "sessions", "recovery_codes", "assistant_runs"])
+          this.db.prepare(`DELETE FROM ${t} WHERE owner_id=?`).run(u.id);
+        this.db.prepare("DELETE FROM owners WHERE id=?").run(u.id);
+        const pending = u.invited && !u.joined;
+        this.audit(
+          pending ? "user.invite_cancelled" : "user.removed",
+          String(u.id),
+          u.email + (pending ? "" : "; removed for good, sessions ended"),
+          { email: u.email, role: u.role, name: u.name || "", joined: u.joined || null },
+          null,
+        );
+      });
+    },
     async acceptInvite(token, b, passwordHash) {
       this.teamTokenUser(token, "invite");
       const password = await passwordHash(b.password);
