@@ -617,7 +617,8 @@ export default function booksUI(h) {
   // ---------- slots ----------
   function healthPanel() {
     const b = B();
-    if (!b) return "";
+    // Cash health is a company figure: owner and accountant only.
+    if (!b || !b.health || !h.allowed("view", "money")) return "";
     const x = b.health;
     const tile = (label, value, hint, cls = "") => `<div class="metric"><div class="label">${label}</div><div class="value ${cls}">${value}</div><div class="hint">${hint}</div></div>`;
     const runway =

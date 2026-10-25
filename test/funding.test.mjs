@@ -264,7 +264,19 @@ test("funding: capital and loans in, repayments out, and what each person is sti
     );
     const staff = await member(f, "staff");
     await assert.rejects(staff.json("/api/funding"), (e) => e.status === 403);
-    assert.ok(!(await staff.json("/api/workspace")).ext.funding);
+    const staffWs = await staff.json("/api/workspace");
+    assert.ok(!staffWs.ext.funding);
+    // Company figures from Books are not sent to staff either.
+    assert.equal(staffWs.ext.books.health, null);
+    assert.equal(staffWs.ext.books.forecastSummary, null);
+    assert.ok(
+      (await f.json("/api/workspace")).ext.books.health,
+      "the owner still gets cash health",
+    );
+    assert.ok(
+      (await acc.json("/api/workspace")).ext.books.health,
+      "and so does the accountant",
+    );
   } finally {
     await f.close();
   }

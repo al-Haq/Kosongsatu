@@ -427,6 +427,8 @@ export default {
   workspace(r) {
     const store = r.ctx.store;
     const { lateness, health, forecast } = store.cashPicture();
+    // Cash health and the forecast are company figures: owner and accountant only.
+    const money = r.session.role !== "staff";
     return {
       settings: store.booksSettings(),
       categories: store.booksCategories(),
@@ -436,8 +438,8 @@ export default {
       pos: store.pos().map(({ business, business_snapshot, ...p }) => p),
       clientCodes: store.clientCodes(),
       lateness,
-      health,
-      forecastSummary: { lowest: forecast.lowest, negativeWeeks: forecast.negativeWeeks, openingKnown: forecast.opening.known },
+      health: money ? health : null,
+      forecastSummary: money ? { lowest: forecast.lowest, negativeWeeks: forecast.negativeWeeks, openingKnown: forecast.opening.known } : null,
       ai: scanStatus(r),
       mail: r.ctx.mailer.status().configured,
       paymentMethods: PAYMENT_METHODS,
