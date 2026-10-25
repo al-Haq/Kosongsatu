@@ -580,6 +580,7 @@ export function cashForecast({
   clients = [],
   recurring = [],
   scheduledDrafts = [],
+  funding = [],
   lateness,
   cashBalance = null,
   cashDate = null,
@@ -602,13 +603,15 @@ export function cashForecast({
     w.items.push({ date: day, amount, ...item });
   };
   // Opening balance: the owner's bank balance plus money in and out since that date.
-  let opening = { known: cashBalance !== null && !!cashDate, balance: cashBalance ?? 0, date: cashDate, receipts: 0, refunds: 0, spent: 0 };
+  let opening = { known: cashBalance !== null && !!cashDate, balance: cashBalance ?? 0, date: cashDate, receipts: 0, refunds: 0, spent: 0, funding: 0 };
   if (opening.known) {
     for (const c of customerCash(receipts, docsById))
       if (c.date > cashDate && c.date <= asOf) c.amount > 0 ? (opening.receipts += c.amount) : (opening.refunds -= c.amount);
     for (const e of expenses) if (e.status === "paid" && e.paid_date > cashDate && e.paid_date <= asOf) opening.spent += e.amount;
+    // Capital and loans in, loan repayments out (funding module).
+    for (const f of funding) if (f.date > cashDate && f.date <= asOf) opening.funding += f.amount;
   }
-  opening.estimated = opening.balance + opening.receipts - opening.refunds - opening.spent;
+  opening.estimated = opening.balance + opening.receipts - opening.refunds - opening.spent + opening.funding;
   const delayOf = (cid) => {
     const c = lateness?.clients?.[cid];
     return Math.round(c?.count ? c.avgDelay : lateness?.workspace?.avgDelay || 0);

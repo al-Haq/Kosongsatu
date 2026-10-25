@@ -6,6 +6,7 @@ import payments from "./ext/payments.mjs";
 import comms from "./ext/comms.mjs";
 import portal from "./ext/portal.mjs";
 import books from "./ext/books.mjs";
+import funding from "./ext/funding.mjs";
 import ops from "./ext/ops.mjs";
 import team from "./ext/team.mjs";
 import platform from "./ext/platform.mjs";
@@ -19,6 +20,7 @@ export const UI_PLUGINS = [
   ["comms", comms],
   ["portal", portal],
   ["books", books],
+  ["funding", funding],
   ["ops", ops],
   ["team", team],
   ["platform", platform],

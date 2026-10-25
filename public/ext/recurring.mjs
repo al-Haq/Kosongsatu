@@ -1,5 +1,6 @@
 // Recurring billing: weekly to yearly schedules, multi-line plans, auto-issue and auto-send, late fees, contracts and retainers, monthly accountant report.
 // Browser module contract: see docs/PLUGINS.md.
+import { errorHtml } from "./error-tips.mjs";
 const TAX_RATES = [0, 5, 6, 8, 10];
 export default function recurringUI(h) {
   const { get, api, refresh, renderRoute, navigate, showModal, modal, toast, E, money, dec, dateLabel, timeLabel } = h;
@@ -541,7 +542,7 @@ export default function recurringUI(h) {
           try {
             await api(`/schedules/${id}`, "DELETE");
           } catch (e) {
-            modal.querySelector(".form-error").textContent = e.message;
+            modal.querySelector(".form-error").innerHTML = errorHtml(e);
             return true;
           }
           await mutate(async () => null, "Plan deleted. The audit history keeps a record.", "recurring");
@@ -586,7 +587,7 @@ export default function recurringUI(h) {
           try {
             await api(`/recurring/contracts/${id}`, "DELETE");
           } catch (e) {
-            modal.querySelector(".form-error").textContent = e.message;
+            modal.querySelector(".form-error").innerHTML = errorHtml(e);
             return true;
           }
           await mutate(async () => null, "Contract deleted.", "recurring/contracts");

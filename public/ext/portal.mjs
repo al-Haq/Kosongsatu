@@ -1,6 +1,7 @@
 // Client portal: client accounts, multiple contacts, credit limits, quotation e-signatures and client feedback.
 // Browser module contract: see docs/PLUGINS.md. Client-facing pages live in portal-guest.mjs.
 import { portalGuest } from "./portal-guest.mjs";
+import { errorHtml } from "./error-tips.mjs";
 
 const ROLES = [
   ["billing", "Billing"],
@@ -212,7 +213,7 @@ export default function portalUI(h) {
           try {
             await h.api(`/portal/contacts/${id}`, "DELETE");
           } catch (e) {
-            h.modal.querySelector(".form-error").textContent = e.message;
+            h.modal.querySelector(".form-error").innerHTML = errorHtml(e);
             return true;
           }
           await done("Contact removed.");

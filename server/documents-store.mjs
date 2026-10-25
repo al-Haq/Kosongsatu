@@ -28,6 +28,8 @@ import { hasCjk, cjkFontPath, CJK_MESSAGE } from "./documents-fonts.mjs";
 import { bindPdf, freezeBusiness } from "./documents-assets.mjs";
 
 export const LAYOUTS = ["classic", "modern", "compact"];
+// A client is a company, an individual, a government body or another organisation.
+export const CLIENT_KINDS = ["company", "individual", "government", "organisation"];
 export const TEMPLATE_DEFAULTS = {
   pdfLayout: "classic",
   pdfAccent: "#087F7E",
@@ -213,6 +215,12 @@ export function attachDocuments(Store) {
         if (b.language !== undefined) {
           check(b.language === "" || LANGUAGES.includes(b.language), "Choose a document language.");
           sets.language = b.language;
+        }
+        // An individual has no contact person or SST registration of their own.
+        if (b.kind !== undefined) {
+          check(CLIENT_KINDS.includes(b.kind), "Choose the client type: company, individual, government or organisation.");
+          sets.kind = b.kind;
+          if (b.kind === "individual") Object.assign(sets, { contact: "", sst_number: "" });
         }
         for (const [key, value] of Object.entries(sets))
           this.db.prepare(`UPDATE clients SET ${key}=? WHERE id=?`).run(value, out.id);

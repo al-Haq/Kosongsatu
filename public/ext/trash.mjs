@@ -1,5 +1,6 @@
 // Recently deleted: restore what was deleted in the last 30 days.
 // Feature module contract: see docs/PLUGINS.md. Owner guide: docs/features/trash.md.
+import { errorHtml } from "./error-tips.mjs";
 export default function trashUI(h) {
   const { E, button, empty, heading, timeLabel, dateLabel, modal } = h;
   const T = () => h.get().ext?.trash || { days: 30, items: [], purge: false };
@@ -63,7 +64,7 @@ export default function trashUI(h) {
           try {
             await h.api(`/trash/${encodeURIComponent(id)}`, "DELETE");
           } catch (e) {
-            modal.querySelector(".form-error").textContent = e.message;
+            modal.querySelector(".form-error").innerHTML = errorHtml(e);
             return true;
           }
           modal.close();

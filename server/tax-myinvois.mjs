@@ -257,11 +257,25 @@ export function supplierParty(store, s = taxSettings(store), doc = null) {
     address: addressOf(v),
   };
 }
+// An individual client's ID is their MyKad (12 digits) or passport unless the
+// ID type is set. Without a TIN, LHDN's general TIN stands in: EI00000000010
+// for a Malaysian with MyKad, EI00000000020 for a foreigner with a passport.
+function individualId(c) {
+  const value = String(c.brn || "").replace(/[\s-]/g, "");
+  const idType = c.tax_id_type || (/^\d{12}$/.test(value) ? "NRIC" : "PASSPORT");
+  const general = { NRIC: "EI00000000010", PASSPORT: "EI00000000020" }[idType] || "";
+  return { tin: c.tin || (value ? general : ""), idType, idValue: ["NRIC", "PASSPORT"].includes(idType) ? value : c.brn || "" };
+}
+// A government body without a TIN or registration number uses LHDN's general
+// TIN EI00000000040 and "NA" as its number.
+function buyerId(c) {
+  if (c.kind === "individual") return individualId(c);
+  const government = c.kind === "government";
+  return { tin: c.tin || (government ? "EI00000000040" : ""), idType: c.tax_id_type || "BRN", idValue: c.brn || (government ? "NA" : "") };
+}
 export function buyerParty(c) {
   return {
-    tin: c.tin || "",
-    idType: c.tax_id_type || "BRN",
-    idValue: c.brn || "",
+    ...buyerId(c),
     sst: c.sst_number || "NA",
     ttx: "NA",
     name: c.name,

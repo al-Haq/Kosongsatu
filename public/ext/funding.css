@@ -1,0 +1,21 @@
+/* Funding: owner and investor money (capital, loans, repayments). */
+.funding-form .kind-choice {
+  grid-template-columns: repeat(3, 1fr);
+}
+.funding-form .repayment-only {
+  display: none;
+}
+.funding-form[data-funding-kind="repayment"] .repayment-only {
+  display: block;
+}
+.funding-form[data-funding-kind="repayment"] .not-repayment {
+  display: none;
+}
+.funding-void td {
+  color: var(--muted);
+}
+@media (max-width: 640px) {
+  .funding-form .kind-choice {
+    grid-template-columns: 1fr;
+  }
+}

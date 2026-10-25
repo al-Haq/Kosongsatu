@@ -4,6 +4,7 @@ import { financeUI } from "./finance.mjs";
 import { detailsHtml, detailsPlain, htmlToDetails, DETAILS_MAX } from "./ext/line-details.mjs";
 import { lineChoices, matchChoices } from "./ext/line-suggest.mjs";
 import { auditChanges } from "./ext/doc-changes.mjs";
+import { errorTip, errorHtml } from "./ext/error-tips.mjs";
 import { createAutosave } from "./autosave.mjs";
 import { UI_PLUGINS } from "./plugins.mjs";
 import { totals, toMYR, basisPoints, percentOf } from "./ext/documents-calc.mjs";
@@ -135,16 +136,22 @@ const button = (label, action, id = "", primary = false, iconName = "") =>
     : `<button type="button" class="btn ${primary ? "primary" : ""}" data-action="${action}" data-id="${E(id)}">${iconName ? icon(iconName) : ""}${E(label)}</button>`;
 const empty = (title, body = "", cta = "") =>
   `<div class="empty">${icon("doc")}<h2>${E(title)}</h2><p>${E(body)}</p>${cta}</div>`;
+// message is text or an Error. An error also says what to try next (error-tips.mjs).
 function toast(message, error = false) {
   const t = $("#toast");
   const undo = !error && undoBin && Date.now() - undoBin.at < 15000 ? undoBin.id : "";
   undoBin = null;
-  t.innerHTML = `<span>${E(message)}</span>${undo ? `<button type="button" class="toast-undo" data-action="bin-undo" data-id="${E(undo)}">Undo</button>` : ""}`;
+  const text = message?.message ?? String(message ?? "");
+  const tip = error ? (message?.tip ?? errorTip(text, message?.status)) : "";
+  t.innerHTML = `<span>${E(text)}${tip ? `<span class="error-tip">${E(tip)}</span>` : ""}</span>${undo ? `<button type="button" class="toast-undo" data-action="bin-undo" data-id="${E(undo)}">Undo</button>` : ""}`;
   t.className = "show" + (error ? " error" : "") + (undo ? " with-action" : "");
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => (t.className = ""), undo ? 10000 : 5500);
+  // Longer when there is a tip to read.
+  toastTimer = setTimeout(() => (t.className = ""), undo ? 10000 : tip ? 12000 : 5500);
 }
-async function api(path, method = "GET", body) {
+// A failed request: the server's message, its HTTP status and a tip.
+const failure = (message, status = 0) => Object.assign(new Error(message), { status, tip: errorTip(message, status) });
+async function api(path, method = "GET", body, retried = false) {
   const retryable =
     method === "POST" &&
     /^\/(documents|receipts|bank|clients|services|schedules|sales)/.test(path);
@@ -174,16 +181,29 @@ async function api(path, method = "GET", body) {
   try {
     data = await response.json();
   } catch {
-    throw new Error("Server returned an unreadable response.");
+    throw failure("Server returned an unreadable response.", response.status);
   }
   if (!response.ok) {
+    // The page's sign-in check is out of date (signed in again in another tab,
+    // a server update): take the current one and try once more, but only for
+    // the same account. The server refused before doing anything.
+    if (response.status === 403 && session && !retried && /^Session verification failed/.test(data.error || "")) {
+      const now = await fetch("/api/session")
+        .then((r) => (r.ok ? r.json() : null))
+        .catch(() => null);
+      if (now?.csrf && now.email === session.email) {
+        session = { ...session, csrf: now.csrf };
+        return api(path, method, body, true);
+      }
+      if (now?.email) throw failure(`You are now signed in as ${now.email} in another tab.`, 409);
+    }
     if (response.status === 401 && session) {
       session = null;
       S = null;
       modal.close();
       renderLogin();
     }
-    throw new Error(data.error || "Request failed.");
+    throw failure(data.error || "Request failed.", response.status);
   }
   return data;
 }
@@ -554,31 +574,43 @@ function filteredDocs(kind) {
         .includes(search.toLowerCase()),
   );
 }
+// A client is a company, an individual, a government body or another
+// organisation. Only the name is needed to save one; the other details are for
+// documents and e-Invoices.
+const CLIENT_KINDS = [
+  ["company", "Company or business", "Sdn Bhd, Bhd, enterprise, sole proprietor…"],
+  ["individual", "Individual", "A person, not a business"],
+  ["government", "Government", "Ministry, agency, department, council, school…"],
+  ["organisation", "Organisation", "NGO, association, society, cooperative…"],
+];
+const KIND_LABEL = Object.fromEntries(CLIENT_KINDS.map(([k, label]) => [k, label]));
+const clientKind = (c) => (KIND_LABEL[c?.kind] ? c.kind : "company");
+const kindTag = (c) => (clientKind(c) === "company" ? "" : `<span class="kind-tag">${E(KIND_LABEL[clientKind(c)])}</span>`);
 function clients() {
   return (
     heading("Clients", "", button("Add client", "new-client", "", true, "plus")) +
-    `<section class="panel">${S.clients.length ? `<div class="table-wrap"><table class="table-cards"><thead><tr><th>Client</th><th>Contact</th><th>Payment terms</th><th class="num">Outstanding</th></tr></thead><tbody>${paged(S.clients).rows.map((c) => `<tr class="row-link" data-action="open-client" data-id="${c.id}"><td class="card-title"><button class="link-button" data-action="open-client" data-id="${c.id}">${E(c.name)}</button><small>${E(c.email)}</small></td><td data-label="Contact">${E(c.contact || "")}</td><td data-label="Terms">${c.terms} days${c.archived ? " " + badge("Archived") : ""}</td><td class="num" data-label="Outstanding">${money(S.documents.filter((d) => d.client_id === c.id && d.kind === "invoice" && d.state === "issued").reduce((s, d) => s + myr(d.balance, d), 0))}</td></tr>`).join("")}</tbody></table></div>${paged(S.clients).nav}` : empty("Your first client starts here", "Add their billing name and contact details.", button("Add client", "new-client", "", true))}</section>`
+    `<section class="panel">${S.clients.length ? `<div class="table-wrap"><table class="table-cards"><thead><tr><th>Client</th><th>Contact</th><th>Payment terms</th><th class="num">Outstanding</th></tr></thead><tbody>${paged(S.clients).rows.map((c) => `<tr class="row-link" data-action="open-client" data-id="${c.id}"><td class="card-title"><button class="link-button" data-action="open-client" data-id="${c.id}">${E(c.name)}</button>${kindTag(c)}<small>${E(c.email)}</small></td><td data-label="Contact">${E(clientKind(c) === "individual" ? c.phone || "" : c.contact || "")}</td><td data-label="Terms">${c.terms} days${c.archived ? " " + badge("Archived") : ""}</td><td class="num" data-label="Outstanding">${money(S.documents.filter((d) => d.client_id === c.id && d.kind === "invoice" && d.state === "issued").reduce((s, d) => s + myr(d.balance, d), 0))}</td></tr>`).join("")}</tbody></table></div>${paged(S.clients).nav}` : empty("Your first client starts here", "Add their billing name and contact details.", button("Add client", "new-client", "", true))}</section>`
   );
 }
 function clientProfile(id) {
   const c = S.clients.find((c) => c.id === id);
   if (!c) return empty("Client not found");
+  const person = clientKind(c) === "individual";
+  // Everyday actions stay visible; module actions, archive and delete wait in "More".
+  const more =
+    slot("clientActions", c) +
+    (c.archived ? button("Restore client", "restore-client", c.id) : button("Archive client", "archive-client", c.id)) +
+    button("Delete client", "delete-client", c.id);
   return (
     heading(
       c.name,
-      "",
+      KIND_LABEL[clientKind(c)],
       button("Edit client", "edit-client", c.id) +
-        (c.archived
-          ? button("Restore client", "restore-client", c.id)
-          : button("Archive client", "archive-client", c.id)) +
-        button("Delete client", "delete-client", c.id) +
         button("Statement", "client-statement", c.id) +
-        slot("clientActions", c) +
-        (c.archived
-          ? ""
-          : button("New invoice", "client-invoice", c.id, true, "plus")),
+        (more ? `<details class="dropdown"><summary class="btn">More</summary><div class="menu">${more}</div></details>` : "") +
+        (c.archived ? "" : button("New invoice", "client-invoice", c.id, true, "plus")),
     ) +
-    `<div class="profile-grid"><section class="panel"><div class="client-avatar">${E(c.name.slice(0, 2).toUpperCase())}</div><h2>${E(c.name)}</h2><dl class="detail"><dt>Billing contact</dt><dd>${E(c.contact || "Not provided")}</dd><dt>Email</dt><dd>${E(c.email || "Not provided")}</dd><dt>Phone</dt><dd>${E(c.phone || "Not provided")}</dd><dt>Billing address</dt><dd>${E(c.address || "Not provided")}</dd><dt>Payment terms</dt><dd>${c.terms} days</dd><dt>Registration / TIN</dt><dd>${E([c.brn, c.tin].filter(Boolean).join(" / ") || "Not provided")}</dd>${slot("clientDetails", c)}</dl></section><section class="panel"><div class="panel-head"><h2>Documents</h2>${badge("MYR")}</div>${invoiceTable(S.documents.filter((d) => d.client_id === c.id))}</section></div>${slot("clientPanels", c)}`
+    `<div class="profile-grid"><section class="panel"><div class="client-avatar">${E(c.name.slice(0, 2).toUpperCase())}</div><h2>${E(c.name)}</h2><dl class="detail"><dt>Client type</dt><dd>${E(KIND_LABEL[clientKind(c)])}</dd>${person ? "" : `<dt>Billing contact</dt><dd>${E(c.contact || "Not provided")}</dd>`}<dt>Email</dt><dd>${E(c.email || "Not provided")}</dd><dt>Phone</dt><dd>${E(c.phone || "Not provided")}</dd><dt>${person ? "Address" : "Billing address"}</dt><dd>${E(c.address || "Not provided")}</dd><dt>Payment terms</dt><dd>${c.terms} days</dd><dt>${person ? "IC or passport / TIN" : "Registration / TIN"}</dt><dd>${E([c.brn, c.tin].filter(Boolean).join(" / ") || "Not provided")}</dd>${slot("clientDetails", c)}</dl></section><section class="panel"><div class="panel-head"><h2>Documents</h2>${badge("MYR")}</div>${invoiceTable(S.documents.filter((d) => d.client_id === c.id))}</section></div>${slot("clientPanels", c)}`
   );
 }
 function services() {
@@ -815,20 +847,21 @@ function documentView(id) {
   const d = S.documents.find((d) => d.id === id);
   if (!d) return empty("Document not found");
   const cur = d.currency || "MYR";
-  // Three actions stay visible; the rest (duplicate, delivery, proof, ...) wait in "More".
-  const more = button("Duplicate", "duplicate-document", id) + slot("documentActions", d);
+  // Everyday actions stay visible, the main one last; the rest (duplicate,
+  // delete, delivery, proof, ...) wait in "More".
+  const more = button("Duplicate", "duplicate-document", id) + (d.state === "draft" ? button("Delete draft", "delete-draft", id) : "") + slot("documentActions", d);
+  const pdf = `<a class="btn" href="/api/documents/${id}/pdf">${icon("download")} PDF</a>`;
+  const menu = more ? `<details class="dropdown"><summary class="btn">More</summary><div class="menu">${more}</div></details>` : "";
   const actions =
-    (d.state === "draft"
-      ? button("Edit draft", "edit-document", id) +
-        button("Delete draft", "delete-draft", id) +
-        button("Issue document", "issue-document", id, true)
+    d.state === "draft"
+      ? button("Edit draft", "edit-document", id) + pdf + menu + button("Issue document", "issue-document", id, true)
       : d.state === "void"
-        ? ""
+        ? pdf + menu
         : (d.kind === "quote" && d.state === "issued" ? button("Edit quotation", "edit-document", id) : "") +
-          button("Share", "share-document", id, true, "copy") +
-          button("Email", "email-document", id)) +
-    `<a class="btn" href="/api/documents/${id}/pdf">${icon("download")} PDF</a>` +
-    (more ? `<details class="dropdown"><summary class="btn">More</summary><div class="menu">${more}</div></details>` : "");
+          button("Email", "email-document", id) +
+          pdf +
+          menu +
+          button("Share", "share-document", id, true, "copy");
   // "draft.changed" / "document.revised" say what changed; the bare save entry under them adds nothing.
   const events = S.audit.filter((a) => a.entity_id === id && a.action !== "document.draft.saved").slice(0, 10);
   const statusActions = [
@@ -969,11 +1002,20 @@ function navigate(route) {
   if (location.hash === "#/" + route) renderRoute();
   else location.hash = "/" + route;
 }
+// The labels follow the client type; an individual has no contact person or
+// SST number of their own. Only the name is required.
 function clientForm(id) {
-  const c = S.clients.find((c) => c.id === id) || { terms: 14 };
+  const c = S.clients.find((c) => c.id === id) || { terms: 14, kind: "company" };
+  const kind = clientKind(c);
+  // One <span> per type; the form's data-client-kind shows the right one (app.css).
+  const by = (map) => CLIENT_KINDS.map(([k]) => `<span class="when-${k}">${E(map[k] ?? map.other)}</span>`).join("");
+  const field = (label, name, value, type = "text", required = false, extra = "", cls = "") =>
+    `<label${cls ? ` class="${cls}"` : ""}>${label}<input name="${name}" type="${type}" value="${E(value ?? "")}" ${required ? "required" : ""} ${extra}></label>`;
+  const option = ([value, label, hint]) =>
+    `<label class="kind-option"><input type="radio" name="kind" value="${value}" ${kind === value ? "checked" : ""}><span><strong>${E(label)}</strong><small>${E(hint)}</small></span></label>`;
   showModal(
     id ? "Edit client" : "Add client",
-    `<form data-form="client" data-id="${E(id || "")}"><div class="form-grid">${input("Billing name", "name", c.name, "text", true, 'maxlength="160"')}${input("Contact person", "contact", c.contact, "text", false, 'maxlength="120"')}${input("Email", "email", c.email, "email", false, 'maxlength="160"')}${input("Phone", "phone", c.phone, "text", false, 'maxlength="60"')}${input("Registration / IC number", "brn", c.brn || "", "text", false, 'maxlength="40"')}${input("Tax identification number (TIN)", "tin", c.tin || "", "text", false, 'maxlength="20"')}${input("SST registration (if any)", "sst_number", c.sst_number || "", "text", false, 'maxlength="40"')}<div class="span-2">${area("Billing address", "address", c.address, 600)}</div>${input("Payment terms (days)", "terms", c.terms, "number", true, 'min="0" max="365" step="1"')}${slot("clientFields", c)}</div>${formEnd("Save client")}</form>`,
+    `<form data-form="client" data-id="${E(id || "")}" data-client-kind="${kind}" class="client-form"><fieldset class="kind-choice client-kind"><legend>Client type</legend>${CLIENT_KINDS.map(option).join("")}</fieldset><p class="field-hint">Only the name is required. Registration, TIN and SST are used on documents and e-Invoices; add them when you have them.</p><div class="form-grid">${field(by({ company: "Company name", individual: "Full name", government: "Agency or department name", organisation: "Organisation name" }), "name", c.name, "text", true, 'maxlength="160"')}${field(by({ government: "Officer in charge", other: "Contact person" }), "contact", c.contact, "text", false, 'maxlength="120"', "company-only")}${field("Email", "email", c.email, "email", false, 'maxlength="160"')}${field("Phone", "phone", c.phone, "text", false, 'maxlength="60"')}${field(by({ company: "Registration number (SSM)", individual: "IC or passport number", government: "Reference number, if any", organisation: "Registration number (ROS / SSM), if any" }), "brn", c.brn || "", "text", false, 'maxlength="40"')}${field(by({ company: "Tax identification number (TIN)", other: "Tax identification number (TIN), if any" }), "tin", c.tin || "", "text", false, 'maxlength="20"')}${field("SST registration (if any)", "sst_number", c.sst_number || "", "text", false, 'maxlength="40"', "company-only")}<div class="span-2"><label>${by({ individual: "Address", other: "Billing address" })}<textarea name="address" maxlength="600">${E(c.address || "")}</textarea></label></div>${input("Payment terms (days)", "terms", c.terms, "number", true, 'min="0" max="365" step="1"')}${slot("clientFields", c)}</div>${formEnd("Save client")}</form>`,
   );
 }
 function serviceForm(id) {
@@ -1408,7 +1450,7 @@ async function runAction(action, id, el) {
           "DELETE",
         );
       } catch (e) {
-        modal.querySelector(".form-error").textContent = e.message;
+        modal.querySelector(".form-error").innerHTML = errorHtml(e);
         break;
       }
       modal.close();
@@ -1525,7 +1567,7 @@ async function renderPublic() {
     else info = `<h2>${t("yourDocument")}</h2><p class="mt22">${d.kind === "sales_order" ? t("orderNote") : t("deliveryNote")}</p>`;
     app.innerHTML = `<main class="public-wrap"><header class="public-header">${brand}</header><div class="public-top"><div><h1>${E(t("kind_" + d.kind))} ${E(d.number)}</h1><p>${E(d.client.name)}</p></div><div class="actions">${badge(d.status, statusLabel(lang, d.status))}<a class="btn" href="/api/public/${token}/pdf">${icon("download")} ${t("downloadPdf")}</a></div></div><div class="doc-grid">${paper(d, true)}<aside class="stack">${card}${info ? `<section class="panel">${info}</section>` : ""}${slot("publicPanels", d, token)}</aside></div><footer class="public-footer">${t("privateDocument")} · ${t("poweredBy")}<br>${t("questions")}</footer></main>`;
   } catch (e) {
-    app.innerHTML = `<main class="error-page">${logo()}<h1>This document link is unavailable.</h1><p>${E(e.message)} Contact Nawlogic for a new link.</p></main>`;
+    app.innerHTML = `<main class="error-page">${logo()}<h1>This document link is unavailable.</h1><p>${E(e.message)}</p><p class="error-tip">${E(e.status === 404 || e.status === 410 ? "The link may be mistyped, replaced by a newer one, or withdrawn by the business. Ask the business that sent it for a new link." : e.tip || errorTip(e.message, e.status) || "Ask the business that sent it for a new link.")}</p></main>`;
   }
 }
 async function submitForm(form) {
@@ -1681,7 +1723,7 @@ document.addEventListener("click", async (event) => {
   try {
     await runAction(el.dataset.action, el.dataset.id, el);
   } catch (e) {
-    toast(e.message, true);
+    toast(e, true);
   } finally {
     el.disabled = false;
   }
@@ -1735,8 +1777,10 @@ document.addEventListener("submit", async (event) => {
     autosave?.saved(form, draftKey);
   } catch (e) {
     autosave?.failed(form, draftKey);
-    if (error && error.isConnected) error.textContent = e.message;
-    else toast(e.message, true);
+    // The error block is shown only if it is still on screen (api() closes the
+    // modal when the sign-in has ended).
+    if (error && error.isConnected && (modal.open || !modal.contains(error))) error.innerHTML = errorHtml(e);
+    else toast(e, true);
     // Only an account that uses two-step sign-in is asked for a code, after its password.
     if (form.dataset.form === "login" && /code/i.test(e.message)) {
       const step = $(".mfa-step", form);
@@ -1939,6 +1983,11 @@ document.addEventListener("keydown", (event) => {
     closeSuggest();
   } else if (event.key === "Tab") closeSuggest();
 });
+// Client type: the form's labels and fields follow the choice.
+document.addEventListener("change", (event) => {
+  const kind = event.target.closest?.('form[data-form="client"] input[name=kind]');
+  if (kind) kind.form.dataset.clientKind = kind.value;
+});
 document.addEventListener("change", (event) => {
   if (event.target.id === "catalog-service" && event.target.value) {
     const s = S.services.find((s) => s.id === event.target.value);
@@ -2003,7 +2052,7 @@ async function boot() {
       await loadBrand();
       renderLogin();
     } else {
-      app.innerHTML = `<main class="error-page">${logo()}<h1>Workspace unavailable.</h1><p>${E(e.message)}</p><button class="btn" data-action="reload">Retry</button></main>`;
+      app.innerHTML = `<main class="error-page">${logo()}<h1>Workspace unavailable.</h1><p>${E(e.message)}</p>${e.tip ? `<p class="error-tip">${E(e.tip)}</p>` : ""}<button class="btn" data-action="reload">Retry</button></main>`;
     }
   }
 }

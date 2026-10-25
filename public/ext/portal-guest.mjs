@@ -1,6 +1,7 @@
 // Client-facing parts of the portal module: the client portal pages under
 // /portal/..., the signature pad for accepting quotations, and the feedback
 // form. No owner data is available here.
+import { errorTip } from "./error-tips.mjs";
 const BASE = "/api/guest/portal";
 const KIND = {
   invoice: "Invoice",
@@ -17,6 +18,9 @@ export function portalGuest(h) {
   const { E, badge, icon, dateLabel, timeLabel } = h;
   const app = document.querySelector("#app");
   let csrf = null;
+  // Who this page is signed in as, to retry only for the same person.
+  let who = "";
+  const identity = (s) => `${s?.client?.name || ""}|${s?.contact?.email || ""}`;
   let overview = null,
     docFilter = "All";
   const fmt = (cents, cur = "MYR") => {
@@ -26,7 +30,7 @@ export function portalGuest(h) {
       return h.money(cents);
     }
   };
-  async function gapi(path, method = "GET", body) {
+  async function gapi(path, method = "GET", body, retried = false) {
     const res = await fetch(BASE + path, {
       method,
       headers: {
@@ -41,7 +45,20 @@ export function portalGuest(h) {
     } catch {
       throw new Error("Server returned an unreadable response.");
     }
-    if (!res.ok) throw Object.assign(new Error(data.error || "Request failed."), { status: res.status });
+    if (!res.ok) {
+      // The sign-in check is out of date (signed in again in another tab): take
+      // the current one and try once more, if it is still the same person.
+      if (res.status === 403 && csrf && who && !retried && /^Session verification failed/.test(data.error || "")) {
+        const now = await fetch(BASE + "/session")
+          .then((r) => (r.ok ? r.json() : null))
+          .catch(() => null);
+        if (now?.csrf && identity(now) === who) {
+          csrf = now.csrf;
+          return gapi(path, method, body, true);
+        }
+      }
+      throw Object.assign(new Error(data.error || "Request failed."), { status: res.status });
+    }
     return data;
   }
   const linkToken = () => location.pathname.match(/^\/client\/([\w-]{43})$/)?.[1];
@@ -181,6 +198,7 @@ export function portalGuest(h) {
     try {
       const s = await gapi("/session");
       csrf = s.csrf;
+      who = identity(s);
       return s;
     } catch (e) {
       if (e.status === 401) {
@@ -192,7 +210,8 @@ export function portalGuest(h) {
     }
   }
   function errorPage(title, message) {
-    app.innerHTML = `<main class="error-page">${h.logo()}<h1>${E(title)}</h1><p>${E(message)}</p><a class="btn" href="/portal/signin">Go to portal sign-in</a></main>`;
+    const tip = errorTip(message);
+    app.innerHTML = `<main class="error-page">${h.logo()}<h1>${E(title)}</h1><p>${E(message)}</p>${tip ? `<p class="error-tip">${E(tip)}</p>` : ""}<a class="btn" href="/portal/signin">Go to portal sign-in</a></main>`;
   }
   async function renderSignin(note = "") {
     document.title = "Client portal sign-in";
