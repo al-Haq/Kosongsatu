@@ -310,8 +310,10 @@ export class Store {
       kind,
       deductions: b[DEDUCTIONS] || [],
     });
+    // An issued quotation being edited keeps the SST registration it was issued under.
+    const issuedSst = b[REVISE] && existing?.business_snapshot ? JSON.parse(existing.business_snapshot).sstNumber : "";
     check(
-      !amounts.items.some((i) => i.tax > 0) || this.settings().sstNumber,
+      !amounts.items.some((i) => i.tax > 0) || this.settings().sstNumber || issuedSst,
       "Add your SST registration number in Settings before charging SST.",
     );
     // Amounts are minor units of the document currency; fx_rate converts them to MYR.

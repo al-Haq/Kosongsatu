@@ -1006,7 +1006,10 @@ function serviceForm(id) {
   );
 }
 const TAX_RATES = [0, 5, 6, 8, 10];
-const sstEnabled = () => !!S.settings.sstNumber;
+// SST lines show when the business is registered. An issued quotation being
+// edited keeps the registration it was issued under, so its rates stay.
+let issuedSst = null;
+const sstEnabled = () => issuedSst ?? !!S.settings.sstNumber;
 const editorKind = () => $('form[data-form="editor"]')?.dataset.kind || "invoice";
 // One editor line: description, quantity, rate and SST, then code, unit and line discount.
 // The formatted description under a line's title (public/ext/line-details.mjs).
@@ -1057,6 +1060,7 @@ function documentForm(kind = "invoice", id = "", clientId = "") {
   const priced = kind !== "delivery_order";
   // An issued quotation can still be edited (server/db.mjs reviseQuote).
   const revising = !!d && d.state !== "draft";
+  issuedSst = revising ? !!d.business?.sstNumber || d.items.some((i) => Number(i.tax_rate) > 0) : null;
   const last = d ? null : lastTerms(kind);
   const value = d || {
     kind,

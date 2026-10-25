@@ -7,6 +7,7 @@ import { today, addDays } from "../server/domain.mjs";
 import { fixture } from "./helpers.mjs";
 import { member } from "./team-helpers.mjs";
 import { signatureData } from "./portal-helpers.mjs";
+import { quoteRevision } from "../server/portal-sign.mjs";
 
 const line = (description, quantity, rate, extra = {}) => ({ description, quantity, rate, tax_rate: 0, ...extra });
 
@@ -249,6 +250,68 @@ test("editing an issued quotation keeps custom field values it was issued with, 
     assert.equal(edited.business.customFields[0].label, "Project code");
     // It can still be changed through the field it was issued with.
     assert.deepEqual(s.reviseQuote(q.id, body("150.00", { ["cf_" + project.id]: "PRJ-8" })).meta.custom, { [project.id]: "PRJ-8" });
+  } finally {
+    await f.close();
+  }
+});
+
+test("the version a client accepts covers the deposit and custom fields too", async () => {
+  const f = await fixture();
+  try {
+    const s = f.store;
+    const [project] = s.saveSettings({ customFields: [{ label: "Project code", applies: "quote", show: "pdf" }] }).customFields;
+    const c = s.saveClient({ name: "Client" });
+    const body = (extra = {}) => ({
+      kind: "quote",
+      client_id: c.id,
+      issue_date: today(),
+      due_date: addDays(today(), 14),
+      items: [{ description: "Work", quantity: "1", rate: "1000.00" }],
+      ...extra,
+    });
+    const q = s.issue(s.saveDocument(body({ deposit: { type: "percent", value: "10" }, ["cf_" + project.id]: "PRJ-1" })).id);
+    const { token } = s.share(q.id);
+    const seen = [quoteRevision(s.publicDocument(token))];
+    s.reviseQuote(q.id, body({ deposit: { type: "percent", value: "90" } }));
+    seen.push(quoteRevision(s.publicDocument(token)));
+    s.reviseQuote(q.id, body({ ["cf_" + project.id]: "PRJ-2" }));
+    seen.push(quoteRevision(s.publicDocument(token)));
+    assert.equal(new Set(seen).size, 3, "a new deposit or custom field value is a new version");
+    const accept = (revision) =>
+      f.request(`/api/public/${token}/accept`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: "Aminah", revision }),
+      });
+    assert.equal((await accept(seen[0])).status, 409, "the page showing a 10% deposit cannot accept 90%");
+    assert.equal((await accept(seen[2])).status, 200);
+  } finally {
+    await f.close();
+  }
+});
+
+test("editing an issued quotation keeps its SST even after the SST number is cleared in Settings", async () => {
+  const f = await fixture();
+  try {
+    const s = f.store;
+    s.saveSettings({ ...s.settings(), sstNumber: "W10-1234-56789012" });
+    const c = s.saveClient({ name: "Client" });
+    const body = (notes) => ({
+      kind: "quote",
+      client_id: c.id,
+      issue_date: today(),
+      due_date: addDays(today(), 14),
+      items: [{ description: "Work", quantity: "1", rate: "100.00", tax_rate: 8 }],
+      notes,
+    });
+    const q = s.issue(s.saveDocument(body("")).id);
+    assert.equal(q.total, 10800);
+    s.saveSettings({ ...s.settings(), sstNumber: "" });
+    const edited = s.reviseQuote(q.id, body("Delivery in 7 days"));
+    assert.equal(edited.tax, 800, "the SST it was issued with stays");
+    assert.equal(edited.total, 10800);
+    // A new quotation without the registration still cannot charge SST.
+    assert.throws(() => s.saveDocument(body("")), /SST registration number/);
   } finally {
     await f.close();
   }

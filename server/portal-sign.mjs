@@ -37,6 +37,13 @@ export function quoteFingerprint(d) {
         total: d.total,
         terms: d.terms,
         notes: d.notes,
+        // Also what an edit after issue can change that the client sees: the
+        // deposit asked for, printed custom fields, the language and whether
+        // attachments are listed.
+        deposit: d.meta?.deposit || null,
+        custom: d.meta?.custom || {},
+        language: d.language || "en",
+        list_attachments: !!d.meta?.list_attachments,
       }),
     )
     .digest("hex");
