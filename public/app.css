@@ -959,6 +959,10 @@ input[type="number"]::-webkit-outer-spin-button {
   letter-spacing: 0.08em;
   color: var(--muted);
 }
+/* The first heading of a form sits right under what precedes it. */
+.form-grid > .form-section:first-child {
+  margin-top: 10px;
+}
 .form-actions {
   display: flex;
   justify-content: flex-end;
@@ -1627,23 +1631,6 @@ dialog.wide {
 .step p {
   font-size: 10px;
 }
-.palette {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 22px;
-  margin: 18px 0 22px;
-}
-.swatch {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 11px;
-}
-.swatch span {
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-}
 .panel > .logo {
   width: 140px;
 }
@@ -1654,15 +1641,6 @@ dialog.wide {
   display: none;
 }
 /* The brand colours printed on documents, not the workspace theme. */
-.swatch.teal-bg span {
-  background: #0ea5a4;
-}
-.swatch.orange-bg span {
-  background: #f97316;
-}
-.swatch.ink-bg span {
-  background: #0f172a;
-}
 .setting-line {
   display: flex;
   justify-content: space-between;
