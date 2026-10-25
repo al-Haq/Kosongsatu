@@ -54,8 +54,8 @@ export default function setupUI(h) {
         title: "Business logo",
         why: "It goes on your documents, client links and this workspace.",
         done: !!b.logoFileId,
-        href: "#/settings/documents",
-        focus: 'form[data-form="doc-logo"] input[type=file]|panel:Document template',
+        href: "#/settings",
+        focus: 'form[data-form="doc-logo"] input[type=file]|panel:Company',
         label: "Upload logo",
       },
       {

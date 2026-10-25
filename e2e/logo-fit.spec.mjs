@@ -8,7 +8,7 @@ test("logo upload: a 3000 px photo-sized PNG is resized, WebP converted, a tiny 
 }) => {
   const errors = watchErrors(page);
   await signIn(page);
-  await page.goto("/#/settings/documents");
+  await page.goto("/#/settings");
   const form = page.locator('form[data-form="doc-logo"]');
   const input = form.locator("input[type=file]");
 
@@ -132,7 +132,7 @@ test("logo upload: the decoding fallback works under the CSP", async ({
   const page = await context.newPage();
   const errors = watchErrors(page);
   await signIn(page);
-  await page.goto("/#/settings/documents");
+  await page.goto("/#/settings");
   const form = page.locator('form[data-form="doc-logo"]');
   const webp = Buffer.from(
     await page.evaluate(() => {
