@@ -10,6 +10,17 @@ const label = (iso) =>
   new Intl.DateTimeFormat("en-MY", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Kuala_Lumpur" }).format(new Date(iso));
 
 // What the client agreed to, so a later change to the record would show.
+// The version of a quotation the client was shown. An issued quotation can
+// still be edited until it is accepted, so accepting or signing must name the
+// version seen; a stale page is refused and asked to reload.
+export const quoteRevision = (d) => quoteFingerprint(d).slice(0, 24);
+export function checkRevision(d, revision) {
+  check(
+    typeof revision === "string" && revision === quoteRevision(d),
+    "This quotation was changed after you opened it. Reload the page to see the latest version, then accept.",
+    409,
+  );
+}
 export function quoteFingerprint(d) {
   return createHash("sha256")
     .update(
@@ -61,6 +72,7 @@ export function attachSignatures(Store) {
         const d = this.publicDocument(token);
         check(d.kind === "quote", "Only quotations can be signed.", 409);
         check(!this.signature(d.id), "This quotation is already signed.", 409);
+        checkRevision(d, b.revision);
         const accepted = this.accept(token, name);
         const file = this.saveFile(
           {

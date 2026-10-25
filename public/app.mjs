@@ -1642,7 +1642,7 @@ async function submitForm(form) {
     return;
   }
   if (type === "accept") {
-    await api(`/public/${publicToken()}/accept`, "POST", b);
+    await api(`/public/${publicToken()}/accept`, "POST", { ...b, revision: publicDoc?.revision });
     modal.close();
     await renderPublic();
     toast("Quotation accepted.");

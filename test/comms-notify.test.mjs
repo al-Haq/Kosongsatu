@@ -4,6 +4,7 @@ import { requestContext } from "../server/context.mjs";
 import { today, addDays } from "../server/domain.mjs";
 import { classify } from "../server/comms-notify.mjs";
 import { fixture, issuedInvoice } from "./helpers.mjs";
+import { quoteRevision } from "../server/portal-sign.mjs";
 function fakeTransport() {
   const sent = [];
   return {
@@ -41,7 +42,7 @@ test("client events become one notification each, with a bell count and mark-as-
   const f = await notifyFixture();
   try {
     const { q, token } = quote(f.store);
-    const accept = await f.request(`/api/public/${token}/accept`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: "Aminah" }) });
+    const accept = await f.request(`/api/public/${token}/accept`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: "Aminah", revision: quoteRevision(f.store.publicDocument(token)) }) });
     assert.equal(accept.status, 200);
     const { invoice } = issuedInvoice(f.store);
     const link = f.store.share(invoice.id).token;

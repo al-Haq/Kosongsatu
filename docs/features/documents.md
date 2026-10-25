@@ -28,6 +28,7 @@ An issued quotation can still be changed until the client accepts or declines it
 - On the quotation, press **Edit quotation**. Lines, descriptions, rates, discounts, the validity date, terms and notes can change. The quotation keeps its number (for example QT-2026-0002), and its PDF and client link show the new version at once.
 - The client, issue date and currency stay as issued: they are shown but locked, and the server keeps them even if a request sends others. The client details were frozen when it was issued.
 - Each edit is kept in the activity as **Edited after issue**, with what changed.
+- A client always accepts or signs the version they were shown. The client link and portal send back the version on screen (`revision`, a fingerprint of the content). If the quotation was edited after they opened it, they see "This quotation was changed after you opened it. Reload the page to see the latest version, then accept." Nothing is accepted until they reload.
 - Once accepted, a quotation is locked: "An accepted quotation can't be edited. Duplicate it to make a new version." Declined and void quotations are locked too. Issued invoices and other documents stay locked as before.
 - Staff can edit issued quotations; accountants cannot.
 

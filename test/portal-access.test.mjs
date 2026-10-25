@@ -268,6 +268,7 @@ test("portal actions reuse the document logic without touching the client link",
     assert.equal(d.client.email, undefined, "client-safe fields only");
     assert.equal(f.store.document(quote.id).status, "Viewed");
     const accepted = await g.json(`/documents/${quote.id}/accept`, "POST", {
+      revision: d.revision,
       name: "Siti Aminah",
       agree: true,
       method: "draw",

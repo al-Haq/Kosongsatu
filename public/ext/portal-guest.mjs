@@ -121,6 +121,7 @@ export function portalGuest(h) {
       drawTyped(f.querySelector(".portal-pad-typed"), f.elements.typed.value);
     }
   }
+  let shownRevision = "";
   function signaturePayload(form, b) {
     const method = b.method === "type" ? "type" : "draw";
     const canvas = form.querySelector(method === "draw" ? ".portal-sign-draw canvas" : ".portal-pad-typed");
@@ -129,7 +130,8 @@ export function portalGuest(h) {
       if (!String(b.typed || "").trim()) throw new Error("Type your name as your signature.");
       drawTyped(canvas, b.typed);
     }
-    return { name: b.name, typed: b.typed || "", method, agree: b.agree === "on", signature: canvas.toDataURL("image/png") };
+    // The version on screen: if the quotation was edited meanwhile, the server asks to reload.
+    return { name: b.name, typed: b.typed || "", method, agree: b.agree === "on", signature: canvas.toDataURL("image/png"), revision: shownRevision };
   }
 
   // ---- Feedback --------------------------------------------------------------
@@ -312,6 +314,7 @@ export function portalGuest(h) {
       app.innerHTML = shell(s, `<div class="panel mt22">${h.empty("Document not found", "It may have been withdrawn. Go back to your documents.")}<div class="actions"><a class="btn" href="/portal/home">All documents</a></div></div>`, "");
       return;
     }
+    shownRevision = d.revision || "";
     document.title = `${d.number} | Client portal`;
     const body = `<p class="portal-back"><a href="/portal/home">← All documents</a></p><div class="public-top"><div><h1>${E(kindLabel(d.kind))} ${E(d.number)}</h1><p>${E(d.client.name)} / ${badge(d.status)}</p></div><div class="actions"><a class="btn" href="${BASE}/documents/${E(d.id)}/pdf">${icon("download")} Download PDF</a></div></div><div class="doc-grid">${h.paper(d, true)}<aside class="stack"><section class="balance-card"><p>${d.kind === "invoice" ? "Balance due" : "Total"}</p><div class="value">${fmt(d.kind === "invoice" ? d.balance : d.adjusted_total ?? d.total, d.currency)}</div><p>${d.kind === "quote" ? "Valid until" : d.kind === "invoice" ? "Due" : "Dated"} ${dateLabel(d.kind === "invoice" || d.kind === "quote" ? d.due_date : d.issue_date)}</p>${d.kind === "invoice" ? `<p>Total ${fmt(d.adjusted_total ?? d.total, d.currency)} / Paid ${fmt(d.paid, d.currency)}</p>` : ""}</section>${quotePanel(d, s)}${invoicePanel(d)}${feedbackPanel(d.ext?.portal?.feedback, "portal", d.id)}</aside></div>`;
     app.innerHTML = shell(s, body, d.business?.company);
@@ -352,6 +355,7 @@ export function portalGuest(h) {
     },
     // Client link page (/client/<token>): signature and feedback panels.
     publicPanels(d, token) {
+      shownRevision = d.revision || "";
       const p = d.ext?.portal || {};
       let out = "";
       if (new URLSearchParams(location.search).has("signed")) {

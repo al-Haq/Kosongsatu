@@ -6,6 +6,7 @@ import { today } from "../server/domain.mjs";
 import platform from "../server/ext/platform.mjs";
 import https from "node:https";
 import { isPublicAddress, checkUrl, resolveDestination, verifySignature, signatureHeader, eventsFromAudit, httpsSend, RETRY_WINDOW } from "../server/platform-webhooks.mjs";
+import { quoteRevision } from "../server/portal-sign.mjs";
 
 // Self-signed test certificate for hooks.example.com (valid until 2126). Test use only.
 const TEST_KEY = `-----BEGIN PRIVATE KEY-----
@@ -312,7 +313,7 @@ test("other business events map to webhook types", async () => {
     );
     const link = await f.json(`/api/documents/${q.id}/share`, "POST", { days: 7 });
     const token = link.url.split("/client/")[1];
-    assert.equal((await f.request(`/api/public/${token}/accept`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: "Ali" }) })).status, 200);
+    assert.equal((await f.request(`/api/public/${token}/accept`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: "Ali", revision: quoteRevision(f.store.publicDocument(token)) }) })).status, 200);
     const { invoice } = issuedInvoice(f.store, { client: c });
     f.store.adjustment(invoice.id, { kind: "credit", amount: "10.00", reason: "Goodwill" });
     const { invoice: other } = issuedInvoice(f.store, { client: c });

@@ -6,6 +6,7 @@ import { makePng, signatureData, issued, signatureInk } from "./portal-helpers.m
 import { inspectSignaturePng, decodeSignature } from "../server/portal-png.mjs";
 import { renderPdf } from "../server/pdf.mjs";
 import { today, addDays } from "../server/domain.mjs";
+import { quoteRevision } from "../server/portal-sign.mjs";
 
 test("signature images are decoded, checked and re-encoded without metadata", () => {
   const good = makePng(600, 200, { extra: [["tEXt", "Comment\0<script>alert(1)</script>"]] });
@@ -51,11 +52,13 @@ async function quoteLink(f, options = {}) {
   const client = f.store.saveClient({ name: "Signer client", email: "signer@client.example" });
   const quote = issued(f.store, client, { kind: "quote", ...options });
   const { token } = f.store.share(quote.id);
+  // The version shown on the page, sent back when signing.
+  const revision = quoteRevision(f.store.publicDocument(token));
   const post = (body, headers = {}) =>
     f.request(`/api/guest/portal/link/${token}/accept`, {
       method: "POST",
       headers: { "Content-Type": "application/json", "User-Agent": "TestBrowser/1.0 (Phone)", ...headers },
-      body: JSON.stringify(body),
+      body: JSON.stringify({ revision, ...body }),
     });
   return { client, quote, token, post };
 }

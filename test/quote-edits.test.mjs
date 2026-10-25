@@ -6,6 +6,7 @@ import { documentChanges, auditChanges } from "../public/ext/doc-changes.mjs";
 import { today, addDays } from "../server/domain.mjs";
 import { fixture } from "./helpers.mjs";
 import { member } from "./team-helpers.mjs";
+import { signatureData } from "./portal-helpers.mjs";
 
 const line = (description, quantity, rate, extra = {}) => ({ description, quantity, rate, tax_rate: 0, ...extra });
 
@@ -171,6 +172,55 @@ test("terms and conditions can be up to 4000 characters", async () => {
     assert.throws(() => f.store.saveDocument(doc("T".repeat(4001))), /4000 characters/);
     f.store.saveSettings({ ...f.store.settings(), paymentTerms: "D".repeat(4000) });
     assert.equal(f.store.settings().paymentTerms.length, 4000, "the company default too");
+  } finally {
+    await f.close();
+  }
+});
+
+test("a client can only accept the version they were shown: an edit made meanwhile asks them to reload", async () => {
+  const f = await fixture();
+  try {
+    const s = f.store;
+    const c = s.saveClient({ name: "Client", email: "c@example.com" });
+    const body = (rate) => ({
+      kind: "quote",
+      client_id: c.id,
+      issue_date: today(),
+      due_date: addDays(today(), 14),
+      items: [{ description: "Work", quantity: "1", rate }],
+    });
+    const q = s.issue(s.saveDocument(body("100.00")).id);
+    const { token } = s.share(q.id);
+    const shown = await (await f.request(`/api/public/${token}`)).json();
+    assert.match(shown.revision, /^[0-9a-f]{24}$/);
+    // The owner edits the price while the client reads the old one.
+    s.reviseQuote(q.id, body("150.00"));
+    const accept = (extra) =>
+      f.request(`/api/public/${token}/accept`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: "Aminah", ...extra }),
+      });
+    for (const stale of [{ revision: shown.revision }, {}]) {
+      const r = await accept(stale);
+      assert.equal(r.status, 409);
+      assert.match((await r.json()).error, /changed after you opened it\. Reload/);
+    }
+    assert.equal(s.document(q.id).state, "issued", "not accepted");
+    // Signing from the link is held to the same rule.
+    const sign = (revision) =>
+      f.request(`/api/guest/portal/link/${token}/accept`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: "Aminah", agree: true, method: "draw", signature: signatureData(), revision }),
+      });
+    assert.equal((await sign(shown.revision)).status, 409);
+    // After reloading, the new version is accepted.
+    const fresh = await (await f.request(`/api/public/${token}`)).json();
+    assert.notEqual(fresh.revision, shown.revision);
+    assert.equal(fresh.total, 15000);
+    assert.equal((await sign(fresh.revision)).status, 200);
+    assert.equal(s.document(q.id).state, "accepted");
   } finally {
     await f.close();
   }

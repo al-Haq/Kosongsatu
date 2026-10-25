@@ -23,6 +23,7 @@ import {
 import { renderPdf, renderReceiptPdf, renderAdjustmentPdf } from "./pdf.mjs";
 import { requestContext } from "./context.mjs";
 import { BackupManager } from "./recovery.mjs";
+import { quoteRevision, checkRevision } from "./portal-sign.mjs";
 import {
   mfaStatus,
   beginMfa,
@@ -97,6 +98,8 @@ export function safeDoc(d) {
     // as do the owner's module choices and setup checklist (server/ext/setup.mjs).
     business: { ...d.business, customFields: undefined, modules: undefined, setup: undefined },
     accepted_name: d.accepted_name,
+    // Sent back when accepting, so a quotation edited meanwhile is not accepted unseen.
+    revision: d.kind === "quote" ? quoteRevision(d) : undefined,
     proofs: d.proofs.map((p) => ({
       reference: p.reference,
       status: p.status,
@@ -457,7 +460,16 @@ export function createApp({
           if (method === "POST" && action === "accept") {
             allow("submit:" + ipOf(req), 12, 60000);
             const b = await body();
-            return send(200, safeDoc(store.accept(token, b.name)));
+            // Accepts only the version the client was shown (see quoteRevision).
+            return send(
+              200,
+              safeDoc(
+                store.tx(() => {
+                  checkRevision(store.publicDocument(token), b.revision);
+                  return store.accept(token, b.name);
+                }),
+              ),
+            );
           }
           if (method === "POST" && action === "payment-reference") {
             allow("submit:" + ipOf(req), 12, 60000);
