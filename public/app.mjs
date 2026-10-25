@@ -476,6 +476,9 @@ function overview() {
   const agingTotal = buckets.reduce((t, b) => t + b.amount, 0);
   // The setup checklist (public/ext/setup.mjs) covers the company and bank details while it shows.
   const top = slot("overviewTop");
+  // Company figures (the money tiles, the collections chart, aging) are for the
+  // owner and the accountant; staff get the work list.
+  const figures = allowed("view", "money");
   return (
     heading(
       "Overview",
@@ -486,7 +489,7 @@ function overview() {
       (!S.settings.bankAccount
         ? `<div class="notice info">${icon("settings")}<p>Add your company details and payment instructions before sharing a real invoice.</p><a href="#/settings">Open settings →</a></div>`
         : "")) +
-    `<div class="metrics">${cards.map((c) => `<div class="metric"><span class="metric-icon">${icon(c.icon)}</span><div class="label">${c.label}</div><div class="value ${c.cls || ""}">${money(c.value)}</div><div class="hint">${c.foot}</div>${c.chart || ""}</div>`).join("")}</div><div class="grid-2"><section class="panel"><div class="panel-head"><div><h2>Collections</h2><p>Last 12 weeks · MYR</p></div><div class="legend"><span class="key now">Last 12 weeks</span><span class="key before">12 weeks before</span></div></div><div class="trend-total"><strong>${money(total12)}</strong>${deltaLine(total12, totalBefore, "vs the 12 weeks before")}</div>${trendChart(collected, before)}<div class="trend-axis"><span>${dateLabel(collected[0].start).slice(0, 6)}</span><span>${dateLabel(collected[6].start).slice(0, 6)}</span><span>Today</span></div></section><section class="panel"><div class="panel-head"><div><h2>Needs attention</h2><p>Oldest due first</p></div><a href="#/invoices">View all →</a></div>${
+    `${figures ? `<div class="metrics">${cards.map((c) => `<div class="metric"><span class="metric-icon">${icon(c.icon)}</span><div class="label">${c.label}</div><div class="value ${c.cls || ""}">${money(c.value)}</div><div class="hint">${c.foot}</div>${c.chart || ""}</div>`).join("")}</div>` : ""}${figures ? `<div class="grid-2"><section class="panel"><div class="panel-head"><div><h2>Collections</h2><p>Last 12 weeks · MYR</p></div><div class="legend"><span class="key now">Last 12 weeks</span><span class="key before">12 weeks before</span></div></div><div class="trend-total"><strong>${money(total12)}</strong>${deltaLine(total12, totalBefore, "vs the 12 weeks before")}</div>${trendChart(collected, before)}<div class="trend-axis"><span>${dateLabel(collected[0].start).slice(0, 6)}</span><span>${dateLabel(collected[6].start).slice(0, 6)}</span><span>Today</span></div></section>` : ""}<section class="panel"><div class="panel-head"><div><h2>Needs attention</h2><p>Oldest due first</p></div><a href="#/invoices">View all →</a></div>${
       [...outstanding]
         .sort((a, b) => dueOf(a).localeCompare(dueOf(b)))
         .slice(0, 4)
@@ -495,7 +498,7 @@ function overview() {
           return `<button type="button" class="attention" data-action="open-document" data-id="${d.id}"><span><strong>${E(d.number)}</strong><small>${E(d.client.name)}</small></span><span class="attention-right">${late > 0 ? `<span class="late-chip">${late} day${late === 1 ? "" : "s"} late</span>` : ""}<strong>${money(d.balance, d.currency)}</strong>${badge(d.status)}</span></button>`;
         })
         .join("") || empty("All caught up", "No outstanding issued invoices.")
-    }</section></div><section class="panel mt22 aging-panel"><div class="panel-head"><div><h2>Aging</h2><p>Open invoices by days past due · MYR</p></div><strong class="aging-total">${money(agingTotal)}</strong></div>${agingTotal ? `${agingBar(buckets)}<div class="aging-tiles">${buckets.map((b, i) => `<div class="aging-tile"><span class="age-key"><span class="age-dot age-${i}"></span>${b.label}</span><strong>${money(b.amount)}</strong><small>${b.count} invoice${b.count === 1 ? "" : "s"} · ${Math.round((b.amount / agingTotal) * 100)}%</small></div>`).join("")}</div>` : "<p>No money is owed to you right now.</p>"}</section>${slot("overview")}<section class="panel mt22"><div class="panel-head"><h2>Recent documents</h2><a href="#/invoices">View invoices →</a></div>${invoiceTable(S.documents.slice(0, 5))}</section>`
+    }</section>${figures ? `</div><section class="panel mt22 aging-panel"><div class="panel-head"><div><h2>Aging</h2><p>Open invoices by days past due · MYR</p></div><strong class="aging-total">${money(agingTotal)}</strong></div>${agingTotal ? `${agingBar(buckets)}<div class="aging-tiles">${buckets.map((b, i) => `<div class="aging-tile"><span class="age-key"><span class="age-dot age-${i}"></span>${b.label}</span><strong>${money(b.amount)}</strong><small>${b.count} invoice${b.count === 1 ? "" : "s"} · ${Math.round((b.amount / agingTotal) * 100)}%</small></div>`).join("")}</div>` : "<p>No money is owed to you right now.</p>"}</section>${slot("overview")}<section class="panel mt22"><div class="panel-head"><h2>Recent documents</h2><a href="#/invoices">View invoices →</a></div>${invoiceTable(S.documents.slice(0, 5))}</section>` : ""}`
   );
 }
 // Screens per document kind. Only invoices carry money owed.
@@ -2087,6 +2090,8 @@ async function upload(file, params) {
 }
 const uiHelpers = {
   emailPrefill,
+  // allowed("view", "money"): whether this person may see company figures.
+  allowed,
   get: () => S,
   paper,
   brandMark: () => brandMark(),

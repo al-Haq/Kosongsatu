@@ -31,7 +31,8 @@ export default function teamUI(h) {
   const READ_ACTIONS = new Set(["close-modal", "toggle-nav", "logout", "filter", "page", "reload", "client-statement", "statement-pdf", "mfa-setup", "copy-link"]);
   const READ_PREFIX = /^(open|view|show|download|toggle|filter|team-(verify|copy|forgot))(-|$)/;
   // Funding (owner and investor money) is the owner's business; accountants read it.
-  const OWNER_PAGES = { staff: ["settings", "automation", "team", "audit", "funding"], accountant: ["settings", "automation", "team", "deleted"] };
+  // Company figures (reports, tax, funding) are for the owner and the accountant.
+  const OWNER_PAGES = { staff: ["settings", "automation", "team", "audit", "funding", "reports", "tax"], accountant: ["settings", "automation", "team", "deleted"] };
 
   async function copyField(name) {
     const el = modal.querySelector(`[name="${name}"]`);
@@ -276,6 +277,8 @@ export default function teamUI(h) {
       if (kind === "action") return r === "staff" ? !STAFF_HIDDEN.has(name) : READ_ACTIONS.has(name) || READ_PREFIX.test(name);
       // Document history (what was changed, by whom) is for the owner only.
       if (kind === "view" && name === "activity") return false;
+      // Company totals (revenue, collections, cash health, aging) are not for staff.
+      if (kind === "view" && name === "money") return r !== "staff";
       return true;
     },
     guestPage,

@@ -86,7 +86,8 @@ export default function taxUI(h) {
     return out;
   }
   function overviewSlot() {
-    if (!T()) return "";
+    // Tax figures are company figures: owner and accountant only.
+    if (!T() || !h.allowed("view", "money")) return "";
     const w = warnings();
     const { notReady } = readinessCounts();
     const t = T().thresholds;

@@ -2,7 +2,10 @@ import { test, expect } from "@playwright/test";
 import { signIn, watchErrors, unique, createClient } from "./helpers.mjs";
 
 // Buttons the server would refuse for a role are not shown to that role.
-test("staff and accountants do not see Reverse on a recorded payment, nor the activity", async ({ page, context }) => {
+test("staff and accountants do not see Reverse on a recorded payment, nor the activity", async ({
+  page,
+  context,
+}) => {
   const errors = watchErrors(page);
   await signIn(page);
   const client = unique("E2E Roles Client");
@@ -12,7 +15,9 @@ test("staff and accountants do not see Reverse on a recorded payment, nor the ac
   await page.goto("/#/invoices");
   await page.click('[data-action="new-invoice"]');
   const editor = page.locator('form[data-form="editor"]');
-  await editor.locator("select[name=client_id]").selectOption({ label: client });
+  await editor
+    .locator("select[name=client_id]")
+    .selectOption({ label: client });
   await editor.locator(".item-description").first().fill("Network audit");
   await editor.locator(".item-rate").first().fill("400");
   await editor.locator("button[type=submit]").click();
@@ -28,7 +33,9 @@ test("staff and accountants do not see Reverse on a recorded payment, nor the ac
   await expect(page.locator("#toast")).toContainText("Payment confirmed");
   const docUrl = page.url();
   const history = (p) => p.locator(".payment", { hasText: "E2E-ROLES-1" });
-  await expect(history(page).locator('[data-action="reverse-payment"]')).toBeVisible();
+  await expect(
+    history(page).locator('[data-action="reverse-payment"]'),
+  ).toBeVisible();
   // The owner sees the document's activity (who changed what).
   await expect(page.locator(".activity-panel")).toBeVisible();
 
@@ -53,7 +60,9 @@ test("staff and accountants do not see Reverse on a recorded payment, nor the ac
   await join.locator("input[name=password]").fill(password);
   await join.locator("input[name=confirm]").fill(password);
   await join.locator("button[type=submit]").click();
-  await expect(staff.locator(".login-inner")).toContainText("Your account is ready");
+  await expect(staff.locator(".login-inner")).toContainText(
+    "Your account is ready",
+  );
   await staff.goto(new URL("/", docUrl).href);
   await staff.fill('form[data-form="login"] input[name=email]', email);
   await staff.fill('form[data-form="login"] input[name=password]', password);
@@ -66,10 +75,39 @@ test("staff and accountants do not see Reverse on a recorded payment, nor the ac
   await expect(staff.locator('[data-action="reverse-payment"]')).toHaveCount(0);
   await expect(staff.locator(".activity-panel")).toHaveCount(0);
 
+  // Company figures are not for staff: no money tiles, chart, aging or cash
+  // health on the Overview, no totals on Credits, no Reports, Tax or Funding.
+  await staff.goto(new URL("/#/overview", docUrl).href);
+  await expect(staff.locator("main h1")).toHaveText("Overview");
+  await expect(staff.locator(".attention").first()).toBeVisible();
+  await expect(staff.locator(".metrics")).toHaveCount(0);
+  await expect(staff.locator(".aging-panel")).toHaveCount(0);
+  await expect(staff.locator(".books-health")).toHaveCount(0);
+  await expect(staff.locator(".tax-watch")).toHaveCount(0);
+  for (const label of ["Reports", "Tax", "Funding"])
+    await expect(
+      staff.locator(".sidebar nav a", { hasText: label }),
+    ).toHaveCount(0);
+  await expect(
+    staff.locator(".sidebar nav a", { hasText: "Bank matching" }),
+  ).toHaveCount(1);
+  await staff.goto(new URL("/#/ledger", docUrl).href);
+  await expect(staff.locator("main h1")).toContainText(
+    "Cash and customer credits",
+  );
+  await expect(staff.locator(".metrics")).toHaveCount(0);
+  await expect(staff.locator("main table tbody tr").first()).toBeVisible();
+  await staff.goto(docUrl);
+
   // The same person as a read-only accountant.
   await page.goto("/#/team");
-  await page.locator("table.team-users tr", { hasText: email }).locator('[data-action="team-edit"]').click();
-  await page.locator('form[data-form="team-edit"] select[name=role]').selectOption("accountant");
+  await page
+    .locator("table.team-users tr", { hasText: email })
+    .locator('[data-action="team-edit"]')
+    .click();
+  await page
+    .locator('form[data-form="team-edit"] select[name=role]')
+    .selectOption("accountant");
   await page.locator('form[data-form="team-edit"] button[type=submit]').click();
   await expect(page.locator("#toast")).toContainText("User updated");
   await staff.reload();
@@ -77,6 +115,12 @@ test("staff and accountants do not see Reverse on a recorded payment, nor the ac
   await expect(history(staff).locator('a[href$="/receipt"]')).toBeVisible();
   await expect(staff.locator('[data-action="reverse-payment"]')).toHaveCount(0);
   await expect(staff.locator(".activity-panel")).toHaveCount(0);
+  // An accountant reads the company figures.
+  await staff.goto(new URL("/#/overview", docUrl).href);
+  await expect(staff.locator(".metrics").first()).toBeVisible();
+  await expect(
+    staff.locator(".sidebar nav a", { hasText: "Reports" }),
+  ).toHaveCount(1);
 
   await staffContext.close();
   expect(staffErrors).toEqual([]);

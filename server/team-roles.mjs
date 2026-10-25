@@ -11,7 +11,7 @@ export const ROLE_INFO = {
   staff: {
     label: "Staff",
     summary:
-      "Day-to-day billing: clients, services, drafts, issue, share, email, record payments and receipts. No settings, keys, users, connectors, backups, voids, refunds or client deletes.",
+      "Day-to-day billing: clients, services, drafts, issue, share, email, record payments and receipts. No company totals, reports or tax figures; no settings, keys, users, connectors, backups, voids, refunds or client deletes.",
   },
   accountant: {
     label: "Accountant",
@@ -45,8 +45,6 @@ const READ = [
   rule("GET", `clients/${id}/statement`),
   rule("GET", `clients/${id}/statement/pdf`),
   rule("GET", "invoices\\.csv"),
-  rule("GET", "reports/sst"),
-  rule("GET", "reports/sst\\.csv"),
   rule("GET", "files"),
   rule("GET", `files/${id}`),
 ];
@@ -81,6 +79,9 @@ const STAFF = [
 
 const ACCOUNTANT = [
   rule("GET", "backup"), // JSON business export (not a restore image)
+  // Company figures (SST reports) are for the owner and the accountant.
+  rule("GET", "reports/sst"),
+  rule("GET", "reports/sst\\.csv"),
   rule("GET", "team/audit/(verify|head)"),
 ];
 
