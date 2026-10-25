@@ -123,6 +123,21 @@
   flex: 1;
   min-width: 220px;
 }
+/* The picture chosen for the logo, before it is saved. */
+.doc-logo-pick[hidden] {
+  display: none;
+}
+.doc-logo-pick {
+  display: block;
+  max-width: 240px;
+  max-height: 80px;
+  object-fit: contain;
+  margin: 0 0 12px;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #fff;
+}
 .doc-show {
   display: flex;
   flex-wrap: wrap;

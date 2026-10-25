@@ -30,7 +30,7 @@ test("setup checklist: progress, links to the place to fix each step, skip and h
   await expect(step("first")).toHaveClass(/done/);
   await expect(step("bank")).toHaveClass(/done/);
   for (const [key, href] of [
-    ["logo", "#/settings/documents"],
+    ["logo", "#/settings"],
     ["mail", "#/settings/integrations"],
     ["gateway", "#/settings/payments"],
     ["backup", "#/settings/security"],
@@ -43,7 +43,7 @@ test("setup checklist: progress, links to the place to fix each step, skip and h
   await expect(page.locator('form[data-form="settings"] input:focus')).toHaveCount(1);
   await page.goto("/#/overview");
   await step("logo").locator("a.btn").click();
-  await expect(page.locator(".settings-tabs .tab.active")).toHaveText("Documents");
+  await expect(page.locator(".settings-tabs .tab.active")).toHaveText("Company");
   await expect(page.locator('form[data-form="doc-logo"] input[type=file]')).toBeFocused();
   // Nor is it offered under Settings > Security.
   await page.goto("/#/settings/security");
@@ -161,9 +161,9 @@ test("branding: the business name and logo replace the Nawlogic brand in the sid
   await expect(page.getByText(`Sign in to the ${name} workspace.`)).toBeVisible();
   await expect(page).toHaveTitle(`Sign in · ${name}`);
 
-  // The logo from Settings > Documents.
+  // The logo from Settings > Company.
   await signIn(page);
-  await page.goto("/#/settings/documents");
+  await page.goto("/#/settings");
   await page.locator('form[data-form="doc-logo"] input[type=file]').setInputFiles({ name: "logo.png", mimeType: "image/png", buffer: PNG });
   await page.locator('form[data-form="doc-logo"] button[type=submit]').click();
   await expect(page.locator("#toast")).toContainText("Logo saved");
@@ -182,7 +182,7 @@ test("branding: the business name and logo replace the Nawlogic brand in the sid
 
   // Put the workspace back for the other tests: no logo and the default name.
   await signIn(page);
-  await page.goto("/#/settings/documents");
+  await page.goto("/#/settings");
   await page.click('[data-action="doc-logo-remove"]');
   await expect(page.locator("#toast")).toContainText("Nawlogic logo again");
   await page.goto("/#/settings");

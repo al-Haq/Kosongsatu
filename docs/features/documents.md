@@ -76,7 +76,7 @@ Old documents are unchanged: they total and print exactly as before.
 
 - **Layout**: Classic (today's look, the default), Modern colour header, or Compact.
 - **Accent colour**: used for titles, totals and the Modern header.
-- **Business logo**: upload a PNG or JPEG (up to 1 MB). It replaces the Nawlogic logo on PDFs and on client links. "Use Nawlogic logo" switches back.
+- **Business logo** (under **Settings › Company**, with the rest of the company details): upload a PNG, JPEG or WebP picture of any size. A large picture is scaled down in your browser before it is sent (longest side 2000 px, under 1 MB), so a photo-sized file from a phone works; PNG keeps its transparency. A picture under 600 px wide is accepted with a note that it may print blurry. It replaces the Nawlogic logo on PDFs, client links, the menu, emails and the sign-in page. "Remove logo" switches back.
 - **Show**: bank details, terms, notes, client TIN/registration, page footer text. Switch any of them off.
 - **Footer text**: replaces "Nawlogic | Business document". The "Not a validated MyInvois e-Invoice" notice stays whenever the footer is shown.
 

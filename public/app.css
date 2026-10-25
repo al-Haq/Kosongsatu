@@ -2797,3 +2797,77 @@ textarea:focus {
   font-size: 12px;
   text-align: center;
 }
+
+/* A file picker that looks like the rest of the app: the native input stays
+   (focusable, works with the keyboard and tests) but is not seen; the box
+   takes a click or a dropped file. */
+.file-pick {
+  position: relative;
+  display: block;
+  margin: 7px 0 15px;
+  cursor: pointer;
+}
+.file-pick input[type="file"] {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  padding: 0;
+  opacity: 0;
+  overflow: hidden;
+}
+.file-pick-box {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px dashed var(--ink);
+  border-radius: var(--radius);
+  background: #fff;
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 400;
+}
+.file-pick:hover .file-pick-box,
+.file-pick.is-over .file-pick-box {
+  background: var(--soft);
+}
+.file-pick:focus-within .file-pick-box {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+.file-pick-icon {
+  flex: none;
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--ink);
+  color: #fff;
+}
+.file-pick-icon svg {
+  width: 16px;
+  height: 16px;
+}
+.file-pick-text strong {
+  display: block;
+  font-size: 12px;
+}
+.file-pick-text small {
+  display: block;
+  color: var(--muted);
+  font-size: 10px;
+}
+.file-pick-name {
+  margin-left: auto;
+  max-width: 40%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+  font-size: 11px;
+}
+.file-pick-name:empty {
+  display: none;
+}
