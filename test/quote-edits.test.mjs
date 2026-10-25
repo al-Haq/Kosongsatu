@@ -225,3 +225,31 @@ test("a client can only accept the version they were shown: an edit made meanwhi
     await f.close();
   }
 });
+
+test("editing an issued quotation keeps custom field values it was issued with, even if the field was removed since", async () => {
+  const f = await fixture();
+  try {
+    const s = f.store;
+    const settings = s.saveSettings({ customFields: [{ label: "Project code", applies: "quote", show: "pdf" }] });
+    const [project] = settings.customFields;
+    const c = s.saveClient({ name: "Client" });
+    const body = (rate, extra = {}) => ({
+      kind: "quote",
+      client_id: c.id,
+      issue_date: today(),
+      due_date: addDays(today(), 14),
+      items: [{ description: "Work", quantity: "1", rate }],
+      ...extra,
+    });
+    const q = s.issue(s.saveDocument(body("100.00", { ["cf_" + project.id]: "PRJ-7" })).id);
+    s.saveSettings({ customFields: [] });
+    const edited = s.reviseQuote(q.id, body("150.00"));
+    assert.equal(edited.total, 15000);
+    assert.deepEqual(edited.meta.custom, { [project.id]: "PRJ-7" }, "kept, and still printed from the issued field list");
+    assert.equal(edited.business.customFields[0].label, "Project code");
+    // It can still be changed through the field it was issued with.
+    assert.deepEqual(s.reviseQuote(q.id, body("150.00", { ["cf_" + project.id]: "PRJ-8" })).meta.custom, { [project.id]: "PRJ-8" });
+  } finally {
+    await f.close();
+  }
+});
