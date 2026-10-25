@@ -316,3 +316,56 @@ test("editing an issued quotation keeps its SST even after the SST number is cle
     await f.close();
   }
 });
+
+test("editing an issued quotation keeps the client's tax position it was issued with", async () => {
+  const f = await fixture();
+  try {
+    const s = f.store;
+    s.saveSettings({ ...s.settings(), sstNumber: "W10-1234-56789012" });
+    const c = s.saveClient({ name: "Client" });
+    const body = (notes) => ({
+      kind: "quote",
+      client_id: c.id,
+      issue_date: today(),
+      due_date: addDays(today(), 14),
+      items: [{ description: "Work", quantity: "1", rate: "100.00", tax_rate: 8 }],
+      notes,
+    });
+    const q = s.issue(s.saveDocument(body("")).id);
+    // The client is exempted after the quotation went out.
+    s.db.prepare("UPDATE clients SET tax_exempt=1, tax_exempt_ref='EXM-1' WHERE id=?").run(c.id);
+    assert.equal(s.reviseQuote(q.id, body("Delivery in 7 days")).tax, 800, "the issued quotation keeps its SST");
+    assert.equal(s.saveDocument(body("")).tax, 0, "new documents follow the exemption");
+  } finally {
+    await f.close();
+  }
+});
+
+test("an edit that would need a Chinese font the server lacks is refused, and the issued quotation stays printable", async () => {
+  const f = await fixture();
+  try {
+    const s = f.store;
+    const c = s.saveClient({ name: "Client" });
+    const body = (extra = {}) => ({
+      kind: "quote",
+      client_id: c.id,
+      issue_date: today(),
+      due_date: addDays(today(), 14),
+      items: [{ description: "Work", quantity: "1", rate: "100.00" }],
+      ...extra,
+    });
+    const q = s.issue(s.saveDocument(body()).id);
+    s.cjkFont = () => null;
+    assert.throws(
+      () => s.reviseQuote(q.id, body({ language: "zh" })),
+      (e) => e.status === 409 && /Chinese font/.test(e.message),
+    );
+    assert.throws(() => s.reviseQuote(q.id, body({ notes: "网站设计" })), /Chinese font/);
+    const kept = s.document(q.id);
+    assert.equal(kept.language, "en");
+    assert.equal(kept.notes, "");
+    assert.equal(s.reviseQuote(q.id, body({ notes: "Delivery in 7 days" })).notes, "Delivery in 7 days", "other edits still work");
+  } finally {
+    await f.close();
+  }
+});

@@ -216,7 +216,15 @@ function attach(Store) {
     // Exempt clients are charged no SST while the exemption is valid on the issue date.
     saveDocument(b, idv) {
       return this.tx(() => {
-        const c = b?.client_id ? this.db.prepare("SELECT * FROM clients WHERE id=?").get(b.client_id) : null;
+        // An issued quotation being edited keeps the client's tax position it was
+        // issued with (its client snapshot), not an exemption granted since.
+        const existing = idv ? this.db.prepare("SELECT state,client_snapshot FROM documents WHERE id=?").get(idv) : null;
+        const c =
+          existing && existing.state !== "draft" && existing.client_snapshot
+            ? JSON.parse(existing.client_snapshot)
+            : b?.client_id
+              ? this.db.prepare("SELECT * FROM clients WHERE id=?").get(b.client_id)
+              : null;
         const exempt = exemptOn(c, b?.issue_date);
         let body = b;
         if (exempt && Array.isArray(b.items) && b.items.some((i) => Number(i?.tax_rate || 0) > 0))

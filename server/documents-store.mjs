@@ -281,6 +281,9 @@ export function attachDocuments(Store) {
         const language = input.language ?? existing?.language ?? "en";
         input[DEDUCTIONS] = this.depositDeductions(kind, existing || b[LINK] || null, language, idv);
         const out = original.saveDocument.call(this, input, idv);
+        // An issued quotation edited into Chinese must still print: without a
+        // Chinese font the edit is refused and the issued version stays as it was.
+        if (existing && existing.state !== "draft" && this.needsCjk(out)) check(this.cjkFont(), CJK_MESSAGE, 409);
         if (kind === "quote" && meta.deposit)
           check(
             depositParts(out.items, meta.deposit).length,
