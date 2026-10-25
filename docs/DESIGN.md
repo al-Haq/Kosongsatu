@@ -31,7 +31,7 @@ The charts are SVG built from attributes only, because the CSP allows no inline 
 
 Built by the `setup` module (`server/ext/setup.mjs`, `public/ext/setup.mjs`). Owner guide: [features/setup.md](features/setup.md).
 
-**Setup checklist.** Until every step is done or the owner hides it, the top of the Overview shows "Set up your workspace" with "N of 9 done", a progress bar, and the open steps. Each step has one line on why it matters and a button to the exact place to fix it: the Settings tab opens with the field focused or the section in view. Done steps fold away under "Done".
+**Setup checklist.** Until every step is done or the owner hides it, the top of the Overview shows "Set up your workspace" with "N of 8 done", a progress bar, and the open steps. Each step has one line on why it matters and a button to the exact place to fix it: the Settings tab opens with the field focused or the section in view. Done steps fold away under "Done".
 
 1. Company details: business name, registration number, address, email and phone.
 2. Business logo (Settings > Documents).
@@ -40,8 +40,9 @@ Built by the `setup` module (`server/ext/setup.mjs`, `public/ext/setup.mjs`). Ow
 5. Email sending (SMTP, under Integration keys).
 6. Online payments. Optional: **Not now**.
 7. Encrypted backups with an off-site copy.
-8. Two-step sign-in (MFA) for the owner.
-9. First client and first issued invoice.
+8. First client and first issued invoice.
+
+Two-step sign-in (MFA) is hidden for now (`public/ext/features.mjs`), so it is not a step.
 
 The steps are worked out in the browser from the workspace data it already has. **Hide** is saved in Settings, so the checklist stays hidden on every device; **Show again** is under Settings > Modules. Staff and accountants never see it. It takes the place of the older "add your company details" notice while it shows.
 

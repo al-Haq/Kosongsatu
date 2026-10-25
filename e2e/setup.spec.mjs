@@ -9,6 +9,9 @@ async function signOut(page) {
   await page.click(".avatar-menu summary");
   await page.click('[data-action="logout"]');
   await expect(page.locator('form[data-form="login"]')).toBeVisible();
+  // No authenticator code box unless an account that uses one is signing in.
+  await expect(page.locator('form[data-form="login"] input[name=code]')).toBeHidden();
+  await expect(page.getByText("Use an authenticator")).toHaveCount(0);
 }
 
 test("setup checklist: progress, links to the place to fix each step, skip and hide kept on the server", async ({ page }) => {
@@ -19,9 +22,11 @@ test("setup checklist: progress, links to the place to fix each step, skip and h
   const count = panel.locator(".panel-head p");
   const step = (key) => panel.locator(`[data-setup-step="${key}"]`);
   await expect(panel).toBeVisible();
-  await expect(count).toHaveText(/^\d of 9 done$/);
+  await expect(count).toHaveText(/^\d of 8 done$/);
   const done = Number((await count.textContent()).split(" ")[0]);
-  // The test workspace has bank details, clients and issued invoices, but no logo, email, backups or MFA.
+  // The test workspace has bank details, clients and issued invoices, but no logo, email or backups.
+  // Two-step sign-in is not offered for now (public/ext/features.mjs), so it is not a step.
+  await expect(step("mfa")).toHaveCount(0);
   await expect(step("first")).toHaveClass(/done/);
   await expect(step("bank")).toHaveClass(/done/);
   for (const [key, href] of [
@@ -29,7 +34,6 @@ test("setup checklist: progress, links to the place to fix each step, skip and h
     ["mail", "#/settings/integrations"],
     ["gateway", "#/settings/payments"],
     ["backup", "#/settings/security"],
-    ["mfa", "#/settings/security"],
   ])
     await expect(step(key).locator("a.btn")).toHaveAttribute("href", href);
 
@@ -41,16 +45,15 @@ test("setup checklist: progress, links to the place to fix each step, skip and h
   await step("logo").locator("a.btn").click();
   await expect(page.locator(".settings-tabs .tab.active")).toHaveText("Documents");
   await expect(page.locator('form[data-form="doc-logo"] input[type=file]')).toBeFocused();
-  await page.goto("/#/overview");
-  await step("mfa").locator("a.btn").click();
-  await expect(page.locator(".settings-tabs .tab.active")).toHaveText("Security");
-  await expect(page.locator("main section.panel", { has: page.locator("h2", { hasText: "Authenticator and recovery" }) })).toBeInViewport();
+  // Nor is it offered under Settings > Security.
+  await page.goto("/#/settings/security");
+  await expect(page.locator("main section.panel h2", { hasText: "Authenticator and recovery" })).toHaveCount(0);
 
   // An optional step can be marked as not needed, and undone.
   await page.goto("/#/overview");
   await step("sst").locator('[data-action="setup-skip"]').click();
   await expect(page.locator("#toast")).toContainText("not registered for SST");
-  await expect(count).toHaveText(`${done + 1} of 9 done`);
+  await expect(count).toHaveText(`${done + 1} of 8 done`);
   await panel.locator(".setup-done summary").click();
   await expect(step("sst")).toContainText("Not registered");
 
@@ -77,7 +80,7 @@ test("setup checklist: progress, links to the place to fix each step, skip and h
   await expect(panel).toBeVisible();
   await panel.locator(".setup-done summary").click();
   await step("sst").locator('[data-action="setup-unskip"]').click();
-  await expect(count).toHaveText(`${done} of 9 done`);
+  await expect(count).toHaveText(`${done} of 8 done`);
   expect(errors).toEqual([]);
 });
 
