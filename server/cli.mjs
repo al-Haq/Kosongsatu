@@ -149,7 +149,7 @@ if (mode === "setup") {
       }),
     );
 } else if (
-  ["audit-verify", "audit-head", "remote-backups", "fetch-backup", "add-user"].includes(mode)
+  ["audit-verify", "audit-head", "remote-backups", "fetch-backup", "add-user", "set-email"].includes(mode)
 ) {
   // Audit chain, off-site backup and add-user commands (server/team-cli.mjs).
   const { runTeamCli } = await import("./team-cli.mjs");

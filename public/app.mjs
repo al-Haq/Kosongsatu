@@ -292,7 +292,8 @@ function renderShell(html, active) {
   const accountLink = items.some((n) => n.key === "account")
     ? '<a href="#/account">My account</a>'
     : items.some((n) => n.key === "settings")
-      ? '<a href="#/settings">Settings</a>'
+      ? // The logo is used on every PDF, email, the menu and the sign-in page.
+        '<a href="#/settings">Settings</a><a href="#/settings/documents" data-account="logo">Change logo</a>'
       : "";
   app.innerHTML = `<div class="shell"><aside class="sidebar">${brandMark()}<nav aria-label="Main navigation">${allNav()
     .map(

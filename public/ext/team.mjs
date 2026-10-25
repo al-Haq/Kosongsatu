@@ -109,7 +109,7 @@ export default function teamUI(h) {
     if (!u) return;
     showModal(
       "Edit " + (u.name || u.email),
-      `<form data-form="team-edit" data-id="${E(id)}"><p>${E(u.email)}</p>${input("Name", "name", u.name, "text", false, 'maxlength="120"')}${select("Role", "role", roleOptions(), u.role)}<p class="field-hint">A new role applies to their next request; they do not need to sign in again.</p>${formEnd("Save")}</form>`,
+      `<form data-form="team-edit" data-id="${E(id)}">${input("Sign-in email", "email", u.email, "email", true, 'maxlength="160" autocomplete="off"')}${input("Name", "name", u.name, "text", false, 'maxlength="120"')}${select("Role", "role", roleOptions(), u.role)}<p class="field-hint">A new role applies to their next request; they do not need to sign in again.</p>${formEnd("Save")}</form>`,
     );
   }
 
@@ -433,7 +433,7 @@ export default function teamUI(h) {
         return true;
       }
       if (type === "team-edit") {
-        await api(`/team/users/${id}`, "PUT", { name: b.name, role: b.role });
+        await api(`/team/users/${id}`, "PUT", { email: b.email, name: b.name, role: b.role });
         await done("User updated.");
         return true;
       }

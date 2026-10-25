@@ -1,18 +1,17 @@
 // PDFs owned by the tax module: the SST-02 working paper and self-billed e-Invoices.
 import PDFDocument from "pdfkit";
-import { fileURLToPath } from "node:url";
 import { currency } from "./domain.mjs";
 import { registerTextFonts, textFont } from "./documents-fonts.mjs";
 import { drawQr } from "./qr.mjs";
 import { STATE_CODES, EINVOICE_TYPES } from "./tax-codes.mjs";
 
-const logo = fileURLToPath(new URL("../public/assets/nawlogic-logo.png", import.meta.url));
+import { drawLogoImage } from "./pdf-logo.mjs";
 const ink = "#0F172A",
   teal = "#087F7E",
   muted = "#64748B",
   line = "#E2E8F0";
 
-function page(title, subtitle, footer) {
+function page(title, subtitle, footer, logo = null) {
   const pdf = new PDFDocument({ size: "A4", margin: 42, bufferPages: true, info: { Title: title } });
   registerTextFonts(pdf);
   const chunks = [];
@@ -49,7 +48,7 @@ function page(title, subtitle, footer) {
       return done;
     },
   };
-  pdf.image(logo, 37, 32, { width: 150 });
+  drawLogoImage(pdf, logo, 37, 32, 150);
   t.text(title, 300, 46, 15, "Bold", ink, 253, "right");
   t.text(subtitle, 300, 70, 9, "Body", muted, 253, "right");
   t.y = 112;
@@ -80,12 +79,13 @@ function table(t, head, rows, widths) {
 }
 const rm = (sen) => currency(sen);
 
-export function renderSst02Pdf(ws) {
+export function renderSst02Pdf(ws, logo = null) {
   const p = ws.period;
   const t = page(
     "SST-02 WORKING PAPER",
     `Taxable period ${p.from} to ${p.to}\nReturn and payment due ${p.due}`,
     "Kosongsatu | SST-02 working paper | Not a submission: file and pay on MySST (mysst.customs.gov.my)",
+    logo,
   );
   t.pdf.roundedRect(42, t.y, 511, 46, 6).fill("#FFF4E8");
   t.text(
@@ -157,7 +157,7 @@ export function renderSst02Pdf(ws) {
   return t.finish();
 }
 
-export function renderSelfBilledPdf(sb, business, einvoice) {
+export function renderSelfBilledPdf(sb, business, einvoice, logo = null) {
   const seller = JSON.parse(sb.supplier);
   const lines = JSON.parse(sb.lines);
   const t = page(
@@ -166,6 +166,7 @@ export function renderSelfBilledPdf(sb, business, einvoice) {
     einvoice?.state === "valid"
       ? `Kosongsatu | Self-billed e-Invoice validated by LHDN MyInvois | UUID ${einvoice.uuid}`
       : "Kosongsatu | Self-billed document | Not yet a validated MyInvois e-Invoice",
+    logo,
   );
   const address = (a) => [...a.lines, [a.postcode, a.city].filter(Boolean).join(" "), STATE_CODES[a.state] && a.state !== "17" ? STATE_CODES[a.state] : "", a.country].filter(Boolean).join("\n");
   t.text("SUPPLIER (SELLER)", 42, t.y, 9, "Bold", muted, 250);

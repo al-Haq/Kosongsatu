@@ -5,6 +5,7 @@ import { id, now, today, check, currency } from "./domain.mjs";
 import { daysBetween, periodLabel, previousMonth, monthRange, dayLabel } from "./recurring-dates.mjs";
 import { STALE_DAYS, planOf } from "./recurring-plans.mjs";
 import { packData, packFiles } from "./recurring-pack.mjs";
+import { businessLogo } from "./pdf-logo.mjs";
 
 const message = (e) => (e?.status ? e.message : "Unexpected error. See the server log.");
 const row = (store, sid) => store.db.prepare("SELECT * FROM schedules WHERE id=?").get(sid);
@@ -213,7 +214,7 @@ export async function sendPack(ctx, month, { to = null, source = "manual" } = {}
     check(recipients.length, "Enter the accountant's email address.");
     check(mailer?.status().configured, "Email is not configured. Set up SMTP to email the pack.", 409);
     const p = packData(store, month);
-    const files = await packFiles(p);
+    const files = await packFiles(p, businessLogo(store));
     const b = p.business;
     await mailer.deliver({
       kind: "accountant_pack",

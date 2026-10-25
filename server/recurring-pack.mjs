@@ -3,12 +3,11 @@
 import { toMYR } from "../public/ext/documents-calc.mjs";
 import PDFDocument from "pdfkit";
 import { crc32 } from "node:zlib";
-import { fileURLToPath } from "node:url";
 import { currency, now } from "./domain.mjs";
 import { registerTextFonts, textFont } from "./documents-fonts.mjs";
 import { monthRange, daysBetween, dayLabel } from "./recurring-dates.mjs";
 
-const logo = fileURLToPath(new URL("../public/assets/nawlogic-logo.png", import.meta.url));
+import { drawLogoImage } from "./pdf-logo.mjs";
 const name = (snapshot) => {
   try {
     return JSON.parse(snapshot || "{}").name || "";
@@ -168,7 +167,7 @@ export function packCsv(p) {
     ]),
   };
 }
-export function renderPackPdf(p) {
+export function renderPackPdf(p, logo = null) {
   return new Promise((resolve, reject) => {
     const pdf = new PDFDocument({
       size: "A4",
@@ -189,7 +188,7 @@ export function renderPackPdf(p) {
     // Table cells stay on one line; long text is cut with an ellipsis.
     const cell = { height: 11, ellipsis: true };
     const rule = (y) => pdf.strokeColor("#E2E8F0").lineWidth(0.7).moveTo(42, y).lineTo(553, y).stroke();
-    pdf.image(logo, 37, 32, { width: 150 });
+    drawLogoImage(pdf, logo, 37, 32, 150);
     put("ACCOUNTANT PACK", 330, 46, 14, "Bold", teal, 223, "right");
     put(`${dayLabel(p.from)} – ${dayLabel(p.to)}`, 330, 68, 9, "Body", muted, 223, "right");
     const b = p.business;
@@ -323,10 +322,10 @@ export function renderPackPdf(p) {
     pdf.end();
   });
 }
-export async function packFiles(p) {
+export async function packFiles(p, logo = null) {
   const files = packCsv(p);
   return [
-    { name: `accountant-pack-${p.month}.pdf`, data: await renderPackPdf(p), type: "application/pdf" },
+    { name: `accountant-pack-${p.month}.pdf`, data: await renderPackPdf(p, logo), type: "application/pdf" },
     { name: `invoices-${p.month}.csv`, data: Buffer.from(files.invoices), type: "text/csv" },
     { name: `receipts-${p.month}.csv`, data: Buffer.from(files.receipts), type: "text/csv" },
     { name: `sst-${p.month}.csv`, data: Buffer.from(files.sst), type: "text/csv" },

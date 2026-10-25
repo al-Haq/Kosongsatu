@@ -34,6 +34,6 @@ Sales pipeline · Proforma invoices · Sales and delivery orders · Recurring bi
 
 ## Your brand
 
-Once you enter your business name (Settings > Company) the sidebar and the sign-in page show it instead of Nawlogic. Upload a logo under Settings > Documents and it shows there too. The browser tab shows your business name as well.
+Once you enter your business name (Settings > Company) the sidebar and the sign-in page show it instead of Nawlogic. Upload a logo under Settings > Documents (or **Change logo** in the account menu) and it shows there too, and on every PDF (documents, statements, receipts, purchase orders, reports, the accountant pack, SST-02 and self-billed e-Invoices) and at the top of emails. Remove it and everything goes back to the Nawlogic logo. Issued documents keep the logo they were issued with. The browser tab shows your business name as well.
 
 The sign-in page can show your name and logo before anyone signs in, so those two things are public. Nothing else is: not your address, email, bank details or any other file.

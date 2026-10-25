@@ -292,6 +292,15 @@ Without Docker, run `npm run add-user -- person@example.com owner "Their Name"`.
 - An existing email, an unknown role or a password under 12 characters is refused, and nothing is changed.
 - The audit records `user.created` with the actor `local-console`.
 
+To change someone's sign-in email (the password, MFA and role stay), an owner uses **Team → Edit**. From the console, which also works for your own account:
+
+```sh
+cd /opt/nawlogic
+sudo docker compose exec app node server/cli.mjs set-email old@example.com new@example.com
+```
+
+The audit records `user.email_changed`.
+
 ## Financial corrections and reconciliation
 
 - Record each actual customer receipt once. Allocate its available funds across invoices for that customer.

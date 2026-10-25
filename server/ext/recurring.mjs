@@ -6,6 +6,7 @@ import { attachPlans, MODES, recipients } from "../recurring-plans.mjs";
 import { attachContracts, RENEWALS } from "../recurring-contracts.mjs";
 import { attachLateFees, LATE_FEE_DEFAULTS, normalizeLateFees, lateFeePolicy } from "../recurring-fees.mjs";
 import { packData, packFiles, renderPackPdf, packCsv, zip } from "../recurring-pack.mjs";
+import { businessLogo } from "../pdf-logo.mjs";
 import { processPeriod, sendRun, runDuePlans, runContracts, sendPack, runAccountantPack } from "../recurring-auto.mjs";
 
 const HOUR = 3600000;
@@ -278,7 +279,7 @@ export default {
           );
         if (format === "pdf")
           return (
-            r.send(200, await renderPackPdf(data), {
+            r.send(200, await renderPackPdf(data, businessLogo(store)), {
               "Content-Type": "application/pdf",
               "Content-Disposition": `attachment; filename="accountant-pack-${month}.pdf"`,
             }),
@@ -286,7 +287,7 @@ export default {
           );
         store.audit("accountant_pack.downloaded", null, month);
         return (
-          r.send(200, zip(await packFiles(data)), {
+          r.send(200, zip(await packFiles(data, businessLogo(store))), {
             "Content-Type": "application/zip",
             "Content-Disposition": `attachment; filename="accountant-pack-${month}.zip"`,
           }),
