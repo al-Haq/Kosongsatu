@@ -210,6 +210,7 @@ function documentSnapshot(d, appUrl) {
     client: { id: d.client_id, name: d.client?.name || "", email: d.client?.email || "", phone: d.client?.phone || "", tin: d.client?.tin || "", brn: d.client?.brn || "" },
     items: (d.items || []).map((i) => ({
       description: i.description,
+      ...(i.details ? { details: i.details } : {}),
       quantity: i.quantity,
       rate: i.rate,
       amount: i.amount,

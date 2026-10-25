@@ -1,6 +1,8 @@
 import { automationUI } from "./automation.mjs";
 import { dmy, isoDate, tidyDmy } from "./dates.mjs";
 import { financeUI } from "./finance.mjs";
+import { detailsHtml, detailsPlain, htmlToDetails, DETAILS_MAX } from "./ext/line-details.mjs";
+import { lineChoices, matchChoices } from "./ext/line-suggest.mjs";
 import { createAutosave } from "./autosave.mjs";
 import { UI_PLUGINS } from "./plugins.mjs";
 import { totals, toMYR, basisPoints, percentOf } from "./ext/documents-calc.mjs";
@@ -681,7 +683,7 @@ function paper(d, publicView = false) {
     const meta = [i.quantity + (i.unit ? " " + i.unit : ""), priced ? "× " + m(i.rate) : "", i.discount ? "− " + m(i.discount) : ""]
       .filter(Boolean)
       .join(" ");
-    return `<tr>${showCode ? `<td class="line-code">${E(i.sku || "")}</td>` : ""}<td class="quote-scope">${E(i.description)}<small class="mobile-line-meta">${E(meta)}</small></td><td class="num line-qty">${i.quantity}</td>${showUnit ? `<td class="line-unit">${E(i.unit || "")}</td>` : ""}${priced ? `<td class="num line-rate">${m(i.rate)}</td>${showDiscount ? `<td class="num line-disc">${i.discount ? m(i.discount) + (i.discount_percent ? `<small>${E(i.discount_percent)}%</small>` : "") : ""}</td>` : ""}<td class="num">${m(i.amount)}</td>` : ""}</tr>`;
+    return `<tr${i.details ? ' class="has-details"' : ""}>${showCode ? `<td class="line-code">${E(i.sku || "")}</td>` : ""}<td class="quote-scope">${i.details ? `<span class="line-title">${E(i.description)}</span><div class="line-details-view">${detailsHtml(i.details)}</div>` : E(i.description)}<small class="mobile-line-meta">${E(meta)}</small></td><td class="num line-qty">${i.quantity}</td>${showUnit ? `<td class="line-unit">${E(i.unit || "")}</td>` : ""}${priced ? `<td class="num line-rate">${m(i.rate)}</td>${showDiscount ? `<td class="num line-disc">${i.discount ? m(i.discount) + (i.discount_percent ? `<small>${E(i.discount_percent)}%</small>` : "") : ""}</td>` : ""}<td class="num">${m(i.amount)}</td>` : ""}</tr>`;
   };
   const details = [
     `${t("issueDate")}: ${dl(d.issue_date)}`,
@@ -972,13 +974,27 @@ const TAX_RATES = [0, 5, 6, 8, 10];
 const sstEnabled = () => !!S.settings.sstNumber;
 const editorKind = () => $('form[data-form="editor"]')?.dataset.kind || "invoice";
 // One editor line: description, quantity, rate and SST, then code, unit and line discount.
+// The formatted description under a line's title (public/ext/line-details.mjs).
+function detailsEditor(details = "") {
+  const fmt = (cmd, label, text) => `<button type="button" class="fmt-btn" data-fmt="${cmd}" aria-label="${label}" title="${label}">${text}</button>`;
+  return `<div class="line-details"${details ? "" : " hidden"}><div class="details-toolbar" role="toolbar" aria-label="Description formatting">${fmt("bold", "Bold", "<b>B</b>")}${fmt("italic", "Italic", "<i>I</i>")}${fmt("strikeThrough", "Strikethrough", "<s>S</s>")}${fmt("insertUnorderedList", "Bullet list", "• List")}${fmt("insertOrderedList", "Numbered list", "1. List")}<button type="button" class="fmt-btn details-remove" data-details="remove" aria-label="Remove description" title="Remove description">${icon("close")}</button></div><div class="item-details" contenteditable="true" role="textbox" aria-multiline="true" aria-label="Item description" data-placeholder="Description: features, scope, specifications…">${detailsHtml(details)}</div><small class="details-count">${details.length} / ${DETAILS_MAX}</small></div><button type="button" class="link-button details-add" data-details="add"${details ? " hidden" : ""}>+ Description</button>`;
+}
+// A catalog service's description becomes the line's description; its
+// stars and tildes are text, not formatting.
+const catalogDetails = (s) => (s.description && s.description !== s.name ? s.description.replace(/([\\*~])/g, "\\$1") : "");
+// The description markup of a line, or "" when it has none.
+const lineDetails = (row) => {
+  const box = $(".line-details", row);
+  return box && !box.hidden ? htmlToDetails($(".item-details", box)) : "";
+};
 function lineMarkup(i = { description: "", quantity: 1, rate: 0 }, kind = editorKind()) {
   const tax = Number(i.tax_rate || 0);
   const priced = kind !== "delivery_order";
   const percent = !!i.discount_percent;
   const off = i.discount_percent || (i.discount ? dec(i.discount) : i.discount_amount || "");
   const more = i.sku || i.unit || off ? " open" : "";
-  return `<div class="line-item"><textarea aria-label="Line description" class="item-description" rows="1" maxlength="240" required>${E(i.description)}</textarea><input aria-label="Quantity" class="item-quantity" type="number" min="0.01" max="99999.99" step="0.01" value="${i.quantity}" required>${priced ? `<input aria-label="Rate" class="item-rate" type="number" min="0" max="99999999.99" step="0.01" value="${dec(i.rate)}" required>` : ""}${priced && sstEnabled() ? `<select aria-label="SST rate" class="item-tax">${TAX_RATES.map((r) => `<option value="${r}" ${r === tax ? "selected" : ""}>${r ? r + "%" : "No SST"}</option>`).join("")}</select>` : ""}<button class="btn ghost" type="button" data-action="remove-line" aria-label="Remove item">${icon("close")}</button><details class="line-more"${more}><summary>${priced ? "Code, unit, discount" : "Code and unit"}</summary><div class="line-extra"><input aria-label="Item code" class="item-sku" maxlength="40" placeholder="Code" value="${E(i.sku || "")}"><input aria-label="Unit" class="item-unit" maxlength="30" placeholder="Unit" value="${E(i.unit || "")}">${priced ? `<span class="line-discount"><input aria-label="Line discount" class="item-discount" type="number" min="0" step="0.01" placeholder="Discount" value="${E(off)}"><select aria-label="Discount type" class="item-discount-type"><option value="amount" ${percent ? "" : "selected"}>Amount</option><option value="percent" ${percent ? "selected" : ""}>%</option></select></span>` : ""}<input type="hidden" class="item-service" value="${E(i.service_id || "")}"></div></details></div>`;
+  const details = i.details || "";
+  return `<div class="line-item"><textarea aria-label="Item title" class="item-description" rows="1" maxlength="240" placeholder="Item title" autocomplete="off" aria-autocomplete="list" aria-expanded="false" required>${E(i.description)}</textarea><input aria-label="Quantity" class="item-quantity" type="number" min="0.01" max="99999.99" step="0.01" value="${i.quantity}" required>${priced ? `<input aria-label="Rate" class="item-rate" type="number" min="0" max="99999999.99" step="0.01" value="${dec(i.rate)}" required>` : ""}${priced && sstEnabled() ? `<select aria-label="SST rate" class="item-tax">${TAX_RATES.map((r) => `<option value="${r}" ${r === tax ? "selected" : ""}>${r ? r + "%" : "No SST"}</option>`).join("")}</select>` : ""}<button class="btn ghost" type="button" data-action="remove-line" aria-label="Remove item">${icon("close")}</button><details class="line-more"${more}><summary>${priced ? "Code, unit, discount" : "Code and unit"}</summary><div class="line-extra"><input aria-label="Item code" class="item-sku" maxlength="40" placeholder="Code" value="${E(i.sku || "")}"><input aria-label="Unit" class="item-unit" maxlength="30" placeholder="Unit" value="${E(i.unit || "")}">${priced ? `<span class="line-discount"><input aria-label="Line discount" class="item-discount" type="number" min="0" step="0.01" placeholder="Discount" value="${E(off)}"><select aria-label="Discount type" class="item-discount-type"><option value="amount" ${percent ? "" : "selected"}>Amount</option><option value="percent" ${percent ? "selected" : ""}>%</option></select></span>` : ""}<input type="hidden" class="item-service" value="${E(i.service_id || "")}"></div></details>${detailsEditor(details)}</div>`;
 }
 function documentForm(kind = "invoice", id = "", clientId = "") {
   if (!S.clients.length) {
@@ -1007,7 +1023,7 @@ function documentForm(kind = "invoice", id = "", clientId = "") {
   const tax = priced && sstEnabled();
   showModal(
     d ? "Edit draft" : "New " + kindUI(kind).one,
-    `<form data-form="editor" data-id="${E(id)}" data-kind="${kind}"><div class="editor-grid ${tax ? "with-tax" : ""} ${priced ? "" : "no-price"}"><div><div class="form-grid"><div class="span-2">${select(kind === "delivery_order" ? "Deliver to" : "Bill to", "client_id", clientOptions(value.client_id), value.client_id)}</div>${input("Issue date", "issue_date", value.issue_date, "date", true)}${input(dueLabelFor(labels("en"), kind), "due_date", value.due_date, "date", true)}</div><div class="line-head"><span>DESCRIPTION</span><span>QTY</span>${priced ? '<span class="rate-head">RATE</span>' : ""}${tax ? "<span>SST</span>" : ""}<span></span></div><div id="line-items">${value.items
+    `<form data-form="editor" data-id="${E(id)}" data-kind="${kind}"><div class="editor-grid ${tax ? "with-tax" : ""} ${priced ? "" : "no-price"}"><div><div class="form-grid"><div class="span-2">${select(kind === "delivery_order" ? "Deliver to" : "Bill to", "client_id", clientOptions(value.client_id), value.client_id)}</div>${input("Issue date", "issue_date", value.issue_date, "date", true)}${input(dueLabelFor(labels("en"), kind), "due_date", value.due_date, "date", true)}</div><div class="line-head"><span>ITEM</span><span>QTY</span>${priced ? '<span class="rate-head">RATE</span>' : ""}${tax ? "<span>SST</span>" : ""}<span></span></div><div id="line-items">${value.items
       .filter((i) => !i.deposit_id)
       .map((i) => lineMarkup(i, kind))
       .join("")}</div>${value.items.some((i) => i.deposit_id) ? `<p class="field-hint">The deposit already invoiced (${E([...new Set(value.items.filter((i) => i.deposit_id).map((i) => i.deposit_number))].join(", "))}) is deducted when you save.</p>` : ""}<div class="actions mt22">${button("Custom item", "add-line", "", "", "plus")}<label class="catalog-picker"><span class="sr-only">Add service from catalog</span><select id="catalog-service"><option value="">Add from catalog...</option>${S.services
@@ -1031,6 +1047,7 @@ function editorData(form) {
     items: $$(".line-item", form).map((row) => {
       const item = {
         description: $(".item-description", row).value,
+        details: lineDetails(row),
         quantity: $(".item-quantity", row).value,
         rate: $(".item-rate", row)?.value ?? "0",
         tax_rate: Number($(".item-tax", row)?.value || 0),
@@ -1075,7 +1092,7 @@ function updatePreview() {
   });
   const deducted = deductions.reduce((s, x) => s + x.amount, 0);
   $("#live-preview").innerHTML =
-    `<div class="preview-paper">${brandMark({ company: "", logo: brand().logo })}<h3>${E(S.settings.company)}</h3><p class="field-hint">${E(S.clients.find((c) => c.id === b.client_id)?.name || "Select a client")}<br>${E(dueLabelFor(labels("en"), b.kind))}: ${E(/^\d{4}-\d{2}-\d{2}$/.test(b.due_date || "") ? dateLabel(b.due_date) : b.due_date || "")}</p><div class="mt22">${b.items.map((i, n) => `<div class="preview-row"><span>${E(i.description || "New line item")}${lines[n].discount ? `<small>Line discount −${money(lines[n].discount, cur)}</small>` : ""}</span><strong>${priced ? money(r.lines[n].amount, cur) : E(`${i.quantity || 0} ${i.unit || ""}`)}</strong></div>`).join("")}</div>${priced ? `${discount ? `<div class="preview-row"><span>Discount</span><strong>−${money(discount, cur)}</strong></div>` : ""}${deducted ? `<div class="preview-row"><span>Less deposit</span><strong>${money(deducted, cur)}</strong></div>` : ""}${[...taxes].sort((x, y) => x[0] - y[0]).map(([rate, v]) => `<div class="preview-row"><span>SST ${rate}%</span><strong>${money(v, cur)}</strong></div>`).join("")}<div class="preview-total"><span>Total</span><span class="teal">${money(r.total, cur)}</span></div>` : ""}</div>`;
+    `<div class="preview-paper">${brandMark({ company: "", logo: brand().logo })}<h3>${E(S.settings.company)}</h3><p class="field-hint">${E(S.clients.find((c) => c.id === b.client_id)?.name || "Select a client")}<br>${E(dueLabelFor(labels("en"), b.kind))}: ${E(/^\d{4}-\d{2}-\d{2}$/.test(b.due_date || "") ? dateLabel(b.due_date) : b.due_date || "")}</p><div class="mt22">${b.items.map((i, n) => `<div class="preview-row"><span>${E(i.description || "New line item")}${i.details ? `<div class="line-details-view">${detailsHtml(i.details)}</div>` : ""}${lines[n].discount ? `<small>Line discount −${money(lines[n].discount, cur)}</small>` : ""}</span><strong>${priced ? money(r.lines[n].amount, cur) : E(`${i.quantity || 0} ${i.unit || ""}`)}</strong></div>`).join("")}</div>${priced ? `${discount ? `<div class="preview-row"><span>Discount</span><strong>−${money(discount, cur)}</strong></div>` : ""}${deducted ? `<div class="preview-row"><span>Less deposit</span><strong>${money(deducted, cur)}</strong></div>` : ""}${[...taxes].sort((x, y) => x[0] - y[0]).map(([rate, v]) => `<div class="preview-row"><span>SST ${rate}%</span><strong>${money(v, cur)}</strong></div>`).join("")}<div class="preview-total"><span>Total</span><span class="teal">${money(r.total, cur)}</span></div>` : ""}</div>`;
 }
 function paymentForm(id) {
   const d = S.documents.find((d) => d.id === id);
@@ -1661,13 +1678,185 @@ document.addEventListener("input", (event) => {
     );
   } else if (event.target.closest('form[data-form="editor"]')) updatePreview();
 });
+// Line descriptions: formatting buttons keep the text selection (mousedown),
+// paste brings plain text only, and the counter follows what is typed.
+document.addEventListener("mousedown", (event) => {
+  if (event.target.closest(".details-toolbar [data-fmt]")) event.preventDefault();
+});
+document.addEventListener("click", (event) => {
+  const fmt = event.target.closest(".details-toolbar [data-fmt]");
+  if (fmt) {
+    const box = $(".item-details", fmt.closest(".line-details"));
+    if (document.activeElement !== box) box.focus();
+    document.execCommand(fmt.dataset.fmt, false);
+    box.dispatchEvent(new Event("input", { bubbles: true }));
+    return;
+  }
+  const toggle = event.target.closest("[data-details]");
+  if (!toggle) return;
+  const row = toggle.closest(".line-item");
+  const box = $(".line-details", row);
+  const add = $(".details-add", row);
+  if (toggle.dataset.details === "add") {
+    box.hidden = false;
+    add.hidden = true;
+    $(".item-details", box).focus();
+  } else {
+    $(".item-details", box).innerHTML = "";
+    box.hidden = true;
+    add.hidden = false;
+  }
+  row.dispatchEvent(new Event("input", { bubbles: true }));
+});
+document.addEventListener("paste", (event) => {
+  const box = event.target.closest?.(".item-details");
+  if (!box) return;
+  event.preventDefault();
+  const text = (event.clipboardData || window.clipboardData).getData("text/plain");
+  document.execCommand("insertText", false, text);
+});
+document.addEventListener("input", (event) => {
+  const box = event.target.closest?.(".item-details");
+  if (!box) return;
+  const used = htmlToDetails(box).length;
+  const count = $(".details-count", box.closest(".line-details"));
+  if (count) {
+    // Over the limit nothing is cut: it says so, and saving is refused until it is shorter.
+    count.textContent = `${used} / ${DETAILS_MAX}${used > DETAILS_MAX ? " · too long to save" : ""}`;
+    count.classList.toggle("red-text", used > DETAILS_MAX);
+  }
+});
+// Items used before: clicking an empty line title, or typing in one, lists
+// lines from saved documents and catalog services (public/ext/line-suggest.mjs).
+// One click (or arrows and Enter) fills the title, description, rate, SST,
+// code and unit; the quantity stays.
+let suggestCache = { docs: null, services: null, list: [] };
+const suggestChoices = () => {
+  if (suggestCache.docs !== S.documents || suggestCache.services !== S.services)
+    suggestCache = { docs: S.documents, services: S.services, list: lineChoices(S.documents, S.services) };
+  return suggestCache.list;
+};
+let suggest = { row: null, items: [], active: -1 };
+function closeSuggest() {
+  for (const el of document.querySelectorAll(".line-suggest")) el.remove();
+  const field = suggest.row && $(".item-description", suggest.row);
+  if (field) {
+    field.setAttribute("aria-expanded", "false");
+    field.removeAttribute("aria-activedescendant");
+  }
+  suggest = { row: null, items: [], active: -1 };
+}
+function openSuggest(field) {
+  const row = field.closest(".line-item");
+  const form = field.closest('form[data-form="editor"]');
+  if (!row || !form) return;
+  const currency = form.elements.currency?.value || "MYR";
+  const items = matchChoices(suggestChoices(), field.value, { currency });
+  if (!items.length) return closeSuggest();
+  if (suggest.row && suggest.row !== row) closeSuggest();
+  let box = $(".line-suggest", row);
+  if (!box) {
+    box = document.createElement("div");
+    box.className = "line-suggest";
+    box.id = "line-suggest";
+    box.setAttribute("role", "listbox");
+    box.setAttribute("aria-label", "Items used before");
+    row.append(box);
+  }
+  const priced = form.dataset.kind !== "delivery_order";
+  suggest = { row, items, active: -1 };
+  box.innerHTML = `<div class="suggest-head">Items used before</div>${items
+    .map(
+      (c, n) =>
+        `<button type="button" tabindex="-1" class="suggest-item" role="option" id="line-suggest-${n}" data-pick="${n}" aria-selected="false"><span class="suggest-main"><strong>${E(c.title)}</strong>${c.details ? `<small>${E(detailsPlain(c.details).replace(/\s+/g, " ").slice(0, 100))}</small>` : ""}</span><span class="suggest-meta">${priced && c.rate != null ? `<strong>${money(c.rate, c.currency || currency)}</strong>` : ""}<small>${c.source === "catalog" ? "Catalog" : c.uses > 1 ? `Used ${c.uses} times` : "Used once"}</small></span></button>`,
+    )
+    .join("")}`;
+  box.style.top = field.offsetTop + field.offsetHeight + 4 + "px";
+  field.setAttribute("aria-expanded", "true");
+  field.setAttribute("aria-controls", "line-suggest");
+}
+function moveSuggest(step) {
+  const n = suggest.items.length;
+  suggest.active = suggest.active < 0 && step < 0 ? n - 1 : (suggest.active + step + n) % n;
+  const field = $(".item-description", suggest.row);
+  for (const el of $$(".suggest-item", suggest.row)) {
+    const on = Number(el.dataset.pick) === suggest.active;
+    el.classList.toggle("active", on);
+    el.setAttribute("aria-selected", String(on));
+    if (on) {
+      el.scrollIntoView({ block: "nearest" });
+      field.setAttribute("aria-activedescendant", el.id);
+    }
+  }
+}
+function pickSuggestion(n) {
+  const c = suggest.items[n];
+  const row = suggest.row;
+  if (!c || !row) return;
+  const form = row.closest("form");
+  const rate = $(".item-rate", row);
+  closeSuggest();
+  const tpl = document.createElement("template");
+  tpl.innerHTML = lineMarkup(
+    {
+      description: c.title,
+      details: c.details,
+      quantity: $(".item-quantity", row).value || 1,
+      rate: c.rate ?? Math.round(Number(rate?.value || 0) * 100),
+      tax_rate: c.tax_rate,
+      sku: c.sku,
+      unit: c.unit,
+      service_id: c.service_id,
+    },
+    form.dataset.kind,
+  );
+  const fresh = tpl.content.firstElementChild;
+  row.replaceWith(fresh);
+  const qty = $(".item-quantity", fresh);
+  qty.focus();
+  qty.select();
+  fresh.dispatchEvent(new Event("input", { bubbles: true }));
+}
+document.addEventListener("focusin", (event) => {
+  const field = event.target.closest?.('form[data-form="editor"] .item-description');
+  if (field && !field.value.trim()) openSuggest(field);
+});
+document.addEventListener("input", (event) => {
+  const field = event.target.closest?.('form[data-form="editor"] .item-description');
+  if (field) openSuggest(field);
+});
+document.addEventListener("focusout", (event) => {
+  if (suggest.row && event.target.matches?.(".item-description")) closeSuggest();
+});
+document.addEventListener("mousedown", (event) => {
+  if (event.target.closest?.(".suggest-item")) event.preventDefault();
+});
+document.addEventListener("click", (event) => {
+  const pick = event.target.closest?.(".suggest-item");
+  if (pick) pickSuggestion(Number(pick.dataset.pick));
+});
+document.addEventListener("keydown", (event) => {
+  if (!suggest.row || !event.target.matches?.(".item-description")) return;
+  if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+    event.preventDefault();
+    moveSuggest(event.key === "ArrowDown" ? 1 : -1);
+  } else if (event.key === "Enter" && suggest.active >= 0) {
+    event.preventDefault();
+    pickSuggestion(suggest.active);
+  } else if (event.key === "Escape") {
+    // Closes the list only, not the dialog.
+    event.preventDefault();
+    closeSuggest();
+  } else if (event.key === "Tab") closeSuggest();
+});
 document.addEventListener("change", (event) => {
   if (event.target.id === "catalog-service" && event.target.value) {
     const s = S.services.find((s) => s.id === event.target.value);
     const first = $(".line-item");
     if ($$(".line-item").length === 1 && !$(".item-description", first).value) {
       first.outerHTML = lineMarkup({
-        description: s.description || s.name,
+        description: s.name,
+        details: catalogDetails(s),
         quantity: 1,
         rate: s.rate,
         tax_rate: s.tax_rate,
@@ -1679,7 +1868,8 @@ document.addEventListener("change", (event) => {
       $("#line-items").insertAdjacentHTML(
         "beforeend",
         lineMarkup({
-          description: s.description || s.name,
+          description: s.name,
+          details: catalogDetails(s),
           quantity: 1,
           rate: s.rate,
           tax_rate: s.tax_rate,

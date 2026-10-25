@@ -3,6 +3,7 @@ import { fileURLToPath } from "node:url";
 import { currency as formatMoney, taxSummary, AppError } from "./domain.mjs";
 import { drawQr } from "./qr.mjs";
 import { labels, titleFor, statusLabel, formatDate } from "../public/ext/documents-i18n.mjs";
+import { blocks as detailBlocks } from "../public/ext/line-details.mjs";
 import { pdfStore } from "./documents-assets.mjs";
 import { documentSettings, fieldApplies } from "./documents-store.mjs";
 import { hasCjk, cjkFontPath, loadFontFace, boldSibling, CJK_MESSAGE, registerTextFonts, textFont } from "./documents-fonts.mjs";
@@ -107,7 +108,7 @@ export function renderPdf(invoice, payment = null, blocks = []) {
     let ctx;
     try {
       ctx = pdfContext(pdf, invoice, [
-        ...items.map((i) => i.description),
+        ...items.flatMap((i) => [i.description, i.details]),
         invoice.notes,
         invoice.terms,
         ...customFields.map((f) => f[1]),
@@ -362,28 +363,150 @@ export function renderPdf(invoice, payment = null, blocks = []) {
       tableHead();
       // Deposit deductions are shown in the totals, so the amount column adds up.
       for (const item of items.filter((i) => !i.deposit_id)) {
-        const description =
-          priced && item.tax_rate && !item.deposit_id
-            ? `${item.description}\n${t("sst")} ${item.tax_rate}%`
-            : item.description;
+        // The item title, its formatted description (public/ext/line-details.mjs)
+        // and the SST rate. The title is bold when a description follows.
+        const itemTitle = item.description;
+        const notes = item.details ? detailBlocks(item.details) : [];
+        const sstNote = priced && item.tax_rate && !item.deposit_id ? `${t("sst")} ${item.tax_rate}%` : "";
+        const titleFont = notes.length ? "Bold" : "Body";
         // Measured exactly as drawn (same font, size, width and line gap), for
         // the tallest cell: a long description never runs past the row's line.
-        const tall = (value, size, width) => {
-          pdf.font(ctx.font("Body", value)).fontSize(size);
-          return pdf.heightOfString(String(value || ""), { width, lineGap: 3 });
+        const tall = (value, size, width, font = "Body", gap = 3) => {
+          pdf.font(ctx.font(font, value)).fontSize(size);
+          return pdf.heightOfString(String(value || ""), { width, lineGap: gap });
         };
+        const plain = (rs) => rs.map((r) => r.text).join("") || " ";
+        const lead = (b, n) => (b.type === "ol" ? `${n + 1}.` : "•");
+        const indent = (b) => (b.type === "ol" ? 16 : 10);
+        // Description text is measured in bold (the widest face), so it never comes out short.
+        const runsHeight = (rs, b, w) => tall(plain(rs), L.small, b.type === "p" ? w : w - indent(b), "Bold", 2);
+        const notesHeight = (w) =>
+          notes.reduce((h, b, k) => h + (k ? 3 : 1) + (b.type === "p" ? b.lines : b.items).reduce((sum, rs) => sum + runsHeight(rs, b, w), 0), 0);
+        const descHeight = (w) =>
+          tall(itemTitle, L.body, w, titleFont) + (notes.length ? notesHeight(w) : 0) + (sstNote ? 2 + tall(sstNote, L.small, w) : 0);
         const height = Math.max(
           L.rowMin,
-          ...cols.map((c) => (c.key === "description" ? tall(description, L.body, c.w) : tall(cell(item, c.key), L.small, c.w)) + L.rowPad),
+          ...cols.map((c) => (c.key === "description" ? descHeight(c.w) : tall(cell(item, c.key), L.small, c.w)) + L.rowPad),
         );
-        if (y + height > 735) {
+        // A row that fits on a fresh page moves there whole. One taller than a
+        // page (a very long description) starts here and carries on overleaf.
+        const pageRoom = 735 - (81 + L.head + 8);
+        if (y + height > 735 && (height <= pageRoom || y > 735 - 80)) {
           newPage();
           tableHead();
         }
-        for (const c of cols)
-          if (c.key === "description") line(description, c.x, y, L.body, "Body", ink, c.w);
-          else line(cell(item, c.key), c.x, y, L.small, "Body", ink, c.w, alignOf(c.key));
-        y += height;
+        let carried = false;
+        const roomFor = (yy, h) => {
+          if (yy + h <= 735) return yy;
+          newPage();
+          tableHead();
+          carried = true;
+          return y;
+        };
+        // Inline runs (bold, italic, strikethrough) flow as one wrapped paragraph.
+        const drawRuns = (rs, x, yy, w) => {
+          const list = rs.length ? rs : [{ text: " " }];
+          pdf.fontSize(L.small).fillColor(muted);
+          list.forEach((r, k) => {
+            pdf.font(ctx.font(r.b ? "Bold" : "Body", r.text));
+            const opts = { width: w, lineGap: 2, continued: k < list.length - 1, oblique: r.i ? 10 : false, strike: !!r.s };
+            if (k === 0) pdf.text(r.text, x, yy, opts);
+            else pdf.text(r.text, opts);
+          });
+          return pdf.y;
+        };
+        // The runs before and after a character offset.
+        const splitRuns = (rs, at) => {
+          const before = [],
+            after = [];
+          let seen = 0;
+          for (const r of rs) {
+            const end = seen + r.text.length;
+            if (end <= at) before.push(r);
+            else if (seen >= at) after.push(r);
+            else {
+              before.push({ ...r, text: r.text.slice(0, at - seen) });
+              after.push({ ...r, text: r.text.slice(at - seen) });
+            }
+            seen = end;
+          }
+          if (after.length) after[0] = { ...after[0], text: after[0].text.replace(/^\s+/, "") };
+          return [before, after.filter((r) => r.text)];
+        };
+        // How much of a text fits in a height: the longest start ending at a
+        // space (or, for one very long word, at any character), measured in bold.
+        const fitting = (value, w, room) => {
+          const fits = (k) => tall(value.slice(0, k), L.small, w, "Bold", 2) <= room;
+          const spaces = [];
+          for (let k = 1; k < value.length; k++) if (value[k] === " ") spaces.push(k);
+          let lo = 0,
+            hi = spaces.length - 1,
+            best = 0;
+          while (lo <= hi) {
+            const mid = (lo + hi) >> 1;
+            if (fits(spaces[mid])) {
+              best = spaces[mid];
+              lo = mid + 1;
+            } else hi = mid - 1;
+          }
+          if (best) return best;
+          lo = 1;
+          hi = value.length - 1;
+          while (lo <= hi) {
+            const mid = (lo + hi) >> 1;
+            if (fits(mid)) {
+              best = mid;
+              lo = mid + 1;
+            } else hi = mid - 1;
+          }
+          return best;
+        };
+        // One paragraph line or list item. What does not fit above the page's
+        // end carries on overleaf, split between words, under the table header.
+        const drawFlow = (rs, x, w, yy, leadText = "", leadWidth = 0) => {
+          let rest = rs.length ? rs : [{ text: " " }];
+          let first = true;
+          for (;;) {
+            const h = tall(plain(rest), L.small, w, "Bold", 2);
+            const fresh = yy === y && carried;
+            let now = rest,
+              later = [];
+            if (yy + h > 735) {
+              const cut = fitting(plain(rest), w, 735 - yy);
+              if (cut <= 0 && !fresh) {
+                yy = roomFor(yy, h);
+                continue;
+              }
+              if (cut > 0) [now, later] = splitRuns(rest, cut);
+            }
+            if (first && leadText)
+              pdf.font(ctx.font("Body", "")).fontSize(L.small).fillColor(muted).text(leadText, x - leadWidth, yy, { width: leadWidth, lineGap: 2, lineBreak: false });
+            first = false;
+            yy = drawRuns(now, x, yy, w);
+            if (!later.length) return yy;
+            rest = later;
+            yy = roomFor(735, 1);
+          }
+        };
+        // Drawn last, as it may carry on to the next page. Returns where it ends.
+        const drawDescription = (c) => {
+          let yy = line(itemTitle, c.x, y, L.body, titleFont, ink, c.w);
+          notes.forEach((b, k) => {
+            yy += k ? 3 : 1;
+            if (b.type === "p") for (const rs of b.lines) yy = drawFlow(rs, c.x, c.w, yy);
+            else b.items.forEach((rs, n) => (yy = drawFlow(rs, c.x + indent(b), c.w - indent(b), yy, lead(b, n), indent(b))));
+          });
+          if (sstNote) {
+            yy = roomFor(yy + (notes.length ? 2 : 0), tall(sstNote, L.small, c.w));
+            yy = line(sstNote, c.x, yy, L.small, "Body", muted, c.w);
+          }
+          return yy;
+        };
+        const rowTop = y;
+        for (const c of cols) if (c.key !== "description") line(cell(item, c.key), c.x, rowTop, L.small, "Body", ink, c.w, alignOf(c.key));
+        const descCol = cols.find((c) => c.key === "description");
+        const end = descCol ? drawDescription(descCol) : rowTop;
+        y = carried ? Math.max(end + L.rowPad, y + L.rowMin) : rowTop + height;
         rule(y - 6);
       }
       if (priced) {
