@@ -17,7 +17,9 @@ test("maskId keeps the last 4 letters or digits and the shape", () => {
 
 test("only a person's number is masked; a business registration shows in full", () => {
   assert.equal(personalId({ kind: "individual", brn: "900101-14-5678" }), true);
-  assert.equal(personalId({ kind: "company", brn: "900101-14-5678" }), false);
+  // Filed as a company by the migration that added the type, but the number is a MyKad.
+  assert.equal(personalId({ kind: "company", brn: "900101-14-5678" }), true);
+  assert.equal(personalId({ kind: "company", brn: "202001012345" }), false);
   assert.equal(
     personalId({ kind: "company", tax_id_type: "NRIC", brn: "900101145678" }),
     true,
@@ -30,7 +32,7 @@ test("only a person's number is masked; a business registration shows in full", 
     }),
     true,
   );
-  // Saved before the type existed (no kind): a hyphenated MyKad is a person; an SSM number is not.
+  // Older issued snapshots have no kind at all: the same rule applies.
   assert.equal(personalId({ brn: "900101-14-5678" }), true);
   assert.equal(personalId({ brn: "202001012345" }), false);
   assert.equal(personalId({ brn: "1234567-A" }), false);

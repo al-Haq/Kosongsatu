@@ -30,6 +30,6 @@ A MyKad or passport number identifies a person, so it is personal data (Personal
 - Masked: the document preview, the PDF, the client link and the client portal.
 - In full: the client record (owner and staff, for editing and checks) and what is sent to LHDN through MyInvois, which needs the whole number. The validated e-Invoice on MyInvois carries the full data; the printed copy carries the validation QR.
 - Business registration numbers (SSM, ROS) are public records and show in full.
-- Clients saved before the type existed are treated as a person when their number has the MyKad shape `YYMMDD-PB-####`, or when an ID type of NRIC, passport or army is set in the Tax fields.
+- A number with the MyKad shape `YYMMDD-PB-####` is always treated as a person's, whatever the client type says (clients saved before the type existed were filed as companies), as is any client whose Tax ID type is NRIC, passport or army.
 
 Why the last 4 and not the first: the first six digits of a MyKad are the date of birth and the next two the place of birth, so hiding the _last_ four would still reveal those. Showing only the last four lets the client recognise the number without giving away anything else, the same way banks print card numbers.

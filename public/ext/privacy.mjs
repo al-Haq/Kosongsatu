@@ -10,8 +10,9 @@ const MYKAD = /^\d{6}-\d{2}-\d{4}$/;
 export function personalId(c = {}) {
   if (c.kind === "individual") return true;
   if (["NRIC", "PASSPORT", "ARMY"].includes(c.tax_id_type)) return true;
-  // Clients saved before the type existed: a hyphenated MyKad is unmistakable.
-  return !c.kind && MYKAD.test(String(c.brn || "").trim());
+  // A hyphenated MyKad is unmistakable, whatever the type says: clients saved
+  // before the type existed were filed as companies by the migration.
+  return MYKAD.test(String(c.brn || "").trim());
 }
 
 // Keeps the last `keep` letters or digits; every other letter or digit becomes
