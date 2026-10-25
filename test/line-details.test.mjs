@@ -3,7 +3,7 @@
 // document page, the client page and the PDF, and copied with the line.
 import test from "node:test";
 import assert from "node:assert/strict";
-import { runs, blocks, detailsHtml, detailsPlain, DETAILS_MAX } from "../public/ext/line-details.mjs";
+import { runs, blocks, detailsHtml, detailsPlain, htmlToDetails, DETAILS_MAX } from "../public/ext/line-details.mjs";
 import { today, addDays } from "../server/domain.mjs";
 import { eventsFromAudit } from "../server/platform-webhooks.mjs";
 import { fixture } from "./helpers.mjs";
@@ -151,5 +151,29 @@ test("Chinese text in a description picks the Chinese font", async () => {
     assert.equal(f.store.needsCjk(d), true);
   } finally {
     await f.close();
+  }
+});
+
+// A tiny stand-in for the editor's DOM: enough for htmlToDetails.
+const txt = (value) => ({ nodeType: 3, nodeValue: value });
+const el = (tag, ...kids) => ({ nodeType: 1, tagName: tag, childNodes: kids, children: kids.filter((k) => k.nodeType === 1), getAttribute: () => null });
+
+test("formatting typed in the editor reads back exactly, also bold inside italic and side by side", () => {
+  const cases = [
+    [[el("EM", txt("first "), el("STRONG", txt("bold")), txt(" last"))], "<p><em>first </em><strong><em>bold</em></strong><em> last</em></p>"],
+    [[el("EM", txt("italic "), el("STRONG", txt("both")))], "<p><em>italic </em><strong><em>both</em></strong></p>"],
+    [[el("I", txt("x")), el("B", el("I", txt("y")))], "<p><em>x</em><strong><em>y</em></strong></p>"],
+    [[el("EM", txt("a "), el("S", txt("gone")), txt(" b"))], "<p><em>a </em><em><s>gone</s></em><em> b</em></p>"],
+    [[el("B", txt("one")), el("B", txt("two"))], "<p><strong>onetwo</strong></p>"],
+    [[el("B", txt("2 * 3 ~ 4")), txt(" \\ end")], "<p><strong>2 * 3 ~ 4</strong> \\ end</p>"],
+    [[el("DIV", el("B", txt("line one"))), el("DIV", txt("line "), el("I", txt("two")))], "<p><strong>line one</strong><br>line <em>two</em></p>"],
+    [
+      [el("UL", el("LI", el("EM", txt("it "), el("B", txt("bo")))), el("LI", txt("plain")))],
+      "<ul><li><em>it </em><strong><em>bo</em></strong></li><li>plain</li></ul>",
+    ],
+  ];
+  for (const [kids, html] of cases) {
+    const md = htmlToDetails(el("DIV", ...kids));
+    assert.equal(detailsHtml(md), html, md);
   }
 });

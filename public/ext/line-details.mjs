@@ -104,23 +104,53 @@ export function detailsPlain(md) {
 // Never shortened: the counter shows what is over DETAILS_MAX and saving is refused.
 export function htmlToDetails(root) {
   // Stars, tildes and backslashes typed as text stay text; no-break spaces become spaces.
-  const lit = (s) => s.replace(/([\\*~])/g, "\\$1").replace(/ /g, " ");
-  const inline = (node, f = {}) => {
+  const lit = (s) => s.replace(/([\\*~])/g, "\\$1").replace(/\u00a0/g, " ");
+  // Formatted text as runs ({ text, b, i, s } or "\n"), then written with a
+  // marker only where the formatting changes. Wrapping each piece on its own
+  // would put markers side by side ("*a****b***") that read back wrongly.
+  const collect = (node, f, out) => {
     if (node.nodeType === 3) {
       const t = lit(node.nodeValue);
-      if (!t) return "";
-      return (f.b ? "**" : "") + (f.i ? "*" : "") + (f.s ? "~~" : "") + t + (f.s ? "~~" : "") + (f.i ? "*" : "") + (f.b ? "**" : "");
+      if (t) out.push({ text: t, b: !!f.b, i: !!f.i, s: !!f.s });
+      return;
     }
-    if (node.nodeType !== 1) return "";
+    if (node.nodeType !== 1) return;
     const tag = node.tagName;
-    if (tag === "BR") return "\n";
+    if (tag === "BR") return void out.push("\n");
     const style = node.getAttribute?.("style") || "";
     const g = {
       b: f.b || tag === "B" || tag === "STRONG" || /font-weight:\s*(bold|[6-9]00)/.test(style),
       i: f.i || tag === "I" || tag === "EM" || /font-style:\s*italic/.test(style),
       s: f.s || tag === "S" || tag === "STRIKE" || tag === "DEL" || /line-through/.test(style),
     };
-    return [...node.childNodes].map((c) => inline(c, g)).join("");
+    for (const c of node.childNodes) collect(c, g, out);
+  };
+  const MARK = { b: "**", i: "*", s: "~~" };
+  const write = (segs) => {
+    let state = { b: false, i: false, s: false },
+      line = "";
+    const out = [];
+    const to = (next) => {
+      let m = "";
+      for (const k of ["s", "i", "b"]) if (state[k] && !next[k]) m += MARK[k];
+      for (const k of ["b", "i", "s"]) if (!state[k] && next[k]) m += MARK[k];
+      state = { b: !!next.b, i: !!next.i, s: !!next.s };
+      return m;
+    };
+    // Each line starts with no formatting (runs() reads line by line).
+    for (const seg of segs) {
+      if (seg === "\n") {
+        out.push(line + to({}));
+        line = "";
+      } else line += to(seg) + seg.text;
+    }
+    out.push(line + to({}));
+    return out.join("\n");
+  };
+  const inline = (...nodes) => {
+    const segs = [];
+    for (const n of nodes) collect(n, {}, segs);
+    return write(segs);
   };
   const lines = [];
   const block = (node) => {
@@ -150,7 +180,7 @@ export function htmlToDetails(root) {
   // Inline nodes directly in the box belong to one line until a block starts.
   let pending = [];
   const flush = () => {
-    if (pending.length) lines.push(pending.map((n) => inline(n)).join(""));
+    if (pending.length) lines.push(inline(...pending));
     pending = [];
   };
   for (const node of root.childNodes) {

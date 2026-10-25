@@ -24,8 +24,11 @@ export function lineChoices(documents = [], services = []) {
       const seen = byKey.get(key);
       if (seen) {
         seen.uses++;
-        // A delivery order has no prices: take the rate from the latest priced use.
-        if (seen.rate == null && priced) seen.rate = i.rate;
+        // A delivery order has no prices or SST: take both from the latest priced use.
+        if (seen.rate == null && priced) {
+          seen.rate = i.rate;
+          seen.tax_rate = Number(i.tax_rate || 0);
+        }
         continue;
       }
       byKey.set(key, {
@@ -34,7 +37,7 @@ export function lineChoices(documents = [], services = []) {
         rate: priced ? i.rate : null,
         unit: i.unit || "",
         sku: i.sku || "",
-        tax_rate: Number(i.tax_rate || 0),
+        tax_rate: priced ? Number(i.tax_rate || 0) : null,
         service_id: i.service_id || "",
         currency,
         uses: 1,
@@ -43,7 +46,7 @@ export function lineChoices(documents = [], services = []) {
       });
     }
   }
-  const out = [...byKey.values()];
+  const out = [...byKey.values()].map((c) => (c.tax_rate == null ? { ...c, tax_rate: 0 } : c));
   const titles = new Set(out.map((c) => norm(c.title)));
   for (const s of services) {
     if (s.active === 0 || s.active === false || !norm(s.name) || titles.has(norm(s.name))) continue;

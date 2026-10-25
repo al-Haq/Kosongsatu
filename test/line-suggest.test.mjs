@@ -72,3 +72,17 @@ test("typing finds titles that start with it first, then words, then codes; othe
   );
   assert.equal(matchChoices(list, "", { limit: 2 }).length, 2);
 });
+
+test("an item last used on a delivery order keeps the SST of its latest priced use", () => {
+  const list = lineChoices(
+    [
+      doc("2026-10-22T01:00:00Z", [{ description: "Router", rate: 0, tax_rate: 0 }], { kind: "delivery_order" }),
+      doc("2026-10-10T01:00:00Z", [{ description: "Router", rate: 10000, tax_rate: 8 }]),
+    ],
+    [],
+  );
+  assert.deepEqual([list[0].rate, list[0].tax_rate], [10000, 8]);
+  // Used only on delivery orders: no price known, no SST.
+  const only = lineChoices([doc("2026-10-22T01:00:00Z", [{ description: "Cable", rate: 0 }], { kind: "delivery_order" })], []);
+  assert.deepEqual([only[0].rate, only[0].tax_rate], [null, 0]);
+});
