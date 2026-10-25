@@ -60,7 +60,8 @@ function table(t, head, rows, widths) {
   const draw = (cells, f, color, fill) => {
     const heights = cells.map((c, i) => {
       t.pdf.font(textFont(f, c)).fontSize(9);
-      return t.pdf.heightOfString(String(c ?? ""), { width: widths[i] - 8 });
+      // Measured with the same line gap the text is drawn with.
+      return t.pdf.heightOfString(String(c ?? ""), { width: widths[i] - 8, lineGap: 2 });
     });
     const h = Math.max(...heights) + 10;
     t.room(h + 4);

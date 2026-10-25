@@ -10,7 +10,7 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { openDatabase } from "../server/db.mjs";
 import { createOwner, verifyPassword } from "../server/auth.mjs";
-import { businessLogo } from "../server/pdf-logo.mjs";
+import { businessLogo, snapshotLogo, imageSize, fitBox } from "../server/pdf-logo.mjs";
 import { renderReportPdf, renderPurchaseOrderPdf } from "../server/books-pdf.mjs";
 import { renderSst02Pdf } from "../server/tax-pdf.mjs";
 import { packData, renderPackPdf } from "../server/recurring-pack.mjs";
@@ -97,4 +97,53 @@ test("set-email changes any account's sign-in email from the server console", as
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
+});
+
+test("changing the email cancels open invitation and reset links sent to the old address", async () => {
+  const f = await fixture();
+  try {
+    // A pending invitation: the link went to the wrong address.
+    const invite = await f.json("/api/team/users", "POST", { email: "luqman@wrong.example", role: "staff", name: "Luqman" });
+    const token = invite.link.split("/invite/")[1];
+    await f.json(`/api/team/users/${invite.user.id}`, "PUT", { email: "luqman@vatex.my" });
+    const used = await f.request("/api/guest/team/invite/" + token, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ password: memberPassword }) });
+    assert.notEqual(used.status, 200, "the old invitation link no longer works");
+    const fresh = await f.json(`/api/team/users/${invite.user.id}/invite`, "POST", {});
+    const ok = await f.request("/api/guest/team/invite/" + fresh.link.split("/invite/")[1], { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ password: memberPassword }) });
+    assert.equal(ok.status, 200, "a new invitation for the new address works");
+    // An active member with an open password-reset link.
+    const m = await member(f, "staff", "staff-reset@old.example");
+    const reset = await f.json(`/api/team/users/${m.id}/reset-link`, "POST", {});
+    const resetToken = reset.link.split("/reset/")[1];
+    await f.json(`/api/team/users/${m.id}`, "PUT", { email: "staff-reset@vatex.my" });
+    const r = await f.request("/api/guest/team/reset/" + resetToken, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ password: "Another-password-123" }) });
+    assert.notEqual(r.status, 200, "the old reset link no longer works");
+  } finally {
+    await f.close();
+  }
+});
+
+test("issued records keep the logo they were issued with; ones issued before any logo take the current one", async () => {
+  const f = await fixture();
+  try {
+    const s = f.store;
+    const first = s.setLogo({ name: "a.png", data: PNG_1PX });
+    const second = Buffer.concat([PNG_1PX, Buffer.from([0])]);
+    s.setLogo({ name: "b.png", data: second });
+    assert.deepEqual(snapshotLogo(s, { logoFileId: first.id }), PNG_1PX, "issued with the first logo: keeps it");
+    assert.deepEqual(snapshotLogo(s, { logoFileId: null }), second, "issued before any logo: the current one");
+    s.clearLogo();
+    assert.deepEqual(snapshotLogo(s, { logoFileId: first.id }), PNG_1PX, "kept after the logo is removed");
+    assert.equal(snapshotLogo(s, { logoFileId: null }), null, "no logo now: the default");
+  } finally {
+    await f.close();
+  }
+});
+
+test("a logo of any shape is sized to fit the email header without stretching", () => {
+  assert.deepEqual(imageSize(PNG_1PX), { width: 1, height: 1 });
+  assert.deepEqual(fitBox({ width: 900, height: 120 }, 150, 60), { width: 150, height: 20 }, "wide");
+  assert.deepEqual(fitBox({ width: 220, height: 440 }, 150, 60), { width: 30, height: 60 }, "tall");
+  assert.deepEqual(fitBox({ width: 300, height: 300 }, 150, 60), { width: 60, height: 60 }, "square");
+  assert.deepEqual(fitBox({ width: 40, height: 20 }, 150, 60), { width: 40, height: 20 }, "small logos are not enlarged");
 });

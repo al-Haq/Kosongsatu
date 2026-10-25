@@ -1,3 +1,4 @@
+import { imageSize, fitBox } from "./pdf-logo.mjs";
 import nodemailer from "nodemailer";
 import { chmodSync } from "node:fs";
 import { randomBytes } from "node:crypto";
@@ -152,6 +153,16 @@ export class Mailer {
       if (own) return own;
     } catch {}
     return "/assets/nawlogic-logo.png";
+  }
+  // With its exact display size, worked out from the image: email programs
+  // ignore CSS limits, so a tall or wide logo still fits 150 x 60.
+  emailLogo() {
+    const src = `${this.appUrl}${this.logoPath()}`;
+    let size = { width: 400, height: 106 };
+    try {
+      if (!src.endsWith("/assets/nawlogic-logo.png")) size = imageSize(this.store.brandLogo?.()?.data) || size;
+    } catch {}
+    return { src, ...fitBox(size, 150, 60) };
   }
   constructor(store, { config, transport, createTransport } = {}) {
     this.store = store;
@@ -315,7 +326,7 @@ export class Mailer {
                 lang: language,
                 button,
                 pixel: pixel ? `${this.appUrl}/api/guest/comms/open/${pixel}.gif` : null,
-                logo: this.appUrl?.startsWith("https://") ? `${this.appUrl}${this.logoPath()}` : null,
+                logo: this.appUrl?.startsWith("https://") ? this.emailLogo() : null,
               }),
         attachments,
         messageId,

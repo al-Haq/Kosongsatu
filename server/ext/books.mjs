@@ -6,7 +6,10 @@ import { FORM_LINES } from "../books-calc.mjs";
 import { scanConfig, readReceipt } from "../books-scan.mjs";
 import { TARGETS, buildExport, exportClientIds, toCsv, dec, csvCell } from "../books-export.mjs";
 import { renderReportPdf, renderPurchaseOrderPdf, dateLabel } from "../books-pdf.mjs";
-import { businessLogo } from "../pdf-logo.mjs";
+import { businessLogo, snapshotLogo } from "../pdf-logo.mjs";
+
+// A draft purchase order follows the current logo; an issued one keeps the logo it was issued with.
+const poLogo = (store, p) => (p.state === "draft" ? businessLogo(store) : snapshotLogo(store, p.business));
 
 const ID = "([\\w-]{1,80})";
 const route = (r, method, pattern) => {
@@ -240,7 +243,7 @@ export default {
       if ((m = route(r, "PUT", `/pos/${ID}`))) return r.send(200, store.savePo(await r.body(), m[1])), true;
       if ((m = route(r, "GET", `/pos/${ID}/pdf`))) {
         const p = store.po(m[1]);
-        return pdfResponse(r, await renderPurchaseOrderPdf(p, businessLogo(store)), `${p.number || "PO-DRAFT"}.pdf`), true;
+        return pdfResponse(r, await renderPurchaseOrderPdf(p, poLogo(store, p)), `${p.number || "PO-DRAFT"}.pdf`), true;
       }
       if ((m = route(r, "POST", `/pos/${ID}/(issue|receive|cancel|bill|email)`))) {
         const [, pid, action] = m;
@@ -276,7 +279,7 @@ export default {
           cc,
           subject,
           body,
-          attachments: [{ filename: `${p.number}.pdf`, content: await renderPurchaseOrderPdf(p, businessLogo(store)), contentType: "application/pdf" }],
+          attachments: [{ filename: `${p.number}.pdf`, content: await renderPurchaseOrderPdf(p, poLogo(store, p)), contentType: "application/pdf" }],
           dedupeKey: `books-po:${pid}:${key}`,
         });
         if (sent) {

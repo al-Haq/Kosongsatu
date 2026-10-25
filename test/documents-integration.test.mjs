@@ -75,7 +75,7 @@ test("webhook receipt payloads carry the receipt's currency and rate", async () 
   }
 });
 
-test("issued documents keep the logo they were issued with, even when that is none", () => {
+test("issued documents keep the logo they were issued with; ones issued before any logo take the business's logo", () => {
   const s = workspace();
   try {
     const c = s.saveClient({ name: "Logo client" });
@@ -84,11 +84,20 @@ test("issued documents keep the logo they were issued with, even when that is no
     const before = s.issue(draft().id);
     const open = draft();
     assert.equal(s.logoFor(before.business), null);
-    s.setLogo({ name: "logo.png", data: PNG_1PX });
-    assert.equal(s.logoFor(s.document(before.id).business), null, "issued before the logo: unchanged");
+    const first = s.setLogo({ name: "logo.png", data: PNG_1PX });
+    // Issued before there was a logo, it only had the Nawlogic placeholder: it takes the business's logo.
+    assert.deepEqual(s.logoFor(s.document(before.id).business)?.data, PNG_1PX, "issued before the logo: the business logo replaces the placeholder");
     assert.ok(s.logoFor(s.document(open.id).business), "drafts show the current logo");
     const after = s.issue(draft().id);
     assert.ok(s.logoFor(s.document(after.id).business), "issued after the logo: keeps it");
+    // A document issued with a logo keeps that one: a new logo, or removing it, does not change it.
+    const second = Buffer.concat([PNG_1PX, Buffer.from([0])]);
+    s.setLogo({ name: "logo2.png", data: second });
+    assert.deepEqual(s.logoFor(s.document(after.id).business)?.data, PNG_1PX, "kept after a new logo");
+    assert.deepEqual(s.logoFor(s.document(before.id).business)?.data, second, "the placeholder one follows the current logo");
+    s.clearLogo();
+    assert.deepEqual(s.logoFor(s.document(after.id).business)?.data, PNG_1PX, "kept after the logo is removed");
+    assert.ok(first, "setLogo returned the file");
     assert.equal(JSON.stringify(s.document(before.id).business).includes("frozen"), false, "the marker is never serialised");
   } finally {
     s.db.close();
