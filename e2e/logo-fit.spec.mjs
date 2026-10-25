@@ -57,6 +57,7 @@ test("logo upload: a 3000 px photo-sized PNG is resized, WebP converted, a tiny 
   });
   // The chosen picture shows before it is saved; the button says what it does.
   await expect(form.locator(".doc-logo-pick")).toBeVisible();
+  await expect(form.locator(".file-pick-name")).toHaveText("big-logo.png");
   await expect(form.locator("button[type=submit]")).toHaveText("Save logo");
   await form.locator("button[type=submit]").click();
   await expect(page.locator("#toast")).toContainText("Logo saved");
