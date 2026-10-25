@@ -55,6 +55,9 @@ test("logo upload: a 3000 px photo-sized PNG is resized, WebP converted, a tiny 
     mimeType: "image/png",
     buffer: big,
   });
+  // The chosen picture shows before it is saved; the button says what it does.
+  await expect(form.locator(".doc-logo-pick")).toBeVisible();
+  await expect(form.locator("button[type=submit]")).toHaveText("Save logo");
   await form.locator("button[type=submit]").click();
   await expect(page.locator("#toast")).toContainText("Logo saved");
   await expect(page.locator("#toast")).toContainText(
@@ -99,8 +102,9 @@ test("logo upload: a 3000 px photo-sized PNG is resized, WebP converted, a tiny 
     buffer: Buffer.from("hello"),
   });
   await form.locator("button[type=submit]").click();
+  // A browser that cannot read it sends it on; the server refuses the bytes.
   await expect(form.getByRole("alert")).toContainText(
-    "not a picture the browser can read",
+    /not a picture the browser can read|allowed type/,
   );
   expect((await stored()).width).toBe(200);
 
@@ -111,5 +115,45 @@ test("logo upload: a 3000 px photo-sized PNG is resized, WebP converted, a tiny 
   await expect(
     page.locator('.sidebar img.logo[src="/assets/nawlogic-logo.png"]'),
   ).toBeVisible();
+  // The fake PNG is refused by the server on purpose (415).
+  expect(errors.filter((e) => !/status of 4\d\d/.test(e))).toEqual([]);
+});
+
+// Older browsers have no createImageBitmap: the fallback decodes through a
+// data: URL, which the page's CSP allows (blob: would be blocked).
+test("logo upload: the decoding fallback works under the CSP", async ({
+  browser,
+}) => {
+  const context = await browser.newContext();
+  await context.addInitScript(() => {
+    delete window.createImageBitmap;
+  });
+  const page = await context.newPage();
+  const errors = watchErrors(page);
+  await signIn(page);
+  await page.goto("/#/settings/documents");
+  const form = page.locator('form[data-form="doc-logo"]');
+  const webp = Buffer.from(
+    await page.evaluate(() => {
+      const c = document.createElement("canvas");
+      c.width = 2400;
+      c.height = 600;
+      const ctx = c.getContext("2d");
+      ctx.fillStyle = "#087f7e";
+      ctx.fillRect(0, 0, 2400, 600);
+      return c.toDataURL("image/webp").split(",")[1];
+    }),
+    "base64",
+  );
+  await form
+    .locator("input[type=file]")
+    .setInputFiles({ name: "wide.webp", mimeType: "image/webp", buffer: webp });
+  await form.locator("button[type=submit]").click();
+  await expect(page.locator("#toast")).toContainText(
+    "Resized from 2400×600 to 2000×500",
+  );
+  await page.click('[data-action="doc-logo-remove"]');
+  await expect(page.locator("#toast")).toContainText("Nawlogic logo again");
+  await context.close();
   expect(errors).toEqual([]);
 });

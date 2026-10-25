@@ -63,8 +63,16 @@ export function scaled(width, height, side) {
 }
 
 // What to tell the person after a successful upload.
-export function note({ width, height, from, resized, type = "" }) {
+export function note({
+  width,
+  height,
+  from,
+  resized,
+  type = "",
+  unknown = false,
+}) {
   const parts = [];
+  if (unknown) return "";
   if (resized && (width !== from.width || height !== from.height))
     parts.push(
       `Resized from ${from.width}×${from.height} to ${width}×${height}.`,
@@ -78,17 +86,20 @@ export function note({ width, height, from, resized, type = "" }) {
   return parts.join(" ");
 }
 
+// Decodes the picture. Without createImageBitmap (older Safari) an <img> is
+// fed a data: URL: the page's CSP allows data: images, not blob: ones.
 const decode = async (file) => {
   if (typeof createImageBitmap === "function") return createImageBitmap(file);
-  const url = URL.createObjectURL(file);
-  try {
-    const img = new Image();
-    img.src = url;
-    await img.decode();
-    return img;
-  } finally {
-    URL.revokeObjectURL(url);
-  }
+  const url = await new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+  const img = new Image();
+  img.src = url;
+  await img.decode();
+  return img;
 };
 const toBlob = (canvas, type, quality) =>
   new Promise((resolve) => canvas.toBlob(resolve, type, quality));
@@ -101,6 +112,17 @@ export async function fitLogo(file) {
   try {
     image = await decode(file);
   } catch {
+    // A browser that cannot decode it still sends an acceptable file as it
+    // is; the server checks the bytes. Anything else is refused here.
+    if (KEEP_TYPES.includes(file.type) && file.size <= MAX_BYTES)
+      return {
+        file,
+        width: 0,
+        height: 0,
+        from: { width: 0, height: 0 },
+        resized: false,
+        unknown: true,
+      };
     throw new Error(
       "This file is not a picture the browser can read. Use a PNG, JPEG or WebP image.",
     );

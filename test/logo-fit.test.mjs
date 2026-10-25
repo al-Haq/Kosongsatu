@@ -95,6 +95,17 @@ test("the note says what happened and warns about small logos", () => {
     }),
     "Converted to PNG.",
   );
+  // Sent as it is because the browser could not read it: nothing to say about its size.
+  assert.equal(
+    note({
+      width: 0,
+      height: 0,
+      from: { width: 0, height: 0 },
+      resized: false,
+      unknown: true,
+    }),
+    "",
+  );
   assert.match(
     note({
       width: 300,
