@@ -4,6 +4,7 @@ import { currency as formatMoney, taxSummary, AppError } from "./domain.mjs";
 import { drawQr } from "./qr.mjs";
 import { labels, titleFor, statusLabel, formatDate } from "../public/ext/documents-i18n.mjs";
 import { blocks as detailBlocks } from "../public/ext/line-details.mjs";
+import { documentId } from "../public/ext/privacy.mjs";
 import { pdfStore } from "./documents-assets.mjs";
 import { documentSettings, fieldApplies } from "./documents-store.mjs";
 import { hasCjk, cjkFontPath, loadFontFace, boldSibling, CJK_MESSAGE, registerTextFonts, textFont } from "./documents-fonts.mjs";
@@ -234,7 +235,8 @@ export function renderPdf(invoice, payment = null, blocks = []) {
         T.pdfShowBuyerTax === false
           ? ""
           : [
-              invoice.client.brn ? `${t("regIc")}: ${invoice.client.brn}` : "",
+              // A person's IC or passport shows only its last 4 characters.
+              invoice.client.brn ? `${t("regIc")}: ${documentId(invoice.client)}` : "",
               invoice.client.tin ? `${t("tin")}: ${invoice.client.tin}` : "",
               invoice.client.sst_number ? `SST: ${invoice.client.sst_number}` : "",
             ]

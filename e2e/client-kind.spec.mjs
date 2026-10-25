@@ -46,12 +46,45 @@ test("clients: a company or an individual, with labels that follow the choice", 
   await expect(details).toContainText("IC or passport / TIN");
   await expect(details).toContainText("900101-14-5678");
 
-  // Editing opens on the individual's labels.
+  // Editing opens on the individual's labels. Make them a VIP with a note.
   await page.click('[data-action="edit-client"]');
   await expect(
     form.locator("input[name=kind][value=individual]"),
   ).toBeChecked();
   await expect(form.getByText("Full name")).toBeVisible();
+  await form.locator("select[name=tier]").selectOption("vip");
+  await form
+    .locator("input[name=tier_note]")
+    .fill("10% extra discount, 2 pendrives per order");
+  await form.locator("button[type=submit]").click();
+  await expect(page.locator("#toast")).toContainText("Client saved");
+  await expect(page.locator("dl.detail .badge.tier-vip")).toHaveText("VIP");
+  await expect(details).toContainText(
+    "10% extra discount, 2 pendrives per order",
+  );
+
+  // The list shows the VIP badge; the editor reminds whoever bills them.
+  await page.goto("/#/clients");
+  await expect(
+    page.locator("tr", { hasText: name }).locator(".badge.tier-vip"),
+  ).toHaveText("VIP");
+  await page.goto("/#/invoices");
+  await page.click('[data-action="new-invoice"]');
+  const editor = page.locator('form[data-form="editor"]');
+  await editor.locator("select[name=client_id]").selectOption({ label: name });
+  await expect(editor.locator(".client-perks")).toHaveText(
+    "VIP client: 10% extra discount, 2 pendrives per order",
+  );
+
+  // On the paper a person's IC shows only its last 4 characters.
+  await editor.locator(".item-description").first().fill("Tuition");
+  await editor.locator(".item-rate").first().fill("150");
+  await editor.locator("button[type=submit]").click();
+  await expect(page.locator("#toast")).toContainText("Draft saved");
+  await expect(page.locator(".invoice-paper")).toContainText("******-**-5678");
+  await expect(page.locator(".invoice-paper")).not.toContainText(
+    "900101-14-5678",
+  );
   expect(real(errors)).toEqual([]);
 });
 

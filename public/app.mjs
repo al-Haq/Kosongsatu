@@ -5,6 +5,7 @@ import { detailsHtml, detailsPlain, htmlToDetails, DETAILS_MAX } from "./ext/lin
 import { lineChoices, matchChoices } from "./ext/line-suggest.mjs";
 import { auditChanges } from "./ext/doc-changes.mjs";
 import { errorTip, errorHtml } from "./ext/error-tips.mjs";
+import { documentId } from "./ext/privacy.mjs";
 import { createAutosave } from "./autosave.mjs";
 import { UI_PLUGINS } from "./plugins.mjs";
 import { totals, toMYR, basisPoints, percentOf } from "./ext/documents-calc.mjs";
@@ -586,10 +587,22 @@ const CLIENT_KINDS = [
 const KIND_LABEL = Object.fromEntries(CLIENT_KINDS.map(([k, label]) => [k, label]));
 const clientKind = (c) => (KIND_LABEL[c?.kind] ? c.kind : "company");
 const kindTag = (c) => (clientKind(c) === "company" ? "" : `<span class="kind-tag">${E(KIND_LABEL[clientKind(c)])}</span>`);
+// Regular, member or VIP: a reminder of who gets extra care (a bigger discount,
+// a gift). It is shown where documents are made; nothing is applied automatically.
+const CLIENT_TIERS = [
+  ["regular", "Regular"],
+  ["member", "Member"],
+  ["vip", "VIP"],
+];
+const TIER_LABEL = Object.fromEntries(CLIENT_TIERS);
+const clientTier = (c) => (TIER_LABEL[c?.tier] ? c.tier : "regular");
+const tierBadge = (c) => (clientTier(c) === "regular" ? "" : `<span class="badge tier-${clientTier(c)}"><span class="dot"></span>${TIER_LABEL[clientTier(c)]}</span>`);
+// What a member or VIP gets, for the person billing them.
+const perks = (c) => (!c || clientTier(c) === "regular" ? "" : `${TIER_LABEL[clientTier(c)]} client${c.tier_note ? ": " + c.tier_note : ""}`);
 function clients() {
   return (
     heading("Clients", "", button("Add client", "new-client", "", true, "plus")) +
-    `<section class="panel">${S.clients.length ? `<div class="table-wrap"><table class="table-cards"><thead><tr><th>Client</th><th>Contact</th><th>Payment terms</th><th class="num">Outstanding</th></tr></thead><tbody>${paged(S.clients).rows.map((c) => `<tr class="row-link" data-action="open-client" data-id="${c.id}"><td class="card-title"><button class="link-button" data-action="open-client" data-id="${c.id}">${E(c.name)}</button>${kindTag(c)}<small>${E(c.email)}</small></td><td data-label="Contact">${E(clientKind(c) === "individual" ? c.phone || "" : c.contact || "")}</td><td data-label="Terms">${c.terms} days${c.archived ? " " + badge("Archived") : ""}</td><td class="num" data-label="Outstanding">${money(S.documents.filter((d) => d.client_id === c.id && d.kind === "invoice" && d.state === "issued").reduce((s, d) => s + myr(d.balance, d), 0))}</td></tr>`).join("")}</tbody></table></div>${paged(S.clients).nav}` : empty("Your first client starts here", "Add their billing name and contact details.", button("Add client", "new-client", "", true))}</section>`
+    `<section class="panel">${S.clients.length ? `<div class="table-wrap"><table class="table-cards"><thead><tr><th>Client</th><th>Contact</th><th>Payment terms</th><th class="num">Outstanding</th></tr></thead><tbody>${paged(S.clients).rows.map((c) => `<tr class="row-link" data-action="open-client" data-id="${c.id}"><td class="card-title"><button class="link-button" data-action="open-client" data-id="${c.id}">${E(c.name)}</button>${kindTag(c)}${tierBadge(c)}<small>${E(c.email)}</small></td><td data-label="Contact">${E(clientKind(c) === "individual" ? c.phone || "" : c.contact || "")}</td><td data-label="Terms">${c.terms} days${c.archived ? " " + badge("Archived") : ""}</td><td class="num" data-label="Outstanding">${money(S.documents.filter((d) => d.client_id === c.id && d.kind === "invoice" && d.state === "issued").reduce((s, d) => s + myr(d.balance, d), 0))}</td></tr>`).join("")}</tbody></table></div>${paged(S.clients).nav}` : empty("Your first client starts here", "Add their billing name and contact details.", button("Add client", "new-client", "", true))}</section>`
   );
 }
 function clientProfile(id) {
@@ -604,13 +617,13 @@ function clientProfile(id) {
   return (
     heading(
       c.name,
-      KIND_LABEL[clientKind(c)],
+      KIND_LABEL[clientKind(c)] + (clientTier(c) === "regular" ? "" : " · " + TIER_LABEL[clientTier(c)]),
       button("Edit client", "edit-client", c.id) +
         button("Statement", "client-statement", c.id) +
         (more ? `<details class="dropdown"><summary class="btn">More</summary><div class="menu">${more}</div></details>` : "") +
         (c.archived ? "" : button("New invoice", "client-invoice", c.id, true, "plus")),
     ) +
-    `<div class="profile-grid"><section class="panel"><div class="client-avatar">${E(c.name.slice(0, 2).toUpperCase())}</div><h2>${E(c.name)}</h2><dl class="detail"><dt>Client type</dt><dd>${E(KIND_LABEL[clientKind(c)])}</dd>${person ? "" : `<dt>Billing contact</dt><dd>${E(c.contact || "Not provided")}</dd>`}<dt>Email</dt><dd>${E(c.email || "Not provided")}</dd><dt>Phone</dt><dd>${E(c.phone || "Not provided")}</dd><dt>${person ? "Address" : "Billing address"}</dt><dd>${E(c.address || "Not provided")}</dd><dt>Payment terms</dt><dd>${c.terms} days</dd><dt>${person ? "IC or passport / TIN" : "Registration / TIN"}</dt><dd>${E([c.brn, c.tin].filter(Boolean).join(" / ") || "Not provided")}</dd>${slot("clientDetails", c)}</dl></section><section class="panel"><div class="panel-head"><h2>Documents</h2>${badge("MYR")}</div>${invoiceTable(S.documents.filter((d) => d.client_id === c.id))}</section></div>${slot("clientPanels", c)}`
+    `<div class="profile-grid"><section class="panel"><div class="client-avatar">${E(c.name.slice(0, 2).toUpperCase())}</div><h2>${E(c.name)}</h2><dl class="detail"><dt>Client type</dt><dd>${E(KIND_LABEL[clientKind(c)])}</dd>${clientTier(c) === "regular" ? "" : `<dt>Relationship</dt><dd>${tierBadge(c)}${c.tier_note ? ` ${E(c.tier_note)}` : ""}</dd>`}${person ? "" : `<dt>Billing contact</dt><dd>${E(c.contact || "Not provided")}</dd>`}<dt>Email</dt><dd>${E(c.email || "Not provided")}</dd><dt>Phone</dt><dd>${E(c.phone || "Not provided")}</dd><dt>${person ? "Address" : "Billing address"}</dt><dd>${E(c.address || "Not provided")}</dd><dt>Payment terms</dt><dd>${c.terms} days</dd><dt>${person ? "IC or passport / TIN" : "Registration / TIN"}</dt><dd>${E([c.brn, c.tin].filter(Boolean).join(" / ") || "Not provided")}</dd>${slot("clientDetails", c)}</dl></section><section class="panel"><div class="panel-head"><h2>Documents</h2>${badge("MYR")}</div>${invoiceTable(S.documents.filter((d) => d.client_id === c.id))}</section></div>${slot("clientPanels", c)}`
   );
 }
 function services() {
@@ -743,7 +756,7 @@ function paper(d, publicView = false) {
   const buyerTax =
     b.pdfShowBuyerTax === false
       ? ""
-      : [c.brn ? `${t("regIc")}: ${c.brn}` : "", c.tin ? `${t("tin")}: ${c.tin}` : ""].filter(Boolean).join("  |  ");
+      : [c.brn ? `${t("regIc")}: ${documentId(c)}` : "", c.tin ? `${t("tin")}: ${c.tin}` : ""].filter(Boolean).join("  |  ");
   const cell = (i) => {
     const meta = [i.quantity + (i.unit ? " " + i.unit : ""), priced ? "× " + m(i.rate) : "", i.discount ? "− " + m(i.discount) : ""]
       .filter(Boolean)
@@ -1015,7 +1028,7 @@ function clientForm(id) {
     `<label class="kind-option"><input type="radio" name="kind" value="${value}" ${kind === value ? "checked" : ""}><span><strong>${E(label)}</strong><small>${E(hint)}</small></span></label>`;
   showModal(
     id ? "Edit client" : "Add client",
-    `<form data-form="client" data-id="${E(id || "")}" data-client-kind="${kind}" class="client-form"><fieldset class="kind-choice client-kind"><legend>Client type</legend>${CLIENT_KINDS.map(option).join("")}</fieldset><p class="field-hint">Only the name is required. Registration, TIN and SST are used on documents and e-Invoices; add them when you have them.</p><div class="form-grid">${field(by({ company: "Company name", individual: "Full name", government: "Agency or department name", organisation: "Organisation name" }), "name", c.name, "text", true, 'maxlength="160"')}${field(by({ government: "Officer in charge", other: "Contact person" }), "contact", c.contact, "text", false, 'maxlength="120"', "company-only")}${field("Email", "email", c.email, "email", false, 'maxlength="160"')}${field("Phone", "phone", c.phone, "text", false, 'maxlength="60"')}${field(by({ company: "Registration number (SSM)", individual: "IC or passport number", government: "Reference number, if any", organisation: "Registration number (ROS / SSM), if any" }), "brn", c.brn || "", "text", false, 'maxlength="40"')}${field(by({ company: "Tax identification number (TIN)", other: "Tax identification number (TIN), if any" }), "tin", c.tin || "", "text", false, 'maxlength="20"')}${field("SST registration (if any)", "sst_number", c.sst_number || "", "text", false, 'maxlength="40"', "company-only")}<div class="span-2"><label>${by({ individual: "Address", other: "Billing address" })}<textarea name="address" maxlength="600">${E(c.address || "")}</textarea></label></div>${input("Payment terms (days)", "terms", c.terms, "number", true, 'min="0" max="365" step="1"')}${slot("clientFields", c)}</div>${formEnd("Save client")}</form>`,
+    `<form data-form="client" data-id="${E(id || "")}" data-client-kind="${kind}" class="client-form"><fieldset class="kind-choice client-kind"><legend>Client type</legend>${CLIENT_KINDS.map(option).join("")}</fieldset><p class="field-hint">Only the name is required. Registration, TIN and SST are used on documents and e-Invoices; add them when you have them.</p><div class="form-grid">${field(by({ company: "Company name", individual: "Full name", government: "Agency or department name", organisation: "Organisation name" }), "name", c.name, "text", true, 'maxlength="160"')}${field(by({ government: "Officer in charge", other: "Contact person" }), "contact", c.contact, "text", false, 'maxlength="120"', "company-only")}${field("Email", "email", c.email, "email", false, 'maxlength="160"')}${field("Phone", "phone", c.phone, "text", false, 'maxlength="60"')}${field(by({ company: "Registration number (SSM)", individual: "IC or passport number", government: "Reference number, if any", organisation: "Registration number (ROS / SSM), if any" }), "brn", c.brn || "", "text", false, 'maxlength="40"')}${field(by({ company: "Tax identification number (TIN)", other: "Tax identification number (TIN), if any" }), "tin", c.tin || "", "text", false, 'maxlength="20"')}${field("SST registration (if any)", "sst_number", c.sst_number || "", "text", false, 'maxlength="40"', "company-only")}<div class="span-2"><label>${by({ individual: "Address", other: "Billing address" })}<textarea name="address" maxlength="600">${E(c.address || "")}</textarea></label></div>${input("Payment terms (days)", "terms", c.terms, "number", true, 'min="0" max="365" step="1"')}${select("Relationship", "tier", CLIENT_TIERS, clientTier(c))}<div class="span-2">${field("What they get, as a reminder when you bill them (optional)", "tier_note", c.tier_note || "", "text", false, 'maxlength="200" placeholder="e.g. 10% extra discount, 2 pendrives per order"')}</div>${slot("clientFields", c)}</div>${formEnd("Save client")}</form>`,
   );
 }
 function serviceForm(id) {
@@ -1121,7 +1134,7 @@ function documentForm(kind = "invoice", id = "", clientId = "") {
   const tax = priced && sstEnabled();
   showModal(
     revising ? `Edit ${kindUI(kind).one} ${d.number}` : d ? "Edit draft" : "New " + kindUI(kind).one,
-    `<form data-form="editor" data-id="${E(id)}" data-kind="${kind}">${revising ? `<div class="notice info revise-note"><p>This ${E(kindUI(kind).one)} is issued as <strong>${E(d.number)}</strong>. Saving keeps its number, and its PDF and client link show the new version. The client and issue date stay as issued. Each change is kept in the activity history.</p></div>` : ""}<div class="editor-grid ${tax ? "with-tax" : ""} ${priced ? "" : "no-price"}"><div><div class="form-grid"><div class="span-2">${select(kind === "delivery_order" ? "Deliver to" : "Bill to", "client_id", clientOptions(value.client_id), value.client_id)}</div>${input("Issue date", "issue_date", value.issue_date, "date", true)}${input(dueLabelFor(labels("en"), kind), "due_date", value.due_date, "date", true)}</div><div class="line-head"><span>ITEM</span><span>QTY</span>${priced ? '<span class="rate-head">RATE</span>' : ""}${tax ? "<span>SST</span>" : ""}<span></span></div><div id="line-items">${value.items
+    `<form data-form="editor" data-id="${E(id)}" data-kind="${kind}">${revising ? `<div class="notice info revise-note"><p>This ${E(kindUI(kind).one)} is issued as <strong>${E(d.number)}</strong>. Saving keeps its number, and its PDF and client link show the new version. The client and issue date stay as issued. Each change is kept in the activity history.</p></div>` : ""}<div class="editor-grid ${tax ? "with-tax" : ""} ${priced ? "" : "no-price"}"><div><div class="form-grid"><div class="span-2">${select(kind === "delivery_order" ? "Deliver to" : "Bill to", "client_id", clientOptions(value.client_id), value.client_id)}<p class="field-hint client-perks">${E(perks(S.clients.find((c) => c.id === value.client_id)))}</p></div>${input("Issue date", "issue_date", value.issue_date, "date", true)}${input(dueLabelFor(labels("en"), kind), "due_date", value.due_date, "date", true)}</div><div class="line-head"><span>ITEM</span><span>QTY</span>${priced ? '<span class="rate-head">RATE</span>' : ""}${tax ? "<span>SST</span>" : ""}<span></span></div><div id="line-items">${value.items
       .filter((i) => !i.deposit_id)
       .map((i) => lineMarkup(i, kind))
       .join("")}</div>${value.items.some((i) => i.deposit_id) ? `<p class="field-hint">The deposit already invoiced (${E([...new Set(value.items.filter((i) => i.deposit_id).map((i) => i.deposit_number))].join(", "))}) is deducted when you save.</p>` : ""}<div class="actions mt22">${button("Custom item", "add-line", "", "", "plus")}<label class="catalog-picker"><span class="sr-only">Add service from catalog</span><select id="catalog-service"><option value="">Add from catalog...</option>${S.services
@@ -2027,6 +2040,8 @@ document.addEventListener("change", (event) => {
     const form = event.target.form,
       c = S.clients.find((c) => c.id === event.target.value);
     if (c) setDateValue(form.elements.due_date, addDays(dateValue(form.elements.issue_date), c.terms));
+    const hint = form.querySelector(".client-perks");
+    if (hint) hint.textContent = perks(c);
     updatePreview();
   }
 });

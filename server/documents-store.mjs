@@ -30,6 +30,8 @@ import { bindPdf, freezeBusiness } from "./documents-assets.mjs";
 export const LAYOUTS = ["classic", "modern", "compact"];
 // A client is a company, an individual, a government body or another organisation.
 export const CLIENT_KINDS = ["company", "individual", "government", "organisation"];
+// Regular, member or VIP: a reminder of who gets extra care (discount, gifts). Nothing automatic.
+export const CLIENT_TIERS = ["regular", "member", "vip"];
 export const TEMPLATE_DEFAULTS = {
   pdfLayout: "classic",
   pdfAccent: "#087F7E",
@@ -222,6 +224,11 @@ export function attachDocuments(Store) {
           sets.kind = b.kind;
           if (b.kind === "individual") Object.assign(sets, { contact: "", sst_number: "" });
         }
+        if (b.tier !== undefined) {
+          check(CLIENT_TIERS.includes(b.tier), "Choose regular, member or VIP.");
+          sets.tier = b.tier;
+        }
+        if (b.tier_note !== undefined) sets.tier_note = text(b.tier_note || "", 200);
         for (const [key, value] of Object.entries(sets))
           this.db.prepare(`UPDATE clients SET ${key}=? WHERE id=?`).run(value, out.id);
         return Object.keys(sets).length ? this.client(out.id) : out;

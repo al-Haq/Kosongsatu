@@ -88,4 +88,11 @@ export const DOCUMENT_MIGRATIONS = [
     name: "documents-006-client-kind",
     sql: `ALTER TABLE clients ADD COLUMN kind TEXT NOT NULL DEFAULT 'company';`,
   },
+  {
+    // How close the relationship is (regular, member, VIP) and what extra they
+    // get. A reminder for the person issuing documents; nothing is automatic.
+    name: "documents-007-client-tier",
+    sql: `ALTER TABLE clients ADD COLUMN tier TEXT NOT NULL DEFAULT 'regular';
+ALTER TABLE clients ADD COLUMN tier_note TEXT NOT NULL DEFAULT '';`,
+  },
 ];
