@@ -16,7 +16,8 @@ test("a deleted draft comes back with Undo and from Recently deleted", async ({ 
   await expect(page.locator("#toast")).toContainText("Draft saved");
   const url = page.url();
 
-  // Delete, then Undo from the message: the same draft opens again.
+  // Delete (under More), then Undo from the message: the same draft opens again.
+  await page.click(".heading .dropdown summary");
   await page.click('[data-action="delete-draft"]');
   await expect(page.locator("dialog")).toContainText("Recently deleted");
   await page.click('[data-action="confirm-delete-draft"]');
@@ -27,6 +28,7 @@ test("a deleted draft comes back with Undo and from Recently deleted", async ({ 
   await expect(page.locator(".invoice-paper")).toContainText("Router setup");
 
   // Delete again and restore from the Recently deleted page.
+  await page.click(".heading .dropdown summary");
   await page.click('[data-action="delete-draft"]');
   await page.click('[data-action="confirm-delete-draft"]');
   await expect(page.locator("#toast")).toContainText("Draft deleted.");

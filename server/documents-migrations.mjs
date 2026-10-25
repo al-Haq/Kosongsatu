@@ -83,4 +83,9 @@ export const DOCUMENT_MIGRATIONS = [
   PRIMARY KEY(invoice_id,seq)
  );`,
   },
+  {
+    // A client is a company (or other organisation) or an individual person.
+    name: "documents-006-client-kind",
+    sql: `ALTER TABLE clients ADD COLUMN kind TEXT NOT NULL DEFAULT 'company';`,
+  },
 ];

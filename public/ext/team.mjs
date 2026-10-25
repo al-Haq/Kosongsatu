@@ -1,6 +1,7 @@
 // Team and security: users and roles, accountant access, password reset, MFA QR, off-site backups and a verifiable audit chain.
 // Browser module contract: see docs/PLUGINS.md.
 import { OFFER_MFA } from "./features.mjs";
+import { errorHtml } from "./error-tips.mjs";
 export default function teamUI(h) {
   const { E, button, badge, heading, input, select, formEnd, errorBlock, showModal, modal, api, refresh, renderRoute, toast, timeLabel, empty, icon } = h;
   const team = () => h.get()?.ext?.team || {};
@@ -29,7 +30,8 @@ export default function teamUI(h) {
   ]);
   const READ_ACTIONS = new Set(["close-modal", "toggle-nav", "logout", "filter", "page", "reload", "client-statement", "statement-pdf", "mfa-setup", "copy-link"]);
   const READ_PREFIX = /^(open|view|show|download|toggle|filter|team-(verify|copy|forgot))(-|$)/;
-  const OWNER_PAGES = { staff: ["settings", "automation", "team", "audit"], accountant: ["settings", "automation", "team", "deleted"] };
+  // Funding (owner and investor money) is the owner's business; accountants read it.
+  const OWNER_PAGES = { staff: ["settings", "automation", "team", "audit", "funding"], accountant: ["settings", "automation", "team", "deleted"] };
 
   async function copyField(name) {
     const el = modal.querySelector(`[name="${name}"]`);
@@ -321,7 +323,7 @@ export default function teamUI(h) {
             if (what === "remove") await api(`/team/users/${id}`, "DELETE");
             else await api(`/team/users/${id}/${what}`, "POST", {});
           } catch (e) {
-            modal.querySelector(".form-error").textContent = e.message;
+            modal.querySelector(".form-error").innerHTML = errorHtml(e);
             return true;
           }
           await done({ remove: "Invitation removed.", disable: "User disabled and signed out.", enable: "User enabled." }[what]);

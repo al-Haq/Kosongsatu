@@ -1,6 +1,7 @@
 // Payments: online payment providers and keys, DuitNow QR, payment slips,
 // bank statement import with column mapping, and smart bank matching.
 // Browser module contract: see docs/PLUGINS.md.
+import { errorHtml } from "./error-tips.mjs";
 export default function paymentsUI(h) {
   const { get, api, refresh, renderRoute, showModal, modal, toast, E, money, dec, dateLabel, timeLabel, button, badge, input, area, select, formEnd, heading, empty, icon, paged } = h;
   const ext = () => get()?.ext?.payments || {};
@@ -8,9 +9,10 @@ export default function paymentsUI(h) {
   const clientToken = () => location.pathname.match(/^\/client\/([\w-]+)$/)?.[1];
   const level = (c, score) =>
     `<span class="badge ${c === "High" ? "green" : c === "Medium" ? "orange" : ""}"><span class="dot"></span>${E(c)}${score ? " " + score + "%" : ""}</span>`;
+  // msg is text or an Error; an error also says what to try next.
   const formError = (msg) => {
     const el = modal.querySelector(".form-error");
-    if (el) el.textContent = msg;
+    if (el) el.innerHTML = errorHtml(msg);
     else toast(msg, true);
   };
   // Raw upload with the owner's CSRF token (or none on the client page).
@@ -362,7 +364,7 @@ export default function paymentsUI(h) {
           try {
             await preview({ mapping: mappingFrom(form) });
           } catch (e) {
-            formError(e.message);
+            formError(e);
           }
           return true;
         }
@@ -376,7 +378,7 @@ export default function paymentsUI(h) {
             pending.layout = "preset:" + saved.id;
             toast(`Layout "${saved.name}" saved.`);
           } catch (e) {
-            formError(e.message);
+            formError(e);
           }
           return true;
         }

@@ -894,7 +894,8 @@ export function attachBooks(Store) {
       const i = this.booksInputs();
       const s = this.booksSettings();
       const lateness = latePayment({ docs: i.docs, asOf });
-      const forecast = cashForecast({ ...i, lateness, cashBalance: s.cashBalance, cashDate: s.cashDate, asOf });
+      // Owner and investor funding (the funding module) is cash in and out too.
+      const forecast = cashForecast({ ...i, funding: this.fundingCash?.() || [], lateness, cashBalance: s.cashBalance, cashDate: s.cashDate, asOf });
       const health = cashHealth({ forecast, expenses: i.expenses, lateness, asOf });
       return { lateness, forecast, health };
     },

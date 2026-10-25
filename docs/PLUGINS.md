@@ -4,7 +4,7 @@ Kosongsatu's core (documents, finance, banking, sales, automation) lives in `ser
 
 A module can add tables, Store methods, routes, background jobs, Settings keys, PDF blocks and screens without editing core files. Edit a core file only when a feature changes core behaviour, and keep that change small.
 
-Modules: `documents`, `recurring`, `tax`, `payments`, `comms`, `portal`, `books`, `ops`, `team`, `platform`, `setup`, `trash`.
+Modules: `documents`, `recurring`, `tax`, `payments`, `comms`, `portal`, `books`, `funding`, `ops`, `team`, `platform`, `setup`, `trash`.
 
 The owner can turn optional modules off in Settings > Modules (`setup`). To make yours optional, add it to `MODULES` in `public/ext/setup-modules.mjs` with its nav keys, the browser module whose `overview` slot it owns and its Settings section headings. While it is off those are hidden; its routes, jobs and data keep working.
 

@@ -80,7 +80,7 @@ test("the documents rebuild upgrades a populated database without losing anythin
       const done = store.db.prepare("SELECT name FROM schema_migrations WHERE name LIKE 'documents-%' ORDER BY name").all();
       assert.deepEqual(
         done.map((r) => r.name),
-        ["documents-001-kinds", "documents-002-document-fields", "documents-003-catalog-clients", "documents-004-receipt-currency", "documents-005-instalments"],
+        ["documents-001-kinds", "documents-002-document-fields", "documents-003-catalog-clients", "documents-004-receipt-currency", "documents-005-instalments", "documents-006-client-kind"],
       );
       // Every old column and value, in the same rows.
       const after = store.db.prepare(`SELECT ${columns.map((c) => `"${c}"`).join(",")} FROM documents ORDER BY id`).all();
