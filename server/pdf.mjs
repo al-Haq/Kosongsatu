@@ -366,10 +366,15 @@ export function renderPdf(invoice, payment = null, blocks = []) {
           priced && item.tax_rate && !item.deposit_id
             ? `${item.description}\n${t("sst")} ${item.tax_rate}%`
             : item.description;
-        pdf.font(ctx.font("Body", description)).fontSize(L.body);
+        // Measured exactly as drawn (same font, size, width and line gap), for
+        // the tallest cell: a long description never runs past the row's line.
+        const tall = (value, size, width) => {
+          pdf.font(ctx.font("Body", value)).fontSize(size);
+          return pdf.heightOfString(String(value || ""), { width, lineGap: 3 });
+        };
         const height = Math.max(
           L.rowMin,
-          pdf.heightOfString(description, { width: desc.w }) + L.rowPad,
+          ...cols.map((c) => (c.key === "description" ? tall(description, L.body, c.w) : tall(cell(item, c.key), L.small, c.w)) + L.rowPad),
         );
         if (y + height > 735) {
           newPage();

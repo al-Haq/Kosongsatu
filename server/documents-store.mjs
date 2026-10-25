@@ -746,10 +746,12 @@ export function attachDocuments(Store) {
       this.audit("settings.logo.changed", null, "Logo removed", { logoFileId: s.logoFileId || null }, { logoFileId: null });
     },
     // Logo bytes for a document's business snapshot. A frozen snapshot (issued
-    // document, receipt) shows only the logo it was issued with, possibly none;
-    // drafts and live settings fall back to the current logo.
+    // document, receipt) keeps the logo it was issued with. One issued before
+    // the business had a logo showed only the Nawlogic placeholder: it takes
+    // the business's logo once uploaded. Drafts and live settings use the
+    // current logo.
     logoFor(business) {
-      const ids = business?.frozen ? [business.logoFileId] : [business?.logoFileId, this.settings().logoFileId];
+      const ids = business?.frozen && business.logoFileId ? [business.logoFileId] : [business?.logoFileId, this.settings().logoFileId];
       for (const fid of ids) {
         if (!fid) continue;
         const f = this.db.prepare("SELECT mime,data FROM files WHERE id=? AND purpose='logo'").get(fid);

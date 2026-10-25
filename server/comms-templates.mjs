@@ -492,8 +492,10 @@ export function emailHtml({ text, company = "", lang = "en", button = null, pixe
     button && /^https?:\/\//.test(button.url)
       ? `<p style="margin:6px 0 20px"><a href="${esc(button.url)}" style="display:inline-block;background:#087f7e;color:#ffffff;text-decoration:none;font-weight:bold;padding:11px 18px;border-radius:8px">${esc(button.label)}</a></p>`
       : "";
-  const head = logo
-    ? `<img src="${esc(logo)}" alt="${esc(company)}" width="150" style="display:block;border:0;max-width:150px;height:auto">`
+  // logo: a URL, or { src, width, height } sized to fit (see Mailer.emailLogo).
+  const pic = typeof logo === "string" ? { src: logo, width: 150, height: null } : logo;
+  const head = pic?.src
+    ? `<img src="${esc(pic.src)}" alt="${esc(company)}" width="${pic.width}"${pic.height ? ` height="${pic.height}"` : ""} style="display:block;border:0;width:${pic.width}px;${pic.height ? `height:${pic.height}px` : "height:auto"};max-width:150px">`
     : `<strong style="font-size:16px;color:#0f172a">${esc(company)}</strong>`;
   return `<!doctype html><html lang="${lang === "ms" ? "ms" : "en"}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(company)}</title></head><body style="margin:0;padding:0;background:#f4f7fa"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f7fa"><tr><td align="center" style="padding:24px 12px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;background:#ffffff;border-radius:12px;border-top:4px solid #0ea5a4"><tr><td style="padding:22px 28px 6px">${head}</td></tr><tr><td style="padding:14px 28px 10px;font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#0f172a">${paragraphs}${cta}</td></tr><tr><td style="padding:12px 28px 22px;font-family:Arial,Helvetica,sans-serif;font-size:11px;color:#64748b;border-top:1px solid #e2e8f0">${esc(words(lang).footer.replace("{company}", company))}</td></tr></table></td></tr></table>${pixel ? `<img src="${esc(pixel)}" width="1" height="1" alt="" style="display:block;border:0;width:1px;height:1px">` : ""}</body></html>`;
 }

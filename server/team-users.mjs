@@ -178,11 +178,21 @@ export function attachUsers(Store) {
       const next = {
         role: b.role === undefined ? u.role : role(b.role),
         name: b.name === undefined ? u.name : text(b.name, 120),
+        email: b.email === undefined ? u.email : normalEmail(b.email),
       };
+      if (next.email !== u.email)
+        check(!this.db.prepare("SELECT id FROM owners WHERE email=? AND id<>?").get(next.email, u.id), "A user with this email already exists.", 409);
       if (u.role === "owner" && next.role !== "owner" && !u.disabled && (!u.invited || u.joined))
         check(this.activeOwners() > 1, "The workspace needs at least one owner. Make someone else an owner first.", 409);
       return this.tx(() => {
-        this.db.prepare("UPDATE owners SET role=?,name=? WHERE id=?").run(next.role, next.name, u.id);
+        this.db.prepare("UPDATE owners SET role=?,name=?,email=? WHERE id=?").run(next.role, next.name, next.email, u.id);
+        // The sign-in email changes; the password, MFA and sessions stay. Open
+        // invitation and password-reset links went to the old address: they stop
+        // working, and a new one goes to the new address.
+        if (next.email !== u.email) {
+          this.db.prepare("DELETE FROM team_tokens WHERE owner_id=? AND used IS NULL").run(u.id);
+          this.audit("user.email_changed", String(u.id), `${u.email} → ${next.email}`, { email: u.email }, { email: next.email });
+        }
         if (next.role !== u.role)
           this.audit("user.role_changed", String(u.id), `${u.email}: ${u.role} → ${next.role}`, { role: u.role }, { role: next.role });
         if (next.name !== u.name) this.audit("user.renamed", String(u.id), u.email, { name: u.name }, { name: next.name });

@@ -1,3 +1,4 @@
+import { imageSize, fitBox } from "./pdf-logo.mjs";
 import nodemailer from "nodemailer";
 import { chmodSync } from "node:fs";
 import { randomBytes } from "node:crypto";
@@ -144,6 +145,25 @@ const SMTP_REASONS = {
   ETLS: "A secure connection to the mail server could not be made.",
 };
 export class Mailer {
+  // The logo at the top of emails: the business's own once uploaded (served
+  // publicly by the setup module, and only while set), otherwise Nawlogic's.
+  logoPath() {
+    try {
+      const own = this.store.branding?.().logo;
+      if (own) return own;
+    } catch {}
+    return "/assets/nawlogic-logo.png";
+  }
+  // With its exact display size, worked out from the image: email programs
+  // ignore CSS limits, so a tall or wide logo still fits 150 x 60.
+  emailLogo() {
+    const src = `${this.appUrl}${this.logoPath()}`;
+    let size = { width: 400, height: 106 };
+    try {
+      if (!src.endsWith("/assets/nawlogic-logo.png")) size = imageSize(this.store.brandLogo?.()?.data) || size;
+    } catch {}
+    return { src, ...fitBox(size, 150, 60) };
+  }
   constructor(store, { config, transport, createTransport } = {}) {
     this.store = store;
     // An explicit config (tests, embedding) is fixed; otherwise it is read on each use.
@@ -306,7 +326,7 @@ export class Mailer {
                 lang: language,
                 button,
                 pixel: pixel ? `${this.appUrl}/api/guest/comms/open/${pixel}.gif` : null,
-                logo: this.appUrl?.startsWith("https://") ? `${this.appUrl}/assets/nawlogic-logo.png` : null,
+                logo: this.appUrl?.startsWith("https://") ? this.emailLogo() : null,
               }),
         attachments,
         messageId,

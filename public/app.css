@@ -1166,6 +1166,30 @@ dialog.wide {
 .invoice-paper {
   padding: 33px;
 }
+/* A business logo of any shape (wide, tall or square) fits its box: never
+   stretched, never cropped, never larger than its space. */
+.logo.brand-logo {
+  width: auto;
+  height: auto;
+  max-width: 153px;
+  max-height: 64px;
+  object-fit: contain;
+  object-position: left center;
+}
+.invoice-paper .logo.brand-logo {
+  max-width: 170px;
+  max-height: 64px;
+  margin-left: 0;
+}
+.preview .logo.brand-logo,
+.preview-paper .logo.brand-logo {
+  max-width: 116px;
+  max-height: 44px;
+}
+.panel > .logo.brand-logo {
+  max-width: 160px;
+  max-height: 64px;
+}
 .invoice-paper .logo {
   width: 155px;
   margin-left: -4px;

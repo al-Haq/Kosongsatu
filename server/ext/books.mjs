@@ -6,6 +6,10 @@ import { FORM_LINES } from "../books-calc.mjs";
 import { scanConfig, readReceipt } from "../books-scan.mjs";
 import { TARGETS, buildExport, exportClientIds, toCsv, dec, csvCell } from "../books-export.mjs";
 import { renderReportPdf, renderPurchaseOrderPdf, dateLabel } from "../books-pdf.mjs";
+import { businessLogo, snapshotLogo } from "../pdf-logo.mjs";
+
+// A draft purchase order follows the current logo; an issued one keeps the logo it was issued with.
+const poLogo = (store, p) => (p.state === "draft" ? businessLogo(store) : snapshotLogo(store, p.business));
 
 const ID = "([\\w-]{1,80})";
 const route = (r, method, pattern) => {
@@ -239,7 +243,7 @@ export default {
       if ((m = route(r, "PUT", `/pos/${ID}`))) return r.send(200, store.savePo(await r.body(), m[1])), true;
       if ((m = route(r, "GET", `/pos/${ID}/pdf`))) {
         const p = store.po(m[1]);
-        return pdfResponse(r, await renderPurchaseOrderPdf(p), `${p.number || "PO-DRAFT"}.pdf`), true;
+        return pdfResponse(r, await renderPurchaseOrderPdf(p, poLogo(store, p)), `${p.number || "PO-DRAFT"}.pdf`), true;
       }
       if ((m = route(r, "POST", `/pos/${ID}/(issue|receive|cancel|bill|email)`))) {
         const [, pid, action] = m;
@@ -275,7 +279,7 @@ export default {
           cc,
           subject,
           body,
-          attachments: [{ filename: `${p.number}.pdf`, content: await renderPurchaseOrderPdf(p), contentType: "application/pdf" }],
+          attachments: [{ filename: `${p.number}.pdf`, content: await renderPurchaseOrderPdf(p, poLogo(store, p)), contentType: "application/pdf" }],
           dedupeKey: `books-po:${pid}:${key}`,
         });
         if (sent) {
@@ -333,7 +337,7 @@ export default {
           },
         });
         sections.push({ text: "Accrual: issued invoices by issue date, credit and debit notes by note date, expenses by expense date and supplier bills by bill date. Cash: money received less refunds, and expenses and bill payments by the date they were paid. Amounts in other currencies are converted with each document's exchange rate." });
-        const pdf = await renderReportPdf({ title: "Profit and loss", subtitle: `${dateLabel(p.from)} – ${dateLabel(p.to)}`, business: store.settings(), sections, footerText: "Management report. Not audited accounts." });
+        const pdf = await renderReportPdf({ title: "Profit and loss", subtitle: `${dateLabel(p.from)} – ${dateLabel(p.to)}`, business: store.settings(), sections, footerText: "Management report. Not audited accounts.", logo: businessLogo(store) });
         return pdfResponse(r, pdf, `profit-and-loss-${p.from}-${p.to}.pdf`), true;
       }
       if ((m = route(r, "GET", "/reports/tax(\\.csv|\\.pdf)?"))) {
@@ -350,6 +354,7 @@ export default {
           title: "Income tax summary",
           subtitle: `Year of assessment ${t.year} (1 Jan – 31 Dec)`,
           business: store.settings(),
+          logo: businessLogo(store),
           footerText: "Working aid only. Check with your tax agent.",
           sections: [
             { notice: TAX_AID },

@@ -42,6 +42,7 @@ import {
 } from "../tax-myinvois.mjs";
 import { certificateInfo } from "../tax-ubl.mjs";
 import { renderSelfBilledPdf, renderSst02Pdf } from "../tax-pdf.mjs";
+import { businessLogo } from "../pdf-logo.mjs";
 
 const MIGRATIONS = [
   {
@@ -572,7 +573,7 @@ export default {
         const name = `sst02-${ws.period.from}-${ws.period.to}`;
         if (path.endsWith(".pdf"))
           return (
-            r.send(200, await renderSst02Pdf(ws), {
+            r.send(200, await renderSst02Pdf(ws, businessLogo(store)), {
               "Content-Type": "application/pdf",
               "Content-Disposition": `attachment; filename="${name}.pdf"`,
             }),
@@ -714,7 +715,7 @@ export default {
         check(sb, "Self-billed document not found.", 404);
         const e = einvoiceView(einv.latest("selfbilled", sb.id));
         return (
-          r.send(200, await renderSelfBilledPdf(sb, store.settings(), e), {
+          r.send(200, await renderSelfBilledPdf(sb, store.settings(), e, businessLogo(store)), {
             "Content-Type": "application/pdf",
             "Content-Disposition": `attachment; filename="${sb.number}.pdf"`,
           }),

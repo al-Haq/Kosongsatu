@@ -109,7 +109,7 @@ export default function teamUI(h) {
     if (!u) return;
     showModal(
       "Edit " + (u.name || u.email),
-      `<form data-form="team-edit" data-id="${E(id)}"><p>${E(u.email)}</p>${input("Name", "name", u.name, "text", false, 'maxlength="120"')}${select("Role", "role", roleOptions(), u.role)}<p class="field-hint">A new role applies to their next request; they do not need to sign in again.</p>${formEnd("Save")}</form>`,
+      `<form data-form="team-edit" data-id="${E(id)}">${input("Sign-in email", "email", u.email, "email", true, 'maxlength="160" autocomplete="off"')}${input("Name", "name", u.name, "text", false, 'maxlength="120"')}${select("Role", "role", roleOptions(), u.role)}<p class="field-hint">A new role applies to their next request; they do not need to sign in again.</p>${formEnd("Save")}</form>`,
     );
   }
 
@@ -196,13 +196,15 @@ export default function teamUI(h) {
 
   // ---- Password reset and invitations (no sign-in) ---------------------------
   function guestShell(title, sub, body) {
-    return `<div class="login-screen"><section class="login-brand"><span class="eyebrow">NAWLOGIC / BILLING WORKSPACE</span><h1>${E(title)}</h1><p>${E(sub)}</p></section><section class="login-form"><div class="login-inner"><img class="logo" src="/assets/nawlogic-logo.png" alt="Nawlogic">${body}</div></section></div>`;
+    return `<div class="login-screen"><section class="login-brand"><span class="eyebrow">NAWLOGIC / BILLING WORKSPACE</span><h1>${E(title)}</h1><p>${E(sub)}</p></section><section class="login-form"><div class="login-inner">${h.brandMark ? h.brandMark() : '<img class="logo" src="/assets/nawlogic-logo.png" alt="Nawlogic">'}${body}</div></section></div>`;
   }
   async function guestPage(location) {
     const m = location.pathname.match(/^\/(invite|reset)\/([\w-]{1,100})$/);
     if (!m) return false;
     const [, kind, token] = m;
     const app = document.querySelector("#app");
+    // The business's own logo and name on these signed-out pages.
+    await h.loadBrand?.();
     let info;
     try {
       info = await api(`/guest/team/${kind}/${token}`);
@@ -422,7 +424,7 @@ export default function teamUI(h) {
         const r = await api(`/guest/team/${kind}/${id}`, "POST", kind === "invite" ? { password: b.password, name: b.name } : { password: b.password });
         history.replaceState(null, "", "/");
         document.querySelector(".login-inner").innerHTML =
-          `<img class="logo" src="/assets/nawlogic-logo.png" alt="Nawlogic"><h2>${kind === "invite" ? "Your account is ready." : "Password changed."}</h2><p>${kind === "invite" ? `Sign in as ${E(r.email)} with your new password.` : `You were signed out everywhere. Sign in as ${E(r.email)} with the new password${r.mfa ? " and your authenticator code" : ""}.`}</p><a class="btn primary" href="/">Go to sign in ${icon("arrow")}</a>`;
+          `${h.brandMark ? h.brandMark() : '<img class="logo" src="/assets/nawlogic-logo.png" alt="Nawlogic">'}<h2>${kind === "invite" ? "Your account is ready." : "Password changed."}</h2><p>${kind === "invite" ? `Sign in as ${E(r.email)} with your new password.` : `You were signed out everywhere. Sign in as ${E(r.email)} with the new password${r.mfa ? " and your authenticator code" : ""}.`}</p><a class="btn primary" href="/">Go to sign in ${icon("arrow")}</a>`;
         return true;
       }
       if (type === "team-invite") {
@@ -433,8 +435,10 @@ export default function teamUI(h) {
         return true;
       }
       if (type === "team-edit") {
-        await api(`/team/users/${id}`, "PUT", { name: b.name, role: b.role });
-        await done("User updated.");
+        const before = (team().users || []).find((x) => String(x.id) === String(id));
+        await api(`/team/users/${id}`, "PUT", { email: b.email, name: b.name, role: b.role });
+        // Open invitation links went to the old address and no longer work.
+        await done(before?.status === "Invited" && before.email !== String(b.email).trim().toLowerCase() ? "User updated. Send the invitation again to the new address." : "User updated.");
         return true;
       }
       if (type === "team-reset-mfa") {

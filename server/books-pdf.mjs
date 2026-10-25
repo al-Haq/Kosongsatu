@@ -1,10 +1,9 @@
 // Branded PDFs for books: report tables (profit and loss, tax summary) and
 // purchase orders. Same fonts and look as statements.
 import PDFDocument from "pdfkit";
-import { fileURLToPath } from "node:url";
 import { currency } from "./domain.mjs";
 import { registerTextFonts, textFont } from "./documents-fonts.mjs";
-const logo = fileURLToPath(new URL("../public/assets/nawlogic-logo.png", import.meta.url));
+import { drawLogoImage } from "./pdf-logo.mjs";
 const ink = "#0F172A",
   muted = "#64748B",
   teal = "#087F7E",
@@ -36,9 +35,9 @@ function footer(pdf, put, text) {
   }
 }
 // sections: [{ heading, text, notice, table: { columns: [{ label, width, align }], rows: [{ cells, bold, rule }] } }]
-export async function renderReportPdf({ title, subtitle, business, sections, footerText }) {
+export async function renderReportPdf({ title, subtitle, business, sections, footerText, logo = null }) {
   const { pdf, done, put, rule } = start(title, business?.company);
-  pdf.image(logo, 37, 32, { width: 150 });
+  drawLogoImage(pdf, logo, 37, 32, 150);
   put(title.toUpperCase(), 300, 46, 13, "Bold", teal, 253, "right");
   put(subtitle || "", 300, 66, 9, "Body", muted, 253, "right");
   put([business?.company, business?.registration ? `Reg: ${business.registration}` : "", business?.tin ? `TIN: ${business.tin}` : ""].filter(Boolean).join("\n"), 42, 92, 8, "Body", muted, 300);
@@ -106,12 +105,12 @@ export async function renderReportPdf({ title, subtitle, business, sections, foo
   pdf.end();
   return done;
 }
-export async function renderPurchaseOrderPdf(po) {
+export async function renderPurchaseOrderPdf(po, logo = null) {
   const draft = po.state === "draft";
   const { pdf, done, put, rule } = start(`Purchase order ${po.number || "DRAFT"}`, po.business?.company);
   const b = po.business || {},
     v = po.vendor || {};
-  pdf.image(logo, 37, 32, { width: 160 });
+  drawLogoImage(pdf, logo, 37, 32, 160);
   put("PURCHASE ORDER", 320, 48, 16, "Bold", ink, 233, "right");
   put(po.number || "DRAFT - NOT ISSUED", 320, 74, 10, "Body", draft ? red : muted, 233, "right");
   put(b.company || "", 42, 110, 11, "Bold");

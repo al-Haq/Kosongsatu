@@ -5,6 +5,8 @@
 //   node server/cli.mjs fetch-backup <file> <out>    download one off-site copy
 //   node server/cli.mjs add-user <email> [owner|staff|accountant] [name]
 //                                                    add an active user with a generated password
+//   node server/cli.mjs set-email <current email> <new email>
+//                                                    change a user's sign-in email
 import { DatabaseSync } from "node:sqlite";
 import { randomBytes } from "node:crypto";
 import { existsSync } from "node:fs";
@@ -55,6 +57,23 @@ export async function runTeamCli(mode, args) {
 }
 
 async function run(mode, args) {
+  if (mode === "set-email") {
+    const [from, to] = args;
+    if (!from || !to) throw new Error("Use: node server/cli.mjs set-email <current email> <new email>");
+    if (!existsSync(databasePath())) throw new Error(`Database not found at ${databasePath()}. Set DATABASE_PATH.`);
+    const { openDatabase } = await import("./db.mjs");
+    const { requestContext } = await import("./context.mjs");
+    const store = openDatabase(databasePath());
+    try {
+      const u = store.db.prepare("SELECT id FROM owners WHERE email=?").get(String(from).trim().toLowerCase());
+      if (!u) throw new Error("No user with that email. No changes made.");
+      const out = requestContext.run({ actor: "local-console" }, () => store.updateUser(u.id, { email: to }, null));
+      console.log(`Sign-in email changed to ${out.email}. The password, MFA and role are unchanged.`);
+      return 0;
+    } finally {
+      store.db.close();
+    }
+  }
   if (mode === "add-user") {
     const [email, role = "staff", ...name] = args;
     if (!email) throw new Error("Use: node server/cli.mjs add-user <email> [owner|staff|accountant] [name]");
