@@ -71,12 +71,15 @@ export function attachFinance(Store) {
                 terms: d.terms,
               }
             : null;
-        const before = idv ? pick(this.document(idv)) : null;
+        const prev = idv ? this.document(idv) : null;
+        const before = pick(prev);
         const out = originalDraft.call(this, b, idv);
+        // An issued quotation edited after issue (reviseQuote) is told apart from draft saves.
+        const revised = prev && prev.state !== "draft";
         this.audit(
-          "draft.changed",
+          revised ? "document.revised" : "draft.changed",
           out.id,
-          "Draft content changes",
+          revised ? `${prev.number} edited after issue` : "Draft content changes",
           before,
           pick(out),
         );

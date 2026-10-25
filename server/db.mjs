@@ -33,6 +33,7 @@ import {
   CURRENCIES,
   LANGUAGES,
   DEDUCTIONS,
+  REVISE,
   LINK,
   META,
   prefixFor,
@@ -145,7 +146,7 @@ export class Store {
       bankHolder: 180,
       sstNumber: 40,
       tin: 20,
-      paymentTerms: 1000,
+      paymentTerms: 4000,
       invoicePrefix: 12,
       quotePrefix: 12,
     })) {
@@ -295,7 +296,7 @@ export class Store {
       .prepare("SELECT * FROM documents WHERE id=?")
       .get(idv);
     check(
-      !existing || existing.state === "draft",
+      !existing || existing.state === "draft" || (b[REVISE] && existing.kind === "quote" && existing.state === "issued"),
       "Issued documents are locked. Void and replace if appropriate.",
       409,
     );
@@ -309,8 +310,10 @@ export class Store {
       kind,
       deductions: b[DEDUCTIONS] || [],
     });
+    // An issued quotation being edited keeps the SST registration it was issued under.
+    const issuedSst = b[REVISE] && existing?.business_snapshot ? JSON.parse(existing.business_snapshot).sstNumber : "";
     check(
-      !amounts.items.some((i) => i.tax > 0) || this.settings().sstNumber,
+      !amounts.items.some((i) => i.tax > 0) || this.settings().sstNumber || issuedSst,
       "Add your SST registration number in Settings before charging SST.",
     );
     // Amounts are minor units of the document currency; fx_rate converts them to MYR.
@@ -331,7 +334,8 @@ export class Store {
       tax: amounts.tax,
       total: amounts.total,
       notes: text(b.notes || "", 2000),
-      terms: text(b.terms ?? this.settings().paymentTerms, 1000),
+      // Terms and conditions can be long (quotations); the PDF carries them over pages.
+      terms: text(b.terms ?? this.settings().paymentTerms, 4000),
       currency,
       fx_rate:
         currency === "MYR" ? "1" : fxRate(b.fx_rate ?? existing?.fx_rate),
@@ -350,6 +354,31 @@ export class Store {
       .run(d);
     this.audit("document.draft.saved", idv);
     return this.document(idv);
+  }
+  // An issued quotation can still be edited until the client accepts or
+  // declines it. It keeps its number, client, issue date and currency (the
+  // client details were frozen when it was issued); lines, discount, validity,
+  // terms and notes can change. Each edit is audited with what changed.
+  reviseQuote(idv, b) {
+    return this.tx(() => {
+      const e = this.db.prepare("SELECT * FROM documents WHERE id=?").get(idv);
+      check(e, "Document not found.", 404);
+      check(e.kind === "quote", "Issued documents are locked. Void and replace if appropriate.", 409);
+      check(
+        e.state === "issued",
+        e.state === "accepted"
+          ? "An accepted quotation can't be edited. Duplicate it to make a new version."
+          : e.state === "draft"
+            ? "This quotation is still a draft."
+            : "This quotation can no longer be edited.",
+        409,
+      );
+      check(b && typeof b === "object", "Invalid document.");
+      return this.saveDocument(
+        { ...b, client_id: e.client_id, issue_date: e.issue_date, currency: e.currency, fx_rate: e.fx_rate, [REVISE]: true },
+        idv,
+      );
+    });
   }
   issue(idv) {
     return this.tx(() => {

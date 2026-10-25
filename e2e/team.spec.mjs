@@ -2,7 +2,7 @@ import { test, expect } from "@playwright/test";
 import { signIn, watchErrors, unique, createClient } from "./helpers.mjs";
 
 // Buttons the server would refuse for a role are not shown to that role.
-test("staff and accountants do not see Reverse on a recorded payment", async ({ page, context }) => {
+test("staff and accountants do not see Reverse on a recorded payment, nor the activity", async ({ page, context }) => {
   const errors = watchErrors(page);
   await signIn(page);
   const client = unique("E2E Roles Client");
@@ -29,6 +29,8 @@ test("staff and accountants do not see Reverse on a recorded payment", async ({ 
   const docUrl = page.url();
   const history = (p) => p.locator(".payment", { hasText: "E2E-ROLES-1" });
   await expect(history(page).locator('[data-action="reverse-payment"]')).toBeVisible();
+  // The owner sees the document's activity (who changed what).
+  await expect(page.locator(".activity-panel")).toBeVisible();
 
   // Invite a staff member and let them set a password.
   const email = `staff-${Date.now().toString(36)}@example.com`;
@@ -62,6 +64,7 @@ test("staff and accountants do not see Reverse on a recorded payment", async ({ 
   await staff.goto(docUrl);
   await expect(history(staff).locator('a[href$="/receipt"]')).toBeVisible();
   await expect(staff.locator('[data-action="reverse-payment"]')).toHaveCount(0);
+  await expect(staff.locator(".activity-panel")).toHaveCount(0);
 
   // The same person as a read-only accountant.
   await page.goto("/#/team");
@@ -73,6 +76,7 @@ test("staff and accountants do not see Reverse on a recorded payment", async ({ 
   await expect(staff.locator(".topbar")).toContainText("Accountant");
   await expect(history(staff).locator('a[href$="/receipt"]')).toBeVisible();
   await expect(staff.locator('[data-action="reverse-payment"]')).toHaveCount(0);
+  await expect(staff.locator(".activity-panel")).toHaveCount(0);
 
   await staffContext.close();
   expect(staffErrors).toEqual([]);

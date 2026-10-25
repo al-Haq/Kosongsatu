@@ -23,6 +23,7 @@ import {
 import { renderPdf, renderReceiptPdf, renderAdjustmentPdf } from "./pdf.mjs";
 import { requestContext } from "./context.mjs";
 import { BackupManager } from "./recovery.mjs";
+import { quoteRevision, checkRevision } from "./portal-sign.mjs";
 import {
   mfaStatus,
   beginMfa,
@@ -97,6 +98,8 @@ export function safeDoc(d) {
     // as do the owner's module choices and setup checklist (server/ext/setup.mjs).
     business: { ...d.business, customFields: undefined, modules: undefined, setup: undefined },
     accepted_name: d.accepted_name,
+    // Sent back when accepting, so a quotation edited meanwhile is not accepted unseen.
+    revision: d.kind === "quote" ? quoteRevision(d) : undefined,
     proofs: d.proofs.map((p) => ({
       reference: p.reference,
       status: p.status,
@@ -457,7 +460,16 @@ export function createApp({
           if (method === "POST" && action === "accept") {
             allow("submit:" + ipOf(req), 12, 60000);
             const b = await body();
-            return send(200, safeDoc(store.accept(token, b.name)));
+            // Accepts only the version the client was shown (see quoteRevision).
+            return send(
+              200,
+              safeDoc(
+                store.tx(() => {
+                  checkRevision(store.publicDocument(token), b.revision);
+                  return store.accept(token, b.name);
+                }),
+              ),
+            );
           }
           if (method === "POST" && action === "payment-reference") {
             allow("submit:" + ipOf(req), 12, 60000);
@@ -638,10 +650,14 @@ export function createApp({
               await assistant.run(session.owner_id, await body()),
             );
           }
+          // Who changed what (the audit history) is for the owner only: staff and
+          // accountants get no entries. Without the team module everyone is the owner.
+          const ownerView = !session.role || session.role === "owner";
           // Every module reads the documents: they are worked out once per load.
           if (path === "/api/workspace" && method === "GET")
             return send(200, await store.cachedReads(async () => ({
               ...store.workspace(),
+              ...(ownerView ? {} : { audit: [] }),
               finance: store.finance(),
               security: mfaStatus(store, session.owner_id),
               backupStatus: backups.status(),
@@ -692,9 +708,7 @@ export function createApp({
                     PLUGINS.filter((p) => p.exportData).map(async (p) => [p.name, await p.exportData(store)]),
                   ),
                 ),
-                audit: store.db
-                  .prepare("SELECT * FROM audit ORDER BY id")
-                  .all(),
+                audit: ownerView ? store.db.prepare("SELECT * FROM audit ORDER BY id").all() : [],
               },
               {
                 "Content-Disposition":
@@ -1066,8 +1080,12 @@ export function createApp({
             const [, idv, action] = doc;
             if (method === "GET" && !action)
               return send(200, store.document(idv));
-            if (method === "PUT" && !action)
-              return send(200, store.saveDocument(await body(), idv));
+            if (method === "PUT" && !action) {
+              const b = await body();
+              // An issued quotation can still be edited until it is accepted.
+              const cur = store.db.prepare("SELECT kind,state FROM documents WHERE id=?").get(idv);
+              return send(200, cur?.kind === "quote" && cur.state !== "draft" ? store.reviseQuote(idv, b) : store.saveDocument(b, idv));
+            }
             if (method === "GET" && action === "pdf") {
               const d = store.document(idv);
               return send(200, await renderPdf(d, null, await store.pdfBlocks(d)), {

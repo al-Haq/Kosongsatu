@@ -161,6 +161,7 @@ export function renderPdf(invoice, payment = null, blocks = []) {
     const room = (h) => {
       if (y + h > 755) newPage();
     };
+    // The title and number sit against the right margin, across from the logo.
     const title = payment ? titleFor(ctx.language, "receipt") : titleFor(ctx.language, kind);
     // Long translated titles shrink to fit on one line.
     const fit = (value, size) => {
@@ -175,18 +176,18 @@ export function renderPdf(invoice, payment = null, blocks = []) {
       pdf.rect(0, 0, 595.28, 104).fill(teal);
       pdf.roundedRect(34, 24, 186, 58, 7).fill("#FFFFFF");
       drawLogo(pdf, ctx, 40, 30, 165, 46);
-      line(title, 337, 36, fit(title, L.title), "Bold", "#FFFFFF", 216);
-      line(subtitle, 337, 66, 10, "Body", "#FFFFFF", 216);
+      line(title, 337, 36, fit(title, L.title), "Bold", "#FFFFFF", 216, "right");
+      line(subtitle, 337, 66, 10, "Body", "#FFFFFF", 216, "right");
       y = 124;
     } else if (T.pdfLayout === "compact") {
       drawLogo(pdf, ctx, 37, 30, 130, 40);
-      line(title, 337, 38, fit(title, L.title), "Bold", teal, 216);
-      line(subtitle, 337, 60, 9, "Body", muted, 216);
+      line(title, 337, 38, fit(title, L.title), "Bold", teal, 216, "right");
+      line(subtitle, 337, 60, 9, "Body", muted, 216, "right");
       y = 88;
     } else {
       drawLogo(pdf, ctx, 37, 32, 165, 60);
-      line(title, 337, 49, fit(title, L.title), "Bold", ink, 216);
-      line(subtitle, 337, 79, 10, "Body", muted, 216);
+      line(title, 337, 49, fit(title, L.title), "Bold", ink, 216, "right");
+      line(subtitle, 337, 79, 10, "Body", muted, 216, "right");
       y = 114;
     }
     line(invoice.business.company, 42, y, L.body + 2, "Bold");

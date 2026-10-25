@@ -908,6 +908,16 @@ textarea {
 .date-pick:hover {
   background: var(--soft);
 }
+.date-pick[hidden] {
+  display: none;
+}
+/* The client, issue date and currency of an issued quotation being edited. */
+form[data-form="editor"] select:disabled,
+form[data-form="editor"] input[readonly] {
+  background: var(--soft);
+  color: var(--muted);
+  cursor: not-allowed;
+}
 .date-pick svg {
   width: 16px;
   height: 16px;
@@ -1062,6 +1072,17 @@ dialog.wide {
   font-size: 9px;
   font-weight: 700;
   color: var(--muted);
+}
+/* What each save changed, in the owner's Activity panel. */
+.change-list {
+  margin: 4px 0 0;
+  padding-left: 16px;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+.change-list li {
+  overflow-wrap: anywhere;
 }
 /* Items used before, listed under a line's title while typing. */
 .line-suggest {
@@ -1368,6 +1389,10 @@ dialog.wide {
 }
 .paper-head h2 {
   font-size: 22px;
+}
+/* The title and number sit against the right edge, like the PDF. */
+.paper-head > div:last-child {
+  text-align: right;
 }
 .paper-company {
   max-width: 340px;

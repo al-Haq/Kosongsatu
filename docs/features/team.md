@@ -10,7 +10,7 @@ The person who ran `npm run setup` is the first **owner**. Open **Team** (Worksp
 |---|---|---|
 | **Owner** | Everything. | Remove, demote or disable the last active owner. |
 | **Staff** | Day-to-day billing: clients and services (add, edit, archive), drafts (create, edit, delete), issue, client links, email documents and statements, record payments and receipts, allocate receipts, bank import and matching, recurring schedules, sales and customer POs, upload files. | Settings, integration keys, users, connectors, AI assistant and automation, backups, voids, credit/debit notes, refunds, payment reversals, deleting clients/services/schedules, the JSON export, other people's MFA. |
-| **Accountant** | Read-only: see everything, download PDFs, invoice and SST CSVs, the JSON business export and statements; verify the audit chain. | Any change, except their own password and authenticator. |
+| **Accountant** | Read-only: see documents, payments and reports, download PDFs, invoice and SST CSVs, the JSON business export and statements; verify the audit chain. | Any change, except their own password and authenticator. The activity history (who changed what). |
 
 - **Invite:** Team → **Invite user** → email, name, role. With email configured, the invitation is emailed; you can also copy the link. Without email, copy the one-time link and send it yourself (WhatsApp, etc.). The link lets them choose a password, works once and expires after 7 days. **Send again** replaces the link; **Remove** cancels a pending invitation.
 - **Change role / name:** **Edit**. A new role applies to the person's next click; they don't need to sign in again.
@@ -20,6 +20,7 @@ The person who ran `npm run setup` is the first **owner**. Open **Team** (Worksp
 - **Reset MFA:** clears a member's authenticator and recovery codes (lost phone) and signs them out. Needs your password (and your code if you use MFA).
 - Staff and accountants use **My account** for their password and authenticator. The Settings and Automation pages are hidden for them, and so are buttons they can't use. The server checks every request independently of what the screen shows.
 - Audit entries record who did what as `owner:<email>` for every user (the prefix is historical; it is the signed-in person's email).
+- **Activity is for the owner only.** The Activity panel on documents (with what each save changed), the recurring contract history and the Audit page's entry list are shown to owners only. The server sends staff and accountants no audit entries at all: their workspace has none, and the accountant's JSON export leaves them out. Accountants can still verify the audit chain and download its head.
 
 **Security model.** Permissions are enforced on the server with an allow-list per role (`server/team-roles.mjs`). Any route that isn't on the list is refused for staff and accountants, so new features stay owner-only until someone classifies them.
 
@@ -103,7 +104,7 @@ Then follow the restore steps in docs/DEPLOYMENT.md (MFA key file, `DATABASE_PAT
 
 Every audit entry now carries `prev_hash` and `hash` = SHA-256 of the previous entry's hash and the entry itself (number, time, actor, action, record, detail, before/after data). Existing history was sealed into the chain when this module was installed. Entries still cannot be edited or deleted through the app (database guards).
 
-**Audit** page (owner and accountant):
+**Audit** page (owner and accountant; the list of recent entries is for the owner only):
 
 - **Verify audit chain** re-computes every hash and reports **OK**, or the first entry that was changed, removed, added or reordered.
 - **Download chain head** saves a small file with the latest entry number, its hash and time. Your accountant (or you) should keep these, for example at each month end, somewhere outside the server: their own files, an email, a printout.

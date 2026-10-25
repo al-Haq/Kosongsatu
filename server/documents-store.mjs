@@ -266,7 +266,11 @@ export function attachDocuments(Store) {
         }
         if (Array.isArray(b.items)) input.items = b.items.map((i) => this.catalogLine(i));
         const meta = existing ? JSON.parse(existing.meta || "{}") : {};
-        meta.custom = this.customValues(kind, b, meta.custom, settings);
+        // An issued quotation being edited (reviseQuote) prints with the custom
+        // fields it was issued with, so its values follow those definitions,
+        // even if a field was removed from Settings since.
+        const fieldsFrom = existing && existing.state !== "draft" && existing.business_snapshot ? documentSettings(JSON.parse(existing.business_snapshot)) : settings;
+        meta.custom = this.customValues(kind, b, meta.custom, fieldsFrom);
         if (kind === "quote") {
           const deposit = this.depositSetting(b, meta.deposit);
           if (deposit) meta.deposit = deposit;
@@ -277,6 +281,9 @@ export function attachDocuments(Store) {
         const language = input.language ?? existing?.language ?? "en";
         input[DEDUCTIONS] = this.depositDeductions(kind, existing || b[LINK] || null, language, idv);
         const out = original.saveDocument.call(this, input, idv);
+        // An issued quotation edited into Chinese must still print: without a
+        // Chinese font the edit is refused and the issued version stays as it was.
+        if (existing && existing.state !== "draft" && this.needsCjk(out)) check(this.cjkFont(), CJK_MESSAGE, 409);
         if (kind === "quote" && meta.deposit)
           check(
             depositParts(out.items, meta.deposit).length,
