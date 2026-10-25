@@ -3,6 +3,7 @@ import { dmy, isoDate, tidyDmy } from "./dates.mjs";
 import { financeUI } from "./finance.mjs";
 import { detailsHtml, detailsPlain, htmlToDetails, DETAILS_MAX } from "./ext/line-details.mjs";
 import { lineChoices, matchChoices } from "./ext/line-suggest.mjs";
+import { auditChanges } from "./ext/doc-changes.mjs";
 import { createAutosave } from "./autosave.mjs";
 import { UI_PLUGINS } from "./plugins.mjs";
 import { totals, toMYR, basisPoints, percentOf } from "./ext/documents-calc.mjs";
@@ -622,7 +623,7 @@ function settings() {
   const b = S.settings;
   return (
     heading("Settings", "") +
-    `<section class="panel mt22"><div class="panel-head"><h2>Company</h2></div>${brandMark({ company: "", logo: brand().logo })}<p class="field-hint">${brand().logo ? "Your logo, used on documents, emails, the menu and the sign-in page." : 'Upload your logo under <a href="#/settings/documents">Settings › Documents</a>; until then documents use the Nawlogic logo.'}</p><div class="palette"><div class="swatch teal-bg"><span></span>Teal #0EA5A4</div><div class="swatch orange-bg"><span></span>Orange #F97316</div><div class="swatch ink-bg"><span></span>Ink #0F172A</div></div><form data-form="settings"><div class="form-grid">${input("Registered business name", "company", b.company, "text", true, 'maxlength="180"')}${input("Registration number", "registration", b.registration, "text", false, 'maxlength="80"')}${input("Tax identification number (TIN)", "tin", b.tin || "", "text", false, 'maxlength="20"')}${input("SST registration number", "sstNumber", b.sstNumber || "", "text", false, 'maxlength="40"')}${input("Billing email", "email", b.email, "email", false, 'maxlength="160"')}${input("Phone", "phone", b.phone, "text", false, 'maxlength="60"')}<div class="span-2">${area("Business address", "address", b.address, 600)}</div>${input("Invoice prefix", "invoicePrefix", b.invoicePrefix, "text", true, 'pattern="[A-Z][A-Z0-9\\-]{0,11}" maxlength="12"')}${input("Quotation prefix", "quotePrefix", b.quotePrefix, "text", true, 'pattern="[A-Z][A-Z0-9\\-]{0,11}" maxlength="12"')}<div class="span-2">${area("Default terms", "paymentTerms", b.paymentTerms)}</div>${input("Bank name", "bankName", b.bankName, "text", false, 'maxlength="100"')}${input("Account number", "bankAccount", b.bankAccount, "text", false, 'maxlength="60"')}<div class="span-2">${input("Account holder", "bankHolder", b.bankHolder, "text", false, 'maxlength="180"')}</div></div>${errorBlock()}<p class="field-hint">Issued documents keep a snapshot of the company and client details. SST is charged only after you add your SST registration number.</p><div class="form-actions"><button class="btn primary" type="submit">Save settings</button></div></form></section><section class="panel mt22"><div class="panel-head"><h2>Connections</h2></div><div class="setting-line"><div><h3>Owner access</h3><p>${E(session.email)}</p></div>${badge("Password protected")}</div><div class="setting-line"><div><h3>Client invoice links</h3><p>Document only / 1–90 days / revocable</p></div>${badge("Enabled")}</div><div class="setting-line"><div><h3>LHDN MyInvois</h3><p>${S.ext?.tax?.status?.configured ? `e-Invoice via MyInvois (${E(S.ext.tax.status.env)})` : "Add MyInvois keys under Integration keys"}</p></div>${badge(S.ext?.tax?.status?.configured ? "Connected" : "Not connected")}</div><div class="setting-line"><div><h3>Online payment</h3><p>${S.gateway?.configured ? E(S.gateway.label) + (S.gateway.sandbox ? " / test mode" : " / live") : "Choose a provider under Online payments below"}</p></div>${badge(S.gateway?.configured ? "Connected" : "Not connected")}</div><div class="setting-line"><div><h3>Email and scheduled reminders</h3><p>${S.mail?.configured ? "Sending from " + E(S.mail.from) : "Add SMTP settings under Integration keys"}</p></div>${badge(S.mail?.configured ? "Connected" : "Not connected")}</div></section><section class="panel mt22"><div class="panel-head"><h2>Account password</h2></div><form data-form="password">${input("Current password", "current", "", "password", true, 'autocomplete="current-password"')}${input("New password (at least 12 characters)", "password", "", "password", true, 'minlength="12" maxlength="256" autocomplete="new-password"')}${S.security.enabled ? input("Authenticator or recovery code", "code", "", "text", true, 'autocomplete="one-time-code"') : ""}${errorBlock()}<button type="submit" class="btn">Change password and sign out</button></form></section><section class="panel mt22"><div class="panel-head"><h2>Your business data</h2></div><p>Download a business data export, including documents, payments and audit history. Store it privately.</p><div class="actions mt22"><a class="btn" href="/api/backup">${icon("download")} Export JSON</a><a class="btn" href="/api/invoices.csv">Export CSV</a></div><p class="field-hint">For full disaster recovery, use the encrypted backup and restore procedure in the deployment guide.</p></section>`
+    `<section class="panel mt22"><div class="panel-head"><h2>Company</h2></div>${brandMark({ company: "", logo: brand().logo })}<p class="field-hint">${brand().logo ? "Your logo, used on documents, emails, the menu and the sign-in page." : 'Upload your logo under <a href="#/settings/documents">Settings › Documents</a>; until then documents use the Nawlogic logo.'}</p><div class="palette"><div class="swatch teal-bg"><span></span>Teal #0EA5A4</div><div class="swatch orange-bg"><span></span>Orange #F97316</div><div class="swatch ink-bg"><span></span>Ink #0F172A</div></div><form data-form="settings"><div class="form-grid">${input("Registered business name", "company", b.company, "text", true, 'maxlength="180"')}${input("Registration number", "registration", b.registration, "text", false, 'maxlength="80"')}${input("Tax identification number (TIN)", "tin", b.tin || "", "text", false, 'maxlength="20"')}${input("SST registration number", "sstNumber", b.sstNumber || "", "text", false, 'maxlength="40"')}${input("Billing email", "email", b.email, "email", false, 'maxlength="160"')}${input("Phone", "phone", b.phone, "text", false, 'maxlength="60"')}<div class="span-2">${area("Business address", "address", b.address, 600)}</div>${input("Invoice prefix", "invoicePrefix", b.invoicePrefix, "text", true, 'pattern="[A-Z][A-Z0-9\\-]{0,11}" maxlength="12"')}${input("Quotation prefix", "quotePrefix", b.quotePrefix, "text", true, 'pattern="[A-Z][A-Z0-9\\-]{0,11}" maxlength="12"')}<div class="span-2">${area("Default terms and conditions", "paymentTerms", b.paymentTerms, 4000)}</div>${input("Bank name", "bankName", b.bankName, "text", false, 'maxlength="100"')}${input("Account number", "bankAccount", b.bankAccount, "text", false, 'maxlength="60"')}<div class="span-2">${input("Account holder", "bankHolder", b.bankHolder, "text", false, 'maxlength="180"')}</div></div>${errorBlock()}<p class="field-hint">Issued documents keep a snapshot of the company and client details. SST is charged only after you add your SST registration number.</p><div class="form-actions"><button class="btn primary" type="submit">Save settings</button></div></form></section><section class="panel mt22"><div class="panel-head"><h2>Connections</h2></div><div class="setting-line"><div><h3>Owner access</h3><p>${E(session.email)}</p></div>${badge("Password protected")}</div><div class="setting-line"><div><h3>Client invoice links</h3><p>Document only / 1–90 days / revocable</p></div>${badge("Enabled")}</div><div class="setting-line"><div><h3>LHDN MyInvois</h3><p>${S.ext?.tax?.status?.configured ? `e-Invoice via MyInvois (${E(S.ext.tax.status.env)})` : "Add MyInvois keys under Integration keys"}</p></div>${badge(S.ext?.tax?.status?.configured ? "Connected" : "Not connected")}</div><div class="setting-line"><div><h3>Online payment</h3><p>${S.gateway?.configured ? E(S.gateway.label) + (S.gateway.sandbox ? " / test mode" : " / live") : "Choose a provider under Online payments below"}</p></div>${badge(S.gateway?.configured ? "Connected" : "Not connected")}</div><div class="setting-line"><div><h3>Email and scheduled reminders</h3><p>${S.mail?.configured ? "Sending from " + E(S.mail.from) : "Add SMTP settings under Integration keys"}</p></div>${badge(S.mail?.configured ? "Connected" : "Not connected")}</div></section><section class="panel mt22"><div class="panel-head"><h2>Account password</h2></div><form data-form="password">${input("Current password", "current", "", "password", true, 'autocomplete="current-password"')}${input("New password (at least 12 characters)", "password", "", "password", true, 'minlength="12" maxlength="256" autocomplete="new-password"')}${S.security.enabled ? input("Authenticator or recovery code", "code", "", "text", true, 'autocomplete="one-time-code"') : ""}${errorBlock()}<button type="submit" class="btn">Change password and sign out</button></form></section><section class="panel mt22"><div class="panel-head"><h2>Your business data</h2></div><p>Download a business data export, including documents, payments and audit history. Store it privately.</p><div class="actions mt22"><a class="btn" href="/api/backup">${icon("download")} Export JSON</a><a class="btn" href="/api/invoices.csv">Export CSV</a></div><p class="field-hint">For full disaster recovery, use the encrypted backup and restore procedure in the deployment guide.</p></section>`
   );
 }
 // Labels, columns and money on the paper follow the document's language and currency.
@@ -637,6 +638,38 @@ function dueLabelFor(t, kind) {
       : kind === "delivery_order"
         ? t("deliveryDate")
         : t("validUntil");
+}
+// A document's history, with what each save changed (rates, quantities,
+// titles, descriptions, dates, terms, totals). Only the owner sees it.
+const ACTIVITY_TITLES = {
+  "draft.changed": "Draft saved",
+  "document.revised": "Edited after issue",
+  "document.issued": "Issued",
+};
+function activityPanel(events, d) {
+  if (!allowed("view", "activity")) return "";
+  const options = {
+    clientName: (cid) => S.clients.find((c) => c.id === cid)?.name || "another client",
+    date: (x) => (x ? dateLabel(x) : "—"),
+    dueLabel: dueLabelFor(labels("en"), d.kind),
+  };
+  const who = (actor) => String(actor || "system").replace(/^owner:/, "");
+  const item = (e) => {
+    const changes = auditChanges(e, options);
+    const title = ACTIVITY_TITLES[e.action] || e.action.replaceAll(".", " ").replace(/^./, (c) => c.toUpperCase());
+    const body = changes
+      ? changes.length
+        ? `<ul class="change-list">${changes
+            .slice(0, 12)
+            .map((c) => `<li>${E(c)}</li>`)
+            .join("")}${changes.length > 12 ? `<li>and ${changes.length - 12} more</li>` : ""}</ul>`
+        : "<p>Saved with no changes.</p>"
+      : e.detail
+        ? `<p>${E(e.detail)}</p>`
+        : "";
+    return `<div class="timeline-item"><strong>${E(title)}</strong><small>${timeLabel(e.created)} / ${E(who(e.actor))}</small>${body}</div>`;
+  };
+  return `<section class="panel activity-panel"><div class="panel-head"><h2>Activity</h2><span class="badge">Owner only</span></div><div class="timeline">${events.map(item).join("") || "<p>No activity yet.</p>"}</div></section>`;
 }
 function paper(d, publicView = false) {
   const b = d.business,
@@ -791,11 +824,13 @@ function documentView(id) {
         button("Issue document", "issue-document", id, true)
       : d.state === "void"
         ? ""
-        : button("Share", "share-document", id, true, "copy") +
+        : (d.kind === "quote" && d.state === "issued" ? button("Edit quotation", "edit-document", id) : "") +
+          button("Share", "share-document", id, true, "copy") +
           button("Email", "email-document", id)) +
     `<a class="btn" href="/api/documents/${id}/pdf">${icon("download")} PDF</a>` +
     (more ? `<details class="dropdown"><summary class="btn">More</summary><div class="menu">${more}</div></details>` : "");
-  const events = S.audit.filter((a) => a.entity_id === id).slice(0, 8);
+  // "draft.changed" / "document.revised" say what changed; the bare save entry under them adds nothing.
+  const events = S.audit.filter((a) => a.entity_id === id && a.action !== "document.draft.saved").slice(0, 10);
   const statusActions = [
     d.kind === "invoice" && d.state === "issued" && d.balance > 0 ? button("Record payment", "record-payment", id, true, "plus") : "",
     d.kind === "quote" && d.state === "accepted" ? button("Create / open invoice", "convert-quote", id, true) : "",
@@ -804,7 +839,7 @@ function documentView(id) {
   ].join("");
   return (
     heading(d.number || `Draft ${kindUI(d.kind).one}`, d.client.name, actions) +
-    `<div class="doc-grid">${paper(d)}<div class="stack">${advanced.documentExtras(d)}${slot("documentPanels", d)}<section class="panel"><div class="panel-head"><h2>Document status</h2>${badge(d.status)}</div>${d.kind === "delivery_order" ? "" : `<div class="total-row"><span>Document total</span><strong>${money(d.total, cur)}</strong></div>`}${d.kind === "invoice" ? `<div class="total-row"><span>Confirmed payments</span><strong>${money(d.paid, cur)}</strong></div><div class="total-row emphasis"><span>Balance</span><span>${money(d.balance, cur)}</span></div>${cur !== "MYR" ? `<p class="field-hint">${E(cur)} at ${E(d.fx_rate)} MYR = ${money(myr(d.balance, d))}</p>` : ""}` : ""}${d.state === "draft" ? '<p class="field-hint">Review the client, dates, amounts and terms before issuing. Issuing locks the document.</p>' : ""}${d.kind === "quote" && d.state === "accepted" ? `<p class="field-hint">Accepted by ${E(d.accepted_name)}</p>` : ""}${statusActions ? `<div class="actions mt22">${statusActions}</div>` : ""}</section>${
+    `<div class="doc-grid">${paper(d)}<div class="stack">${advanced.documentExtras(d)}${slot("documentPanels", d)}<section class="panel"><div class="panel-head"><h2>Document status</h2>${badge(d.status)}</div>${d.kind === "delivery_order" ? "" : `<div class="total-row"><span>Document total</span><strong>${money(d.total, cur)}</strong></div>`}${d.kind === "invoice" ? `<div class="total-row"><span>Confirmed payments</span><strong>${money(d.paid, cur)}</strong></div><div class="total-row emphasis"><span>Balance</span><span>${money(d.balance, cur)}</span></div>${cur !== "MYR" ? `<p class="field-hint">${E(cur)} at ${E(d.fx_rate)} MYR = ${money(myr(d.balance, d))}</p>` : ""}` : ""}${d.state === "draft" ? `<p class="field-hint">Review the client, dates, amounts and terms before issuing. ${d.kind === "quote" ? "Issuing gives it a number; you can still edit it until the client accepts." : "Issuing locks the document."}</p>` : d.kind === "quote" && d.state === "issued" ? '<p class="field-hint">You can still edit this quotation until the client accepts or declines it. It keeps its number.</p>' : ""}${d.kind === "quote" && d.state === "accepted" ? `<p class="field-hint">Accepted by ${E(d.accepted_name)}</p>` : ""}${statusActions ? `<div class="actions mt22">${statusActions}</div>` : ""}</section>${
       d.proofs.filter((p) => p.status === "pending").length
         ? `<section class="panel"><div class="panel-head"><h2>Awaiting review</h2>${badge("Pending review")}</div>${d.proofs
             .filter((p) => p.status === "pending")
@@ -814,7 +849,7 @@ function documentView(id) {
             )
             .join("")}</section>`
         : ""
-    }${d.kind === "invoice" ? `<section class="panel"><div class="panel-head"><h2>Payment history</h2></div>${d.payments.map((p) => `<div class="payment"><div class="payment-top"><strong>${money(p.amount, cur)}</strong>${badge(p.reversed ? "Reversed" : "Confirmed")}</div><p>${dateLabel(p.paid_date)} / ${E(p.method)}<br>Reference: ${E(p.reference)}</p>${p.reversed ? `<p>Reversal: ${E(p.reversal_reason)}</p>` : `<div class="payment-actions"><a href="/api/payments/${p.id}/receipt">Receipt PDF</a>${allowed("action", "reverse-payment") ? `<button class="link-button red-text" data-action="reverse-payment" data-id="${p.id}">Reverse</button>` : ""}</div>`}</div>`).join("") || "<p>No payments recorded yet.</p>"}</section>` : ""}${emailHistory(S.emailLog.filter((m) => m.document_id === id))}<section class="panel"><div class="panel-head"><h2>Activity</h2></div><div class="timeline">${events.map((e) => `<div class="timeline-item"><strong>${E(e.action.replaceAll(".", " "))}</strong><small>${timeLabel(e.created)} / ${E(e.actor || "system")}</small>${e.detail ? `<p>${E(e.detail)}</p>` : ""}</div>`).join("") || "<p>No activity yet.</p>"}</div></section></div></div>`
+    }${d.kind === "invoice" ? `<section class="panel"><div class="panel-head"><h2>Payment history</h2></div>${d.payments.map((p) => `<div class="payment"><div class="payment-top"><strong>${money(p.amount, cur)}</strong>${badge(p.reversed ? "Reversed" : "Confirmed")}</div><p>${dateLabel(p.paid_date)} / ${E(p.method)}<br>Reference: ${E(p.reference)}</p>${p.reversed ? `<p>Reversal: ${E(p.reversal_reason)}</p>` : `<div class="payment-actions"><a href="/api/payments/${p.id}/receipt">Receipt PDF</a>${allowed("action", "reverse-payment") ? `<button class="link-button red-text" data-action="reverse-payment" data-id="${p.id}">Reverse</button>` : ""}</div>`}</div>`).join("") || "<p>No payments recorded yet.</p>"}</section>` : ""}${emailHistory(S.emailLog.filter((m) => m.document_id === id))}${activityPanel(events, d)}</div></div>`
   );
 }
 // Settings panels are grouped into tabs after rendering, by their heading, so
@@ -996,6 +1031,20 @@ function lineMarkup(i = { description: "", quantity: 1, rate: 0 }, kind = editor
   const details = i.details || "";
   return `<div class="line-item"><textarea aria-label="Item title" class="item-description" rows="1" maxlength="240" placeholder="Item title" autocomplete="off" aria-autocomplete="list" aria-expanded="false" required>${E(i.description)}</textarea><input aria-label="Quantity" class="item-quantity" type="number" min="0.01" max="99999.99" step="0.01" value="${i.quantity}" required>${priced ? `<input aria-label="Rate" class="item-rate" type="number" min="0" max="99999999.99" step="0.01" value="${dec(i.rate)}" required>` : ""}${priced && sstEnabled() ? `<select aria-label="SST rate" class="item-tax">${TAX_RATES.map((r) => `<option value="${r}" ${r === tax ? "selected" : ""}>${r ? r + "%" : "No SST"}</option>`).join("")}</select>` : ""}<button class="btn ghost" type="button" data-action="remove-line" aria-label="Remove item">${icon("close")}</button><details class="line-more"${more}><summary>${priced ? "Code, unit, discount" : "Code and unit"}</summary><div class="line-extra"><input aria-label="Item code" class="item-sku" maxlength="40" placeholder="Code" value="${E(i.sku || "")}"><input aria-label="Unit" class="item-unit" maxlength="30" placeholder="Unit" value="${E(i.unit || "")}">${priced ? `<span class="line-discount"><input aria-label="Line discount" class="item-discount" type="number" min="0" step="0.01" placeholder="Discount" value="${E(off)}"><select aria-label="Discount type" class="item-discount-type"><option value="amount" ${percent ? "" : "selected"}>Amount</option><option value="percent" ${percent ? "selected" : ""}>%</option></select></span>` : ""}<input type="hidden" class="item-service" value="${E(i.service_id || "")}"></div></details>${detailsEditor(details)}</div>`;
 }
+// A new document starts with the terms and conditions of the latest one of
+// the same kind (what was used last time), or the company default. They can
+// be changed for that document only.
+function lastTerms(kind) {
+  const prev = S.documents
+    .filter((x) => x.kind === kind && x.state !== "void" && String(x.terms || "").trim())
+    .sort((a, b) => String(b.created || "").localeCompare(String(a.created || "")))[0];
+  return prev ? { terms: prev.terms, from: prev.number || "your latest draft" } : null;
+}
+function termsHint(last, kind, priced) {
+  if (!last) return "";
+  const reset = priced && last.terms !== (S.settings.paymentTerms || "") ? ` <button type="button" class="link-button" data-terms-default>Use the company default</button>` : "";
+  return `<p class="field-hint terms-hint">Same as ${E(last.from)}. Change them here for this ${E(kindUI(kind).one)} only.${reset}</p>`;
+}
 function documentForm(kind = "invoice", id = "", clientId = "") {
   if (!S.clients.length) {
     toast("Add your first client before creating a document.");
@@ -1006,6 +1055,9 @@ function documentForm(kind = "invoice", id = "", clientId = "") {
   const c =
     S.clients.find((c) => c.id === (d?.client_id || clientId)) || S.clients[0];
   const priced = kind !== "delivery_order";
+  // An issued quotation can still be edited (server/db.mjs reviseQuote).
+  const revising = !!d && d.state !== "draft";
+  const last = d ? null : lastTerms(kind);
   const value = d || {
     kind,
     client_id: c.id,
@@ -1014,7 +1066,7 @@ function documentForm(kind = "invoice", id = "", clientId = "") {
     items: [{ description: "", quantity: 1, rate: 0 }],
     discount: 0,
     notes: "",
-    terms: priced ? S.settings.paymentTerms : "",
+    terms: last ? last.terms : priced ? S.settings.paymentTerms : "",
     currency: c.currency || "MYR",
     language: c.language || S.settings.documentLanguage || "en",
     fx_rate: "",
@@ -1022,8 +1074,8 @@ function documentForm(kind = "invoice", id = "", clientId = "") {
   };
   const tax = priced && sstEnabled();
   showModal(
-    d ? "Edit draft" : "New " + kindUI(kind).one,
-    `<form data-form="editor" data-id="${E(id)}" data-kind="${kind}"><div class="editor-grid ${tax ? "with-tax" : ""} ${priced ? "" : "no-price"}"><div><div class="form-grid"><div class="span-2">${select(kind === "delivery_order" ? "Deliver to" : "Bill to", "client_id", clientOptions(value.client_id), value.client_id)}</div>${input("Issue date", "issue_date", value.issue_date, "date", true)}${input(dueLabelFor(labels("en"), kind), "due_date", value.due_date, "date", true)}</div><div class="line-head"><span>ITEM</span><span>QTY</span>${priced ? '<span class="rate-head">RATE</span>' : ""}${tax ? "<span>SST</span>" : ""}<span></span></div><div id="line-items">${value.items
+    revising ? `Edit ${kindUI(kind).one} ${d.number}` : d ? "Edit draft" : "New " + kindUI(kind).one,
+    `<form data-form="editor" data-id="${E(id)}" data-kind="${kind}">${revising ? `<div class="notice info revise-note"><p>This ${E(kindUI(kind).one)} is issued as <strong>${E(d.number)}</strong>. Saving keeps its number, and its PDF and client link show the new version. The client and issue date stay as issued. Each change is kept in the activity history.</p></div>` : ""}<div class="editor-grid ${tax ? "with-tax" : ""} ${priced ? "" : "no-price"}"><div><div class="form-grid"><div class="span-2">${select(kind === "delivery_order" ? "Deliver to" : "Bill to", "client_id", clientOptions(value.client_id), value.client_id)}</div>${input("Issue date", "issue_date", value.issue_date, "date", true)}${input(dueLabelFor(labels("en"), kind), "due_date", value.due_date, "date", true)}</div><div class="line-head"><span>ITEM</span><span>QTY</span>${priced ? '<span class="rate-head">RATE</span>' : ""}${tax ? "<span>SST</span>" : ""}<span></span></div><div id="line-items">${value.items
       .filter((i) => !i.deposit_id)
       .map((i) => lineMarkup(i, kind))
       .join("")}</div>${value.items.some((i) => i.deposit_id) ? `<p class="field-hint">The deposit already invoiced (${E([...new Set(value.items.filter((i) => i.deposit_id).map((i) => i.deposit_number))].join(", "))}) is deducted when you save.</p>` : ""}<div class="actions mt22">${button("Custom item", "add-line", "", "", "plus")}<label class="catalog-picker"><span class="sr-only">Add service from catalog</span><select id="catalog-service"><option value="">Add from catalog...</option>${S.services
@@ -1034,10 +1086,27 @@ function documentForm(kind = "invoice", id = "", clientId = "") {
       )
       .join(
         "",
-      )}</select></label></div><div class="mt22">${slot("documentFields", value, kind)}<h3 class="form-section">${priced ? "Discount, terms and notes" : "Terms and notes"}</h3>${priced ? input("Document discount", "discount", dec(value.discount), "number", true, 'min="0" max="99999999.99" step="0.01"') : ""}${area(priced ? "Payment / project terms" : "Delivery terms", "terms", value.terms)}${area("Notes", "notes", value.notes, 2000)}</div></div><aside class="preview"><div class="eyebrow mb22">Live preview</div><div id="live-preview"></div><p class="field-hint">${!priced ? "Delivery orders list items and quantities only." : sstEnabled() ? "SST is calculated per line after line and document discounts. The saved document is authoritative." : "Add your SST registration number in Settings to charge SST."} This preview is not a validated e-Invoice.</p></aside></div>${formEnd("Save draft and review")}</form>`,
+      )}</select></label></div><div class="mt22">${slot("documentFields", value, kind)}<h3 class="form-section">${priced ? "Discount, terms and notes" : "Terms and notes"}</h3>${priced ? input("Document discount", "discount", dec(value.discount), "number", true, 'min="0" max="99999999.99" step="0.01"') : ""}${area(kind === "quote" ? "Terms and conditions" : priced ? "Payment / project terms" : "Delivery terms", "terms", value.terms, 4000)}${termsHint(last, kind, priced)}${area("Notes", "notes", value.notes, 2000)}</div></div><aside class="preview"><div class="eyebrow mb22">Live preview</div><div id="live-preview"></div><p class="field-hint">${!priced ? "Delivery orders list items and quantities only." : sstEnabled() ? "SST is calculated per line after line and document discounts. The saved document is authoritative." : "Add your SST registration number in Settings to charge SST."} This preview is not a validated e-Invoice.</p></aside></div>${formEnd(revising ? "Save changes" : "Save draft and review")}</form>`,
     true,
   );
+  if (revising) lockIssuedFields($('form[data-form="editor"]'));
   updatePreview();
+}
+// The client, issue date and currency of an issued document stay as issued:
+// shown, but not changeable (the server keeps them too).
+function lockIssuedFields(form) {
+  for (const name of ["client_id", "currency"]) {
+    const el = form.elements[name];
+    if (!el || el.tagName !== "SELECT") continue;
+    el.disabled = true;
+    el.insertAdjacentHTML("afterend", `<input type="hidden" name="${name}" value="${E(el.value)}">`);
+  }
+  for (const name of ["issue_date", "fx_rate"]) {
+    const el = form.elements[name];
+    if (!el) continue;
+    el.readOnly = true;
+    el.closest(".date-field")?.querySelector(".date-pick")?.setAttribute("hidden", "");
+  }
 }
 function editorData(form) {
   const b = formValues(form);
@@ -1212,7 +1281,7 @@ async function runAction(action, id, el) {
     case "issue-document":
       showModal(
         "Issue this document?",
-        `<p>Check the client, dates, amounts and terms. Issuing assigns an official number and locks the document.</p><p class="field-hint">This does not send an email or create a validated MyInvois e-Invoice.</p><div class="form-actions">${button("Cancel", "close-modal")}${button("Issue document", "confirm-issue", id, true)}</div>`,
+        `<p>Check the client, dates, amounts and terms. ${S.documents.find((x) => x.id === id)?.kind === "quote" ? "Issuing assigns an official number. You can still edit the quotation until the client accepts it." : "Issuing assigns an official number and locks the document."}</p><p class="field-hint">This does not send an email or create a validated MyInvois e-Invoice.</p><div class="form-actions">${button("Cancel", "close-modal")}${button("Issue document", "confirm-issue", id, true)}</div>`,
       );
       break;
     case "confirm-issue":
@@ -1510,7 +1579,7 @@ async function submitForm(form) {
     modal.close();
     await refresh();
     navigate("document/" + d.id);
-    toast("Draft saved. Review before issuing.");
+    toast(d.state === "draft" ? "Draft saved. Review before issuing." : `${d.number} updated.`);
     return;
   }
   if (type === "settings") {
@@ -1677,6 +1746,16 @@ document.addEventListener("input", (event) => {
       filteredDocs(event.target.dataset.kind || "invoice"),
     );
   } else if (event.target.closest('form[data-form="editor"]')) updatePreview();
+});
+// "Use the company default" under the terms of a new document.
+document.addEventListener("click", (event) => {
+  const reset = event.target.closest?.("[data-terms-default]");
+  if (!reset) return;
+  const field = reset.closest("form")?.elements.terms;
+  if (!field) return;
+  field.value = S.settings.paymentTerms || "";
+  field.dispatchEvent(new Event("input", { bubbles: true }));
+  reset.closest(".terms-hint").textContent = "The company default terms, from Settings.";
 });
 // Line descriptions: formatting buttons keep the text selection (mousedown),
 // paste brings plain text only, and the counter follows what is typed.
@@ -2009,8 +2088,8 @@ autosave = createAutosave({
       location.hash = o.route.replace(/^#/, "");
       await new Promise((r) => setTimeout(r, 0));
     }
-    if (o.action === "edit-document" && !S.documents.some((d) => d.id === o.id && d.state === "draft"))
-      return toast("That draft is no longer editable.", true);
+    if (o.action === "edit-document" && !S.documents.some((d) => d.id === o.id && (d.state === "draft" || (d.kind === "quote" && d.state === "issued"))))
+      return toast("That document is no longer editable.", true);
     await runAction(o.action, o.id);
   },
 });

@@ -21,6 +21,34 @@ Each line has a short **title** (what used to be the line description, up to 240
 
 Lines saved before this change have only a title. On the PDF, a line's SST rate is now a small grey note under its title.
 
+## Editing an issued quotation
+
+An issued quotation can still be changed until the client accepts or declines it.
+
+- On the quotation, press **Edit quotation**. Lines, descriptions, rates, discounts, the validity date, terms and notes can change. The quotation keeps its number (for example QT-2026-0002), and its PDF and client link show the new version at once.
+- The client, issue date and currency stay as issued: they are shown but locked, and the server keeps them even if a request sends others. The client details were frozen when it was issued.
+- Each edit is kept in the activity as **Edited after issue**, with what changed.
+- Once accepted, a quotation is locked: "An accepted quotation can't be edited. Duplicate it to make a new version." Declined and void quotations are locked too. Issued invoices and other documents stay locked as before.
+- Staff can edit issued quotations; accountants cannot.
+
+## Terms and conditions follow the last one
+
+A new document starts with the terms and conditions of the latest document of the same kind (the last quotation for a new quotation, and so on). Under the box it says "Same as QT-2026-0002", and **Use the company default** puts back the default from Settings. Changing them affects only that document. With no earlier document, the company default is used. Terms and conditions, and the company default, can be up to 4000 characters; long terms carry on over PDF pages.
+
+## Activity: what changed, for the owner
+
+The **Activity** panel on each document lists every save with what it changed, for example:
+
+- Line 1 "Asus Vivobook 16": quantity 6 → 5, rate 3,800.00 → 3,860.00, description changed
+- Added line 3 "Setup": 1 × 150.00, or Removed line "Bag" (1 × 90.00)
+- Client, issue date and due or valid-until date: old → new
+- Document discount and total: old → new
+- Terms and conditions changed, Notes changed
+
+Lines are matched by title, so a line moved or added in the middle is not reported as every line changing. The changes are worked out from the before and after copies the audit history already kept, so saves made before this update show their details too (`public/ext/doc-changes.mjs`).
+
+Only the owner sees the Activity panel; see [Team](team.md).
+
 ## 6. Line discounts
 
 Each line in the editor has a **Line discount** box. Choose **Amount** or **%**.

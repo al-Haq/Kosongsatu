@@ -638,10 +638,14 @@ export function createApp({
               await assistant.run(session.owner_id, await body()),
             );
           }
+          // Who changed what (the audit history) is for the owner only: staff and
+          // accountants get no entries. Without the team module everyone is the owner.
+          const ownerView = !session.role || session.role === "owner";
           // Every module reads the documents: they are worked out once per load.
           if (path === "/api/workspace" && method === "GET")
             return send(200, await store.cachedReads(async () => ({
               ...store.workspace(),
+              ...(ownerView ? {} : { audit: [] }),
               finance: store.finance(),
               security: mfaStatus(store, session.owner_id),
               backupStatus: backups.status(),
@@ -692,9 +696,7 @@ export function createApp({
                     PLUGINS.filter((p) => p.exportData).map(async (p) => [p.name, await p.exportData(store)]),
                   ),
                 ),
-                audit: store.db
-                  .prepare("SELECT * FROM audit ORDER BY id")
-                  .all(),
+                audit: ownerView ? store.db.prepare("SELECT * FROM audit ORDER BY id").all() : [],
               },
               {
                 "Content-Disposition":
@@ -1066,8 +1068,12 @@ export function createApp({
             const [, idv, action] = doc;
             if (method === "GET" && !action)
               return send(200, store.document(idv));
-            if (method === "PUT" && !action)
-              return send(200, store.saveDocument(await body(), idv));
+            if (method === "PUT" && !action) {
+              const b = await body();
+              // An issued quotation can still be edited until it is accepted.
+              const cur = store.db.prepare("SELECT kind,state FROM documents WHERE id=?").get(idv);
+              return send(200, cur?.kind === "quote" && cur.state !== "draft" ? store.reviseQuote(idv, b) : store.saveDocument(b, idv));
+            }
             if (method === "GET" && action === "pdf") {
               const d = store.document(idv);
               return send(200, await renderPdf(d, null, await store.pdfBlocks(d)), {

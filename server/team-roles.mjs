@@ -15,7 +15,7 @@ export const ROLE_INFO = {
   },
   accountant: {
     label: "Accountant",
-    summary: "Read-only: views everything, downloads PDFs, CSV/JSON exports and reports, verifies the audit chain. Changes only their own password and MFA.",
+    summary: "Read-only: views documents, payments and reports (not the change history), downloads PDFs, CSV/JSON exports and reports, verifies the audit chain. Changes only their own password and MFA.",
   },
 };
 

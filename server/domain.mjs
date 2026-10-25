@@ -99,6 +99,8 @@ export const DEDUCTIONS = Symbol("deposit deductions");
 export const LINK = Symbol("document link");
 // Server-only input to saveDocument: sanitized module data stored in documents.meta.
 export const META = Symbol("document meta");
+// Server-only input to saveDocument: this save edits an issued quotation (Store.reviseQuote).
+export const REVISE = Symbol("edit an issued quotation");
 export const KIND_PREFIX = {
   invoice: ["invoicePrefix", "INV"],
   quote: ["quotePrefix", "QT"],
