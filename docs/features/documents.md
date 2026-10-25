@@ -2,6 +2,20 @@
 
 This module adds more document types, more control over each line, other currencies and languages, and nicer PDFs. Everything works without outside accounts. The only optional setup is a Chinese font on the server (see [Chinese documents](#14-documents-in-english-bahasa-melayu-and-chinese)).
 
+## Line title and description
+
+Each line has a short **title** (what used to be the line description, up to 240 characters) and an optional **description** under it, as on Refrens.
+
+- Press **+ Description** under a line. The box has buttons for **bold**, *italic*, ~~strikethrough~~, a bullet list and a numbered list. Ctrl+B and Ctrl+I work too. Pasted text keeps its words but not its formatting.
+- A description holds up to 3000 characters; the counter under the box shows how many are used. The **×** in the toolbar removes it.
+- The document page, the client link, the client portal and the PDF show the title (in bold when a description follows) and then the formatted description in smaller grey text. PDF rows grow to fit, so nothing runs past the row's line, in all three PDF layouts. A description taller than a page carries on to the next page under the table header.
+- Choosing a service from the catalog puts the service name in the title and its description in the description.
+- The description is copied when a quotation becomes an invoice, when a document is duplicated, and from a sales order to its invoice or delivery order. Webhook payloads carry it as `items[].details`.
+- It is stored as plain text with a small markup: `**bold**`, `*italic*`, `~~strike~~`, lines starting with `- ` (bullets) or `1. ` (numbers), and a blank line between paragraphs. It is never stored or shown as HTML. `public/ext/line-details.mjs` reads it for the browser and the PDF.
+- The e-Invoice and accounting exports use the title only.
+
+Lines saved before this change have only a title. On the PDF, a line's SST rate is now a small grey note under its title.
+
 ## 6. Line discounts
 
 Each line in the editor has a **Line discount** box. Choose **Amount** or **%**.

@@ -389,7 +389,7 @@ export function attachDocuments(Store) {
     needsCjk(d) {
       return (
         d.language === "zh" ||
-        [...d.items.map((i) => i.description), d.notes, d.terms, ...Object.values(d.meta?.custom || {})].some(hasCjk)
+        [...d.items.flatMap((i) => [i.description, i.details]), d.notes, d.terms, ...Object.values(d.meta?.custom || {})].some(hasCjk)
       );
     },
     issue(idv) {

@@ -117,7 +117,7 @@ export function calculate(items, discount = "0", { kind = "invoice", deductions 
     "Add between 1 and 50 line items.",
   );
   const withPrices = priced(kind);
-  const clean = items.map((item) => {
+  const clean = items.map((item, idx) => {
     check(item && typeof item === "object", "Invalid line item.");
     const description = text(item.description, 240, true);
     const rate = withPrices ? money(item.rate) : 0;
@@ -156,6 +156,13 @@ export function calculate(items, discount = "0", { kind = "invoice", deductions 
       line.gross = gross;
       line.discount = off;
       line.amount = gross - off;
+    }
+    // The longer description under the title (public/ext/line-details.mjs markup).
+    if (item.details) {
+      const details = String(item.details).replace(/\r\n?/g, "\n").trim();
+      check(details.length <= 3000, `Line ${idx + 1}: the description can have up to 3000 characters.`);
+      line.details = text(details, 3000);
+      if (!line.details) delete line.details;
     }
     if (item.sku) {
       line.sku = text(String(item.sku), 40).toUpperCase();
@@ -216,7 +223,7 @@ export function itemInput(i) {
   };
   if (i.discount_percent) out.discount_percent = i.discount_percent;
   else if (i.discount) out.discount_amount = (i.discount / 100).toFixed(2);
-  for (const key of ["sku", "unit", "service_id"]) if (i[key]) out[key] = i[key];
+  for (const key of ["details", "sku", "unit", "service_id"]) if (i[key]) out[key] = i[key];
   return out;
 }
 export const regularItems = (items) => items.filter((i) => !i.deposit_id);

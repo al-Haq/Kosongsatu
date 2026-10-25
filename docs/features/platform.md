@@ -87,7 +87,7 @@ Events that happened before an endpoint existed are not sent. Records added by *
 }
 ```
 
-Amounts are integers in sen (RM1.00 = 100). `url` opens the record in your workspace (sign-in needed); it is not a client link. Payloads never contain passwords, keys, client link tokens, bank account details or payment proofs.
+A line with a description under its title also has `details` (the description markup, see [Line title and description](documents.md#line-title-and-description)). Amounts are integers in sen (RM1.00 = 100). `url` opens the record in your workspace (sign-in needed); it is not a client link. Payloads never contain passwords, keys, client link tokens, bank account details or payment proofs.
 
 ### Checking the signature
 

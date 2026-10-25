@@ -1,0 +1,70 @@
+import { test, expect } from "@playwright/test";
+import { signIn, watchErrors, unique, createClient } from "./helpers.mjs";
+
+// A line has a title, and under it a description with bold, italic,
+// strikethrough and lists, shown on the document and kept when edited again.
+test("line items: title with a formatted description", async ({ page }) => {
+  const errors = watchErrors(page);
+  await signIn(page);
+  const client = unique("E2E Details");
+  await createClient(page, client);
+
+  await page.goto("/#/quotes");
+  await page.click('[data-action="new-quote"]');
+  const editor = page.locator('form[data-form="editor"]');
+  await editor.locator("select[name=client_id]").selectOption({ label: client });
+  const row = editor.locator(".line-item").first();
+  await row.locator(".item-description").fill("Corporate website");
+  await row.locator(".item-rate").fill("2650");
+  await expect(row.locator(".line-details")).toBeHidden();
+  await row.locator('[data-details="add"]').click();
+  const box = row.locator(".item-details");
+  await expect(box).toBeFocused();
+  await page.keyboard.type("Design and build, ");
+  await row.locator('[data-fmt="bold"]').click();
+  await page.keyboard.type("up to 7 pages");
+  await row.locator('[data-fmt="bold"]').click();
+  await page.keyboard.press("Enter");
+  await row.locator('[data-fmt="insertUnorderedList"]').click();
+  await page.keyboard.type("Content and copywriting");
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("WhatsApp and Google Maps");
+  // Pasted text arrives without its formatting.
+  await box.evaluate((el) => {
+    const data = new DataTransfer();
+    data.setData("text/html", "<b style='color:red'>pasted</b>");
+    data.setData("text/plain", " (pasted)");
+    el.dispatchEvent(new ClipboardEvent("paste", { clipboardData: data, bubbles: true, cancelable: true }));
+  });
+  await expect(box.locator("[style]")).toHaveCount(0);
+  await expect(row.locator(".details-count")).toContainText("/ 3000");
+  await editor.locator("button[type=submit]").click();
+  await expect(page.locator("#toast")).toContainText("Draft saved");
+
+  // The document shows the title, then the formatted description.
+  const cell = page.locator(".quote-scope").first();
+  await expect(cell).toContainText("Corporate website");
+  await expect(cell.locator(".line-details-view strong")).toHaveText("up to 7 pages");
+  await expect(cell.locator(".line-details-view li")).toHaveText(["Content and copywriting", "WhatsApp and Google Maps (pasted)"]);
+  await expect(cell.locator(".line-details-view b")).toHaveCount(0);
+
+  // Editing again keeps the description, and it can be removed.
+  await page.click('[data-action="edit-document"]');
+  const again = page.locator('form[data-form="editor"] .line-item').first();
+  await expect(again.locator(".line-details")).toBeVisible();
+  await expect(again.locator(".item-details strong")).toHaveText("up to 7 pages");
+  await expect(again.locator(".item-details li")).toHaveCount(2);
+  await page.locator('form[data-form="editor"] button[type=submit]').click();
+  await expect(page.locator("#toast")).toContainText("Draft saved");
+  await expect(page.locator(".quote-scope .line-details-view li")).toHaveCount(2);
+
+  await page.click('[data-action="edit-document"]');
+  const last = page.locator('form[data-form="editor"] .line-item').first();
+  await last.locator('[data-details="remove"]').click();
+  await expect(last.locator('[data-details="add"]')).toBeVisible();
+  await page.locator('form[data-form="editor"] button[type=submit]').click();
+  await expect(page.locator("#toast")).toContainText("Draft saved");
+  await expect(page.locator(".quote-scope").first()).toContainText("Corporate website");
+  await expect(page.locator(".line-details-view")).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
