@@ -1027,6 +1027,7 @@ dialog.wide {
   gap: 28px;
 }
 .line-item {
+  position: relative;
   display: grid;
   grid-template-columns: 1fr 72px 108px 30px;
   gap: 9px;
@@ -1061,6 +1062,71 @@ dialog.wide {
   font-size: 9px;
   font-weight: 700;
   color: var(--muted);
+}
+/* Items used before, listed under a line's title while typing. */
+.line-suggest {
+  position: absolute;
+  left: 0;
+  right: 0;
+  z-index: 20;
+  max-height: 320px;
+  overflow-y: auto;
+  padding: 4px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.14);
+}
+.suggest-head {
+  padding: 6px 10px 4px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.suggest-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink);
+  text-align: left;
+}
+.suggest-item:hover,
+.suggest-item.active {
+  background: var(--soft);
+}
+.suggest-main,
+.suggest-meta {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.suggest-main strong {
+  font-size: 12px;
+  font-weight: 600;
+}
+.suggest-main strong,
+.suggest-main small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.suggest-main small,
+.suggest-meta small {
+  font-size: 10.5px;
+  color: var(--muted);
+}
+.suggest-meta {
+  flex-shrink: 0;
+  justify-items: end;
+  font-size: 12px;
 }
 /* The formatted description under a line's title. */
 .line-item .line-details,

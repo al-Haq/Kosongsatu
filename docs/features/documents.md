@@ -10,6 +10,11 @@ Each line has a short **title** (what used to be the line description, up to 240
 - A description holds up to 3000 characters; the counter under the box shows how many are used. The **×** in the toolbar removes it.
 - The document page, the client link, the client portal and the PDF show the title (in bold when a description follows) and then the formatted description in smaller grey text. PDF rows grow to fit, so nothing runs past the row's line, in all three PDF layouts. A description taller than a page carries on to the next page under the table header.
 - Choosing a service from the catalog puts the service name in the title and its description in the description.
+- **Items used before.** Click an empty line title, or start typing in one, and a list shows items from documents saved before (quotations, invoices, proformas, sales and delivery orders, drafts included) and catalog services not used yet. Each shows its rate and how often it was used. Click one, or use the arrow keys and Enter, to fill the title, description, rate, SST, code and unit; the quantity stays and the cursor moves to it. Esc closes the list without closing the editor.
+  - Each title is listed once, as it was last used. A title used only on delivery orders takes its rate from the latest priced document that has it.
+  - Typing matches titles that start with the text first, then a word in the title, then item codes, and from 3 letters the description too. With nothing typed, the most used items come first.
+  - Only lines in the document's currency are offered. Deposit deductions are never offered.
+  - Nothing new is stored: the list is built in the browser from the documents already loaded (`public/ext/line-suggest.mjs`), so a line is offered as soon as its document is saved.
 - The description is copied when a quotation becomes an invoice, when a document is duplicated, and from a sales order to its invoice or delivery order. Webhook payloads carry it as `items[].details`.
 - It is stored as plain text with a small markup: `**bold**`, `*italic*`, `~~strike~~`, lines starting with `- ` (bullets) or `1. ` (numbers), and a blank line between paragraphs. It is never stored or shown as HTML. `public/ext/line-details.mjs` reads it for the browser and the PDF.
 - The e-Invoice and accounting exports use the title only.

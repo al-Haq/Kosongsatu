@@ -1,7 +1,8 @@
 import { automationUI } from "./automation.mjs";
 import { dmy, isoDate, tidyDmy } from "./dates.mjs";
 import { financeUI } from "./finance.mjs";
-import { detailsHtml, htmlToDetails, DETAILS_MAX } from "./ext/line-details.mjs";
+import { detailsHtml, detailsPlain, htmlToDetails, DETAILS_MAX } from "./ext/line-details.mjs";
+import { lineChoices, matchChoices } from "./ext/line-suggest.mjs";
 import { createAutosave } from "./autosave.mjs";
 import { UI_PLUGINS } from "./plugins.mjs";
 import { totals, toMYR, basisPoints, percentOf } from "./ext/documents-calc.mjs";
@@ -993,7 +994,7 @@ function lineMarkup(i = { description: "", quantity: 1, rate: 0 }, kind = editor
   const off = i.discount_percent || (i.discount ? dec(i.discount) : i.discount_amount || "");
   const more = i.sku || i.unit || off ? " open" : "";
   const details = i.details || "";
-  return `<div class="line-item"><textarea aria-label="Item title" class="item-description" rows="1" maxlength="240" placeholder="Item title" required>${E(i.description)}</textarea><input aria-label="Quantity" class="item-quantity" type="number" min="0.01" max="99999.99" step="0.01" value="${i.quantity}" required>${priced ? `<input aria-label="Rate" class="item-rate" type="number" min="0" max="99999999.99" step="0.01" value="${dec(i.rate)}" required>` : ""}${priced && sstEnabled() ? `<select aria-label="SST rate" class="item-tax">${TAX_RATES.map((r) => `<option value="${r}" ${r === tax ? "selected" : ""}>${r ? r + "%" : "No SST"}</option>`).join("")}</select>` : ""}<button class="btn ghost" type="button" data-action="remove-line" aria-label="Remove item">${icon("close")}</button><details class="line-more"${more}><summary>${priced ? "Code, unit, discount" : "Code and unit"}</summary><div class="line-extra"><input aria-label="Item code" class="item-sku" maxlength="40" placeholder="Code" value="${E(i.sku || "")}"><input aria-label="Unit" class="item-unit" maxlength="30" placeholder="Unit" value="${E(i.unit || "")}">${priced ? `<span class="line-discount"><input aria-label="Line discount" class="item-discount" type="number" min="0" step="0.01" placeholder="Discount" value="${E(off)}"><select aria-label="Discount type" class="item-discount-type"><option value="amount" ${percent ? "" : "selected"}>Amount</option><option value="percent" ${percent ? "selected" : ""}>%</option></select></span>` : ""}<input type="hidden" class="item-service" value="${E(i.service_id || "")}"></div></details>${detailsEditor(details)}</div>`;
+  return `<div class="line-item"><textarea aria-label="Item title" class="item-description" rows="1" maxlength="240" placeholder="Item title" autocomplete="off" aria-autocomplete="list" aria-expanded="false" required>${E(i.description)}</textarea><input aria-label="Quantity" class="item-quantity" type="number" min="0.01" max="99999.99" step="0.01" value="${i.quantity}" required>${priced ? `<input aria-label="Rate" class="item-rate" type="number" min="0" max="99999999.99" step="0.01" value="${dec(i.rate)}" required>` : ""}${priced && sstEnabled() ? `<select aria-label="SST rate" class="item-tax">${TAX_RATES.map((r) => `<option value="${r}" ${r === tax ? "selected" : ""}>${r ? r + "%" : "No SST"}</option>`).join("")}</select>` : ""}<button class="btn ghost" type="button" data-action="remove-line" aria-label="Remove item">${icon("close")}</button><details class="line-more"${more}><summary>${priced ? "Code, unit, discount" : "Code and unit"}</summary><div class="line-extra"><input aria-label="Item code" class="item-sku" maxlength="40" placeholder="Code" value="${E(i.sku || "")}"><input aria-label="Unit" class="item-unit" maxlength="30" placeholder="Unit" value="${E(i.unit || "")}">${priced ? `<span class="line-discount"><input aria-label="Line discount" class="item-discount" type="number" min="0" step="0.01" placeholder="Discount" value="${E(off)}"><select aria-label="Discount type" class="item-discount-type"><option value="amount" ${percent ? "" : "selected"}>Amount</option><option value="percent" ${percent ? "selected" : ""}>%</option></select></span>` : ""}<input type="hidden" class="item-service" value="${E(i.service_id || "")}"></div></details>${detailsEditor(details)}</div>`;
 }
 function documentForm(kind = "invoice", id = "", clientId = "") {
   if (!S.clients.length) {
@@ -1723,6 +1724,129 @@ document.addEventListener("input", (event) => {
     count.textContent = `${used} / ${DETAILS_MAX}`;
     count.classList.toggle("red-text", used >= DETAILS_MAX);
   }
+});
+// Items used before: clicking an empty line title, or typing in one, lists
+// lines from saved documents and catalog services (public/ext/line-suggest.mjs).
+// One click (or arrows and Enter) fills the title, description, rate, SST,
+// code and unit; the quantity stays.
+let suggestCache = { docs: null, services: null, list: [] };
+const suggestChoices = () => {
+  if (suggestCache.docs !== S.documents || suggestCache.services !== S.services)
+    suggestCache = { docs: S.documents, services: S.services, list: lineChoices(S.documents, S.services) };
+  return suggestCache.list;
+};
+let suggest = { row: null, items: [], active: -1 };
+function closeSuggest() {
+  for (const el of document.querySelectorAll(".line-suggest")) el.remove();
+  const field = suggest.row && $(".item-description", suggest.row);
+  if (field) {
+    field.setAttribute("aria-expanded", "false");
+    field.removeAttribute("aria-activedescendant");
+  }
+  suggest = { row: null, items: [], active: -1 };
+}
+function openSuggest(field) {
+  const row = field.closest(".line-item");
+  const form = field.closest('form[data-form="editor"]');
+  if (!row || !form) return;
+  const currency = form.elements.currency?.value || "MYR";
+  const items = matchChoices(suggestChoices(), field.value, { currency });
+  if (!items.length) return closeSuggest();
+  if (suggest.row && suggest.row !== row) closeSuggest();
+  let box = $(".line-suggest", row);
+  if (!box) {
+    box = document.createElement("div");
+    box.className = "line-suggest";
+    box.id = "line-suggest";
+    box.setAttribute("role", "listbox");
+    box.setAttribute("aria-label", "Items used before");
+    row.append(box);
+  }
+  const priced = form.dataset.kind !== "delivery_order";
+  suggest = { row, items, active: -1 };
+  box.innerHTML = `<div class="suggest-head">Items used before</div>${items
+    .map(
+      (c, n) =>
+        `<button type="button" tabindex="-1" class="suggest-item" role="option" id="line-suggest-${n}" data-pick="${n}" aria-selected="false"><span class="suggest-main"><strong>${E(c.title)}</strong>${c.details ? `<small>${E(detailsPlain(c.details).replace(/\s+/g, " ").slice(0, 100))}</small>` : ""}</span><span class="suggest-meta">${priced && c.rate != null ? `<strong>${money(c.rate, c.currency || currency)}</strong>` : ""}<small>${c.source === "catalog" ? "Catalog" : c.uses > 1 ? `Used ${c.uses} times` : "Used once"}</small></span></button>`,
+    )
+    .join("")}`;
+  box.style.top = field.offsetTop + field.offsetHeight + 4 + "px";
+  field.setAttribute("aria-expanded", "true");
+  field.setAttribute("aria-controls", "line-suggest");
+}
+function moveSuggest(step) {
+  const n = suggest.items.length;
+  suggest.active = suggest.active < 0 && step < 0 ? n - 1 : (suggest.active + step + n) % n;
+  const field = $(".item-description", suggest.row);
+  for (const el of $$(".suggest-item", suggest.row)) {
+    const on = Number(el.dataset.pick) === suggest.active;
+    el.classList.toggle("active", on);
+    el.setAttribute("aria-selected", String(on));
+    if (on) {
+      el.scrollIntoView({ block: "nearest" });
+      field.setAttribute("aria-activedescendant", el.id);
+    }
+  }
+}
+function pickSuggestion(n) {
+  const c = suggest.items[n];
+  const row = suggest.row;
+  if (!c || !row) return;
+  const form = row.closest("form");
+  const rate = $(".item-rate", row);
+  closeSuggest();
+  const tpl = document.createElement("template");
+  tpl.innerHTML = lineMarkup(
+    {
+      description: c.title,
+      details: c.details,
+      quantity: $(".item-quantity", row).value || 1,
+      rate: c.rate ?? Math.round(Number(rate?.value || 0) * 100),
+      tax_rate: c.tax_rate,
+      sku: c.sku,
+      unit: c.unit,
+      service_id: c.service_id,
+    },
+    form.dataset.kind,
+  );
+  const fresh = tpl.content.firstElementChild;
+  row.replaceWith(fresh);
+  const qty = $(".item-quantity", fresh);
+  qty.focus();
+  qty.select();
+  fresh.dispatchEvent(new Event("input", { bubbles: true }));
+}
+document.addEventListener("focusin", (event) => {
+  const field = event.target.closest?.('form[data-form="editor"] .item-description');
+  if (field && !field.value.trim()) openSuggest(field);
+});
+document.addEventListener("input", (event) => {
+  const field = event.target.closest?.('form[data-form="editor"] .item-description');
+  if (field) openSuggest(field);
+});
+document.addEventListener("focusout", (event) => {
+  if (suggest.row && event.target.matches?.(".item-description")) closeSuggest();
+});
+document.addEventListener("mousedown", (event) => {
+  if (event.target.closest?.(".suggest-item")) event.preventDefault();
+});
+document.addEventListener("click", (event) => {
+  const pick = event.target.closest?.(".suggest-item");
+  if (pick) pickSuggestion(Number(pick.dataset.pick));
+});
+document.addEventListener("keydown", (event) => {
+  if (!suggest.row || !event.target.matches?.(".item-description")) return;
+  if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+    event.preventDefault();
+    moveSuggest(event.key === "ArrowDown" ? 1 : -1);
+  } else if (event.key === "Enter" && suggest.active >= 0) {
+    event.preventDefault();
+    pickSuggestion(suggest.active);
+  } else if (event.key === "Escape") {
+    // Closes the list only, not the dialog.
+    event.preventDefault();
+    closeSuggest();
+  } else if (event.key === "Tab") closeSuggest();
 });
 document.addEventListener("change", (event) => {
   if (event.target.id === "catalog-service" && event.target.value) {
