@@ -1075,6 +1075,22 @@ form[data-client-kind="individual"] .company-only {
 .client-form > .field-hint {
   margin: 0 0 17px;
 }
+/* Member and VIP clients: a reminder of who gets extra care. */
+.badge.tier-vip {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: #fff;
+}
+.badge.tier-member {
+  border-color: var(--ink);
+}
+.card-title .badge {
+  margin-left: 6px;
+  vertical-align: 1px;
+}
+.client-perks:empty {
+  display: none;
+}
 .kind-tag {
   display: inline-block;
   margin-left: 6px;

@@ -68,6 +68,30 @@ test("clients are companies unless saved as individuals; an individual keeps no 
     });
     assert.equal(ngo.kind, "organisation");
 
+    // Regular, member or VIP, with a note of what they get. Nothing automatic.
+    assert.equal(person.tier, "regular");
+    const vip = await f.json(`/api/clients/${person.id}`, "PUT", {
+      name: person.name,
+      tier: "vip",
+      tier_note: "10% extra discount, 2 pendrives per order",
+    });
+    assert.equal(vip.tier, "vip");
+    assert.equal(vip.tier_note, "10% extra discount, 2 pendrives per order");
+    assert.equal(vip.kind, "individual");
+    await assert.rejects(
+      f.json(`/api/clients/${person.id}`, "PUT", {
+        name: person.name,
+        tier: "gold",
+      }),
+      /Choose regular, member or VIP/,
+    );
+    assert.equal(
+      (await f.json(`/api/clients/${person.id}`, "PUT", { name: person.name }))
+        .tier,
+      "vip",
+      "a save without the field keeps it",
+    );
+
     // The type is kept on the document when it is issued.
     const draft = await f.json("/api/documents", "POST", {
       kind: "invoice",
@@ -78,6 +102,11 @@ test("clients are companies unless saved as individuals; an individual keeps no 
     });
     const issued = await f.json(`/api/documents/${draft.id}/issue`, "POST", {});
     assert.equal(issued.client.kind, "individual");
+    assert.equal(issued.client.tier, "vip");
+    // The paper and PDF show only the last 4 characters of a person's IC (public/ext/privacy.mjs).
+    const pdf = await f.auth(`/api/documents/${draft.id}/pdf`);
+    assert.equal(pdf.status, 200);
+    assert.equal(pdf.headers.get("content-type"), "application/pdf");
   } finally {
     await f.close();
   }

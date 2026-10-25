@@ -261,6 +261,7 @@ function clientSnapshot(c) {
     brn: c.brn || "",
     sst_number: c.sst_number || "",
     kind: c.kind || "company",
+    tier: c.tier || "regular",
     terms: c.terms,
     archived: !!c.archived,
     created: c.created,
