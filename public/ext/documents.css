@@ -110,14 +110,29 @@
 }
 .doc-logo-row {
   display: flex;
-  gap: 18px;
-  align-items: center;
+  gap: 22px;
+  align-items: flex-start;
   flex-wrap: wrap;
+  margin-bottom: 4px;
+}
+.doc-logo-current {
+  flex: 0 0 180px;
+  margin: 7px 0 0;
+}
+.doc-logo-current figcaption {
+  margin-top: 6px;
+  font-size: 10px;
+  color: var(--muted);
 }
 .doc-logo-preview {
-  width: 150px;
-  max-height: 60px;
+  display: block;
+  width: 180px;
+  height: 76px;
+  padding: 8px;
   object-fit: contain;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #fff;
 }
 .doc-logo-row form {
   flex: 1;
