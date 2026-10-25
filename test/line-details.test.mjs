@@ -171,6 +171,10 @@ test("formatting typed in the editor reads back exactly, also bold inside italic
       [el("UL", el("LI", el("EM", txt("it "), el("B", txt("bo")))), el("LI", txt("plain")))],
       "<ul><li><em>it </em><strong><em>bo</em></strong></li><li>plain</li></ul>",
     ],
+    // Text that only looks like a list stays text, with its own number.
+    [[el("DIV", txt("10. Maintenance within 30 days")), el("DIV", txt("- not a bullet"))], "<p>10. Maintenance within 30 days<br>- not a bullet</p>"],
+    [[txt("2) second"), el("BR"), txt("• dot")], "<p>2) second<br>• dot</p>"],
+    [[el("OL", el("LI", txt("1. inside a list")))], "<ol><li>1. inside a list</li></ol>"],
   ];
   for (const [kids, html] of cases) {
     const md = htmlToDetails(el("DIV", ...kids));

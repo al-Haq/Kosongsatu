@@ -145,7 +145,9 @@ export function htmlToDetails(root) {
       } else line += to(seg) + seg.text;
     }
     out.push(line + to({}));
-    return out.join("\n");
+    // Typed text that only looks like a list ("10. Maintenance", "- note") stays
+    // text: only the list buttons make lists.
+    return out.map((l) => l.replace(/^(\s*\d{1,3})([.)])(\s)/, "$1\\$2$3").replace(/^(\s*)([-•])(\s)/, "$1\\$2$3")).join("\n");
   };
   const inline = (...nodes) => {
     const segs = [];
