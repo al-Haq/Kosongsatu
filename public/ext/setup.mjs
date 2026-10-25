@@ -2,6 +2,7 @@
 // The business's own name and logo in the sidebar and on the sign-in page are drawn by public/app.mjs.
 // Browser module contract: see docs/PLUGINS.md.
 import { MODULES, moduleOff, ownCompany } from "./setup-modules.mjs";
+import { OFFER_MFA } from "./features.mjs";
 
 export default function setupUI(h) {
   const { E, icon, badge, api, refresh, renderRoute, toast } = h;
@@ -111,15 +112,20 @@ export default function setupUI(h) {
         focus: "panel:Encrypted backups",
         label: local ? "Add off-site copy" : "Set up backups",
       },
-      {
-        key: "mfa",
-        title: "Two-step sign-in",
-        why: "An authenticator code keeps your account safe if your password leaks.",
-        done: !!s.security?.enabled,
-        href: "#/settings/security",
-        focus: "panel:Authenticator and recovery",
-        label: "Turn on MFA",
-      },
+      // Two-step sign-in is not offered for now (public/ext/features.mjs).
+      ...(OFFER_MFA
+        ? [
+            {
+              key: "mfa",
+              title: "Two-step sign-in",
+              why: "An authenticator code keeps your account safe if your password leaks.",
+              done: !!s.security?.enabled,
+              href: "#/settings/security",
+              focus: "panel:Authenticator and recovery",
+              label: "Turn on MFA",
+            },
+          ]
+        : []),
       {
         key: "first",
         title: "First client and invoice",

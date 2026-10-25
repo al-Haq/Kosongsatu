@@ -249,7 +249,7 @@ function renderLogin() {
   autosave?.flush();
   const { company } = brand();
   document.title = company ? `Sign in · ${company}` : "Nawlogic Invoice";
-  app.innerHTML = `<div class="login-screen"><section class="login-brand"><span class="eyebrow">${company ? E(company) : "NAWLOGIC"} / BILLING WORKSPACE</span><h1>Good work deserves<br><span class="accent">a clear invoice.</span></h1><p>From the first quotation to the final receipt. A quieter way to keep your business moving.</p><div class="login-points"><span>${icon("doc")}Create with confidence</span><span>${icon("wallet")}Track every payment</span><span>${icon("shield")}Your private workspace</span></div></section><section class="login-form"><div class="login-inner">${brandMark()}<h2>Welcome back.</h2><p>${company ? `Sign in to the ${E(company)} workspace.` : "Sign in to your Nawlogic workspace."}</p><form data-form="login">${input("Email address", "email", "", "email", true, 'autocomplete="username" maxlength="160"')}${input("Password", "password", "", "password", true, 'autocomplete="current-password" maxlength="256"')}<details class="mfa"><summary>Use an authenticator or recovery code</summary>${input("Authenticator or recovery code", "code", "", "text", false, 'autocomplete="one-time-code" maxlength="40"')}</details>${errorBlock()}<button class="btn primary" type="submit">Sign in ${icon("arrow")}</button></form>${slot("login")}<div class="login-footer">${icon("shield")} Team access only. Customer invoices use a separate private link.</div></div></section></div>`;
+  app.innerHTML = `<div class="login-screen"><section class="login-brand"><span class="eyebrow">${company ? E(company) : "NAWLOGIC"} / BILLING WORKSPACE</span><h1>Good work deserves<br><span class="accent">a clear invoice.</span></h1><p>From the first quotation to the final receipt. A quieter way to keep your business moving.</p><div class="login-points"><span>${icon("doc")}Create with confidence</span><span>${icon("wallet")}Track every payment</span><span>${icon("shield")}Your private workspace</span></div></section><section class="login-form"><div class="login-inner">${brandMark()}<h2>Welcome back.</h2><p>${company ? `Sign in to the ${E(company)} workspace.` : "Sign in to your Nawlogic workspace."}</p><form data-form="login">${input("Email address", "email", "", "email", true, 'autocomplete="username" maxlength="160"')}${input("Password", "password", "", "password", true, 'autocomplete="current-password" maxlength="256"')}<div class="mfa-step" hidden><p class="field-hint">This account uses two-step sign-in. Enter the code from your authenticator app, or a recovery code.</p>${input("Authenticator or recovery code", "code", "", "text", false, 'autocomplete="one-time-code" maxlength="40"')}</div>${errorBlock()}<button class="btn primary" type="submit">Sign in ${icon("arrow")}</button></form>${slot("login")}<div class="login-footer">${icon("shield")} Team access only. Customer invoices use a separate private link.</div></div></section></div>`;
 }
 const NAV_GROUPS = ["Sell", "Get paid", "Records", "Books", "Operations", "Workspace"];
 const navItems = [
@@ -1737,7 +1737,14 @@ document.addEventListener("submit", async (event) => {
     autosave?.failed(form, draftKey);
     if (error && error.isConnected) error.textContent = e.message;
     else toast(e.message, true);
-    if (form.dataset.form === "login" && /code/i.test(e.message)) $("details.mfa", form)?.setAttribute("open", "");
+    // Only an account that uses two-step sign-in is asked for a code, after its password.
+    if (form.dataset.form === "login" && /code/i.test(e.message)) {
+      const step = $(".mfa-step", form);
+      if (step) {
+        step.hidden = false;
+        $("input[name=code]", step)?.focus();
+      }
+    }
   } finally {
     if (submit) submit.disabled = false;
   }

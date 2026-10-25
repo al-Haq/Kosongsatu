@@ -40,6 +40,17 @@ An operator with server access can also add an active user directly, with a gene
 
 Without email, **Forgot password?** explains the alternatives: members ask the owner for a reset link (Team → Reset password); the owner's server operator runs `npm run recover` on the server, which now asks for the account email (useful when there are several users).
 
+## Two-step sign-in is hidden for now
+
+Two-step sign-in (MFA) is switched off in the screens (`OFFER_MFA` in `public/ext/features.mjs`):
+
+- The sign-in page asks only for email and password. There is no code box.
+- The setup checklist, Settings > Security and My account do not offer to set it up, and the add-user and recovery console messages no longer mention it.
+- An account that already uses MFA keeps it. After its password is accepted, the server asks for a code, and only then does the sign-in page show the code box, with "This account uses two-step sign-in". Its owner still sees **Authenticator and recovery** to manage or turn it off. **Reset MFA** stays on Team for members who use it.
+- The server is unchanged: MFA is still enforced for accounts that have it, and the routes stay for when it is offered again.
+
+Set `OFFER_MFA` to `true` to offer it again; the rest of this section describes it as offered.
+
 ## QR code for authenticator setup (74)
 
 Settings (owner) or My account (others) → **Enable MFA**. After your password, the setup screen shows a QR code of the `otpauth://` link (issuer *Nawlogic*, your email) next to the setup key. Scan it with Google Authenticator, Microsoft Authenticator, 1Password, etc., then type a 6-digit code. Each user has their own authenticator and recovery codes.

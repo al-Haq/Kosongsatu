@@ -1,4 +1,5 @@
 import { toMYR } from "./ext/documents-calc.mjs";
+import { OFFER_MFA } from "./ext/features.mjs";
 export function financeUI(h) {
   const {
     get,
@@ -191,6 +192,8 @@ export function financeUI(h) {
   // Encrypted backups (local and off-site) are shown by the team module.
   function security() {
     const S = get();
+    // Hidden for now (public/ext/features.mjs), except for someone who already uses it.
+    if (!OFFER_MFA && !S.security.enabled) return "";
     return `<section class="panel mt22"><div class="panel-head"><h2>Authenticator and recovery</h2>${badge(S.security.enabled ? "Enabled" : "Not enabled")}</div><p>${S.security.enabled ? `${S.security.recoveryRemaining} unused recovery codes.` : "Add an authenticator app and save your recovery codes securely."}</p><div class="actions mt22">${button(S.security.enabled ? "Manage MFA" : "Enable MFA", "mfa-setup")}</div><p class="field-hint">Lost all login factors? Console recovery is available only to the server operator.</p></section>`;
   }
   async function action(type, id) {

@@ -2,7 +2,7 @@
 
 ## Setup checklist
 
-A new workspace shows **Set up your workspace** at the top of the Overview, for the owner only. It lists what is left to do, how far you are ("5 of 9 done"), and a button that opens the exact place to fix each step:
+A new workspace shows **Set up your workspace** at the top of the Overview, for the owner only. It lists what is left to do, how far you are ("5 of 8 done"), and a button that opens the exact place to fix each step:
 
 | Step | Where it opens |
 | --- | --- |
@@ -13,9 +13,9 @@ A new workspace shows **Set up your workspace** at the top of the Overview, for 
 | Email sending (SMTP) | Settings > Integrations |
 | Online payments (optional) | Settings > Payments |
 | Encrypted backups with an off-site copy | Settings > Security |
-| Two-step sign-in (MFA) | Settings > Security |
 | First client and first invoice | Add client, or New invoice |
 
+- Two-step sign-in (MFA) is not a step for now: it is hidden (see [Team](team.md#two-step-sign-in-is-hidden-for-now)).
 - Not registered for SST? Press **Not registered**. No payment gateway yet? Press **Not now**. Both can be undone under **Done**.
 - **Hide** removes the checklist on every device. Bring it back with **Show again** under Settings > Modules.
 - The checklist goes away by itself when every step is done.

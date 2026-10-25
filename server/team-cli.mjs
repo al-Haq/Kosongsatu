@@ -91,7 +91,7 @@ async function run(mode, args) {
       console.log(`User created: ${u.email} (${u.role}).`);
       if (process.env.ADMIN_PASSWORD) console.log("(Password supplied through ADMIN_PASSWORD; not displayed.)");
       else console.log("Password (shown once, save it privately):\n" + password);
-      console.log("Sign in, change the password and enable MFA.");
+      console.log("Sign in and change the password.");
       return 0;
     } finally {
       store.db.close();

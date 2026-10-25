@@ -113,7 +113,7 @@ if (mode === "setup") {
     console.log(
       "New one-time generated password (save privately):\n" +
         password +
-        "\nSign in, change it, then re-enrol MFA.",
+        "\nSign in and change it.",
     );
   } finally {
     rl.close();

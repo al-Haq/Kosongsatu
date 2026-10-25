@@ -1,5 +1,6 @@
 // Team and security: users and roles, accountant access, password reset, MFA QR, off-site backups and a verifiable audit chain.
 // Browser module contract: see docs/PLUGINS.md.
+import { OFFER_MFA } from "./features.mjs";
 export default function teamUI(h) {
   const { E, button, badge, heading, input, select, formEnd, errorBlock, showModal, modal, api, refresh, renderRoute, toast, timeLabel, empty, icon } = h;
   const team = () => h.get()?.ext?.team || {};
@@ -70,6 +71,8 @@ export default function teamUI(h) {
     return Object.entries(team().roles || {}).map(([k, v]) => [k, v.label]);
   }
   function teamPage() {
+    // The authenticator column shows while MFA is offered, or if someone already uses it.
+    const showMfa = OFFER_MFA || (team().users || []).some((u) => u.mfa);
     const t = team();
     const users = t.users || [];
     const owners = users.filter((u) => u.role === "owner" && u.status === "Active").length;
@@ -78,7 +81,7 @@ export default function teamUI(h) {
       (!t.mail
         ? `<div class="notice">${icon("shield")}<p>Email is not configured. Invitation links are shown for you to copy, and members who forget their password need you to create a reset link for them.</p></div>`
         : "") +
-      `<section class="panel"><div class="table-wrap"><table class="team-users"><caption class="sr-only">Users</caption><thead><tr><th>User</th><th>Role</th><th>Status</th><th>Authenticator</th><th>Last sign-in</th><th><span class="sr-only">Actions</span></th></tr></thead><tbody>${users
+      `<section class="panel"><div class="table-wrap"><table class="team-users"><caption class="sr-only">Users</caption><thead><tr><th>User</th><th>Role</th><th>Status</th>${showMfa ? "<th>Authenticator</th>" : ""}<th>Last sign-in</th><th><span class="sr-only">Actions</span></th></tr></thead><tbody>${users
         .map((u) => {
           const self = u.id === t.me?.id;
           const lastOwner = u.role === "owner" && u.status === "Active" && owners <= 1;
@@ -89,7 +92,7 @@ export default function teamUI(h) {
                 (self ? "" : u.disabled ? button("Enable", "team-enable", u.id) : lastOwner ? "" : button("Disable", "team-disable", u.id)) +
                 (!self && !u.disabled ? button("Reset password", "team-reset-link", u.id) : "") +
                 (!self && u.mfa ? button("Reset MFA", "team-reset-mfa", u.id) : "");
-          return `<tr><td><strong>${E(u.name || u.email)}${self ? " (you)" : ""}</strong>${u.name ? `<small>${E(u.email)}</small>` : ""}</td><td>${E(roleLabel(u.role))}${lastOwner ? "<small>Last owner</small>" : ""}</td><td>${statusBadge(u.status)}${u.status === "Invited" && u.invited ? `<small>Invited ${timeLabel(u.invited)}</small>` : ""}</td><td>${u.mfa ? badge("Enabled") : '<span class="muted">Not set up</span>'}</td><td>${u.last_sign_in ? timeLabel(u.last_sign_in) : '<span class="muted">Never</span>'}</td><td><div class="actions">${actions}</div></td></tr>`;
+          return `<tr><td><strong>${E(u.name || u.email)}${self ? " (you)" : ""}</strong>${u.name ? `<small>${E(u.email)}</small>` : ""}</td><td>${E(roleLabel(u.role))}${lastOwner ? "<small>Last owner</small>" : ""}</td><td>${statusBadge(u.status)}${u.status === "Invited" && u.invited ? `<small>Invited ${timeLabel(u.invited)}</small>` : ""}</td>${showMfa ? `<td>${u.mfa ? badge("Enabled") : '<span class="muted">Not set up</span>'}</td>` : ""}<td>${u.last_sign_in ? timeLabel(u.last_sign_in) : '<span class="muted">Never</span>'}</td><td><div class="actions">${actions}</div></td></tr>`;
         })
         .join("")}</tbody></table></div></section><section class="panel mt22"><details><summary><strong>What each role can do</strong></summary><div class="team-roles mt22">${Object.entries(t.roles || {})
         .map(([k, v]) => `<div class="team-role"><span class="eyebrow teal">${E(v.label)}</span><p>${E(v.summary)}</p><small>${users.filter((u) => u.role === k).length} user(s)</small></div>`)
@@ -146,7 +149,7 @@ export default function teamUI(h) {
       me = team().me || {};
     return (
       heading("My account", "") +
-      `<div class="grid-equal"><section class="panel"><div class="panel-head"><h2>${E(me.name || me.email)}</h2>${badge(roleLabel(me.role))}</div><dl class="detail"><dt>Email</dt><dd>${E(me.email)}</dd><dt>Access</dt><dd>${E(team().roles?.[me.role]?.summary || "")}</dd></dl><p class="field-hint">Your actions are recorded in the audit trail under your email. Ask the workspace owner to change your role.</p></section><section class="panel"><div class="panel-head"><h2>Authenticator and recovery</h2>${badge(S.security.enabled ? "Enabled" : "Not enabled")}</div><p>${S.security.enabled ? `${S.security.recoveryRemaining} unused recovery codes.` : "Add an authenticator app for a second sign-in step."}</p><div class="actions mt22">${button(S.security.enabled ? "Manage MFA" : "Enable MFA", "mfa-setup")}</div><p class="field-hint">Lost your authenticator and recovery codes? Ask the workspace owner to reset it.</p></section></div><section class="panel mt22"><div class="panel-head"><h2>Change password</h2></div><form data-form="team-password">${input("Current password", "current", "", "password", true, 'autocomplete="current-password"')}${input("New password (at least 12 characters)", "password", "", "password", true, 'minlength="12" maxlength="256" autocomplete="new-password"')}${S.security.enabled ? input("Authenticator or recovery code", "code", "", "text", true, 'autocomplete="one-time-code"') : ""}${errorBlock()}<button type="submit" class="btn">Change password and sign out</button></form></section>`
+      `<div class="grid-equal"><section class="panel"><div class="panel-head"><h2>${E(me.name || me.email)}</h2>${badge(roleLabel(me.role))}</div><dl class="detail"><dt>Email</dt><dd>${E(me.email)}</dd><dt>Access</dt><dd>${E(team().roles?.[me.role]?.summary || "")}</dd></dl><p class="field-hint">Your actions are recorded in the audit trail under your email. Ask the workspace owner to change your role.</p></section>${OFFER_MFA || S.security.enabled ? `<section class="panel"><div class="panel-head"><h2>Authenticator and recovery</h2>${badge(S.security.enabled ? "Enabled" : "Not enabled")}</div><p>${S.security.enabled ? `${S.security.recoveryRemaining} unused recovery codes.` : "Add an authenticator app for a second sign-in step."}</p><div class="actions mt22">${button(S.security.enabled ? "Manage MFA" : "Enable MFA", "mfa-setup")}</div><p class="field-hint">Lost your authenticator and recovery codes? Ask the workspace owner to reset it.</p></section>` : ""}</div><section class="panel mt22"><div class="panel-head"><h2>Change password</h2></div><form data-form="team-password">${input("Current password", "current", "", "password", true, 'autocomplete="current-password"')}${input("New password (at least 12 characters)", "password", "", "password", true, 'minlength="12" maxlength="256" autocomplete="new-password"')}${S.security.enabled ? input("Authenticator or recovery code", "code", "", "text", true, 'autocomplete="one-time-code"') : ""}${errorBlock()}<button type="submit" class="btn">Change password and sign out</button></form></section>`
     );
   }
 
