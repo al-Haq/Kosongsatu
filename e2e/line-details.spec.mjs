@@ -135,3 +135,39 @@ test("line items: pick an item used before", async ({ page }) => {
   await expect(page.locator(".quote-scope .line-details-view strong").first()).toHaveText("7 pages");
   expect(errors).toEqual([]);
 });
+
+// A description over the limit is never cut: the counter says so and saving is refused.
+test("line items: a description over 3000 characters is kept and refused, not cut", async ({ page }) => {
+  const errors = watchErrors(page);
+  await signIn(page);
+  const client = unique("E2E Long");
+  await createClient(page, client);
+  await page.goto("/#/quotes");
+  await page.click('[data-action="new-quote"]');
+  const editor = page.locator('form[data-form="editor"]');
+  await editor.locator("select[name=client_id]").selectOption({ label: client });
+  const row = editor.locator(".line-item").first();
+  await row.locator(".item-description").fill("Long scope");
+  await row.locator(".item-rate").fill("100");
+  await row.locator('[data-details="add"]').click();
+  const box = row.locator(".item-details");
+  await box.evaluate((el) => {
+    const data = new DataTransfer();
+    data.setData("text/plain", "x".repeat(3001));
+    el.dispatchEvent(new ClipboardEvent("paste", { clipboardData: data, bubbles: true, cancelable: true }));
+  });
+  await expect(row.locator(".details-count")).toHaveText("3001 / 3000 · too long to save");
+  await expect(row.locator(".details-count")).toHaveClass(/red-text/);
+  await editor.locator("button[type=submit]").click();
+  await expect(page.getByRole("alert")).toContainText("Line 1: the description can have up to 3000 characters.");
+  await expect(editor).toBeVisible();
+  expect((await box.textContent()).length).toBe(3001);
+  // One character shorter, and it saves.
+  await box.click();
+  await page.keyboard.press("End");
+  await page.keyboard.press("Backspace");
+  await expect(row.locator(".details-count")).toHaveText("3000 / 3000");
+  await editor.locator("button[type=submit]").click();
+  await expect(page.locator("#toast")).toContainText("Draft saved");
+  expect(errors.filter((e) => !/status of 400/.test(e))).toEqual([]);
+});

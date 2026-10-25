@@ -415,26 +415,86 @@ export function renderPdf(invoice, payment = null, blocks = []) {
           });
           return pdf.y;
         };
+        // The runs before and after a character offset.
+        const splitRuns = (rs, at) => {
+          const before = [],
+            after = [];
+          let seen = 0;
+          for (const r of rs) {
+            const end = seen + r.text.length;
+            if (end <= at) before.push(r);
+            else if (seen >= at) after.push(r);
+            else {
+              before.push({ ...r, text: r.text.slice(0, at - seen) });
+              after.push({ ...r, text: r.text.slice(at - seen) });
+            }
+            seen = end;
+          }
+          if (after.length) after[0] = { ...after[0], text: after[0].text.replace(/^\s+/, "") };
+          return [before, after.filter((r) => r.text)];
+        };
+        // How much of a text fits in a height: the longest start ending at a
+        // space (or, for one very long word, at any character), measured in bold.
+        const fitting = (value, w, room) => {
+          const fits = (k) => tall(value.slice(0, k), L.small, w, "Bold", 2) <= room;
+          const spaces = [];
+          for (let k = 1; k < value.length; k++) if (value[k] === " ") spaces.push(k);
+          let lo = 0,
+            hi = spaces.length - 1,
+            best = 0;
+          while (lo <= hi) {
+            const mid = (lo + hi) >> 1;
+            if (fits(spaces[mid])) {
+              best = spaces[mid];
+              lo = mid + 1;
+            } else hi = mid - 1;
+          }
+          if (best) return best;
+          lo = 1;
+          hi = value.length - 1;
+          while (lo <= hi) {
+            const mid = (lo + hi) >> 1;
+            if (fits(mid)) {
+              best = mid;
+              lo = mid + 1;
+            } else hi = mid - 1;
+          }
+          return best;
+        };
+        // One paragraph line or list item. What does not fit above the page's
+        // end carries on overleaf, split between words, under the table header.
+        const drawFlow = (rs, x, w, yy, leadText = "", leadWidth = 0) => {
+          let rest = rs.length ? rs : [{ text: " " }];
+          let first = true;
+          for (;;) {
+            const h = tall(plain(rest), L.small, w, "Bold", 2);
+            const fresh = yy === y && carried;
+            let now = rest,
+              later = [];
+            if (yy + h > 735) {
+              const cut = fitting(plain(rest), w, 735 - yy);
+              if (cut <= 0 && !fresh) {
+                yy = roomFor(yy, h);
+                continue;
+              }
+              if (cut > 0) [now, later] = splitRuns(rest, cut);
+            }
+            if (first && leadText)
+              pdf.font(ctx.font("Body", "")).fontSize(L.small).fillColor(muted).text(leadText, x - leadWidth, yy, { width: leadWidth, lineGap: 2, lineBreak: false });
+            first = false;
+            yy = drawRuns(now, x, yy, w);
+            if (!later.length) return yy;
+            rest = later;
+            yy = roomFor(735, 1);
+          }
+        };
         // Drawn last, as it may carry on to the next page. Returns where it ends.
         const drawDescription = (c) => {
           let yy = line(itemTitle, c.x, y, L.body, titleFont, ink, c.w);
           notes.forEach((b, k) => {
             yy += k ? 3 : 1;
-            if (b.type === "p")
-              for (const rs of b.lines) {
-                yy = roomFor(yy, runsHeight(rs, b, c.w));
-                yy = drawRuns(rs, c.x, yy, c.w);
-              }
-            else
-              b.items.forEach((rs, n) => {
-                yy = roomFor(yy, runsHeight(rs, b, c.w));
-                pdf
-                  .font(ctx.font("Body", ""))
-                  .fontSize(L.small)
-                  .fillColor(muted)
-                  .text(lead(b, n), c.x, yy, { width: indent(b), lineGap: 2, lineBreak: false });
-                yy = drawRuns(rs, c.x + indent(b), yy, c.w - indent(b));
-              });
+            if (b.type === "p") for (const rs of b.lines) yy = drawFlow(rs, c.x, c.w, yy);
+            else b.items.forEach((rs, n) => (yy = drawFlow(rs, c.x + indent(b), c.w - indent(b), yy, lead(b, n), indent(b))));
           });
           if (sstNote) {
             yy = roomFor(yy + (notes.length ? 2 : 0), tall(sstNote, L.small, c.w));

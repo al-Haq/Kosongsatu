@@ -101,6 +101,7 @@ export function detailsPlain(md) {
 
 // Markup from the editor's formatted box (browser): bold, italic,
 // strikethrough, lists and line breaks are kept; anything else becomes text.
+// Never shortened: the counter shows what is over DETAILS_MAX and saving is refused.
 export function htmlToDetails(root) {
   // Stars, tildes and backslashes typed as text stay text; no-break spaces become spaces.
   const lit = (s) => s.replace(/([\\*~])/g, "\\$1").replace(/ /g, " ");
@@ -165,6 +166,5 @@ export function htmlToDetails(root) {
     .map((l) => l.replace(/\s+$/, ""))
     .join("\n")
     .replace(/\n{3,}/g, "\n\n")
-    .trim()
-    .slice(0, DETAILS_MAX);
+    .trim();
 }

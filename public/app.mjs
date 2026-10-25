@@ -1721,8 +1721,9 @@ document.addEventListener("input", (event) => {
   const used = htmlToDetails(box).length;
   const count = $(".details-count", box.closest(".line-details"));
   if (count) {
-    count.textContent = `${used} / ${DETAILS_MAX}`;
-    count.classList.toggle("red-text", used >= DETAILS_MAX);
+    // Over the limit nothing is cut: it says so, and saving is refused until it is shorter.
+    count.textContent = `${used} / ${DETAILS_MAX}${used > DETAILS_MAX ? " · too long to save" : ""}`;
+    count.classList.toggle("red-text", used > DETAILS_MAX);
   }
 });
 // Items used before: clicking an empty line title, or typing in one, lists

@@ -111,6 +111,26 @@ test("a line's description is saved, limited, and copied when a quotation become
     });
     const tallPdf = Buffer.from(await (await f.auth(`/api/documents/${tallDoc.id}/pdf`)).arrayBuffer()).toString("latin1");
     assert.ok((tallPdf.match(/\/Type \/Page\b/g) || []).length >= 3, "renders across three pages");
+    // So does one paragraph longer than a page, in a narrow column (code, unit and discount shown).
+    const para = "Development and **support**, with *training* and documentation. ".repeat(60).slice(0, DETAILS_MAX);
+    const narrow = await f.json("/api/documents", "POST", {
+      kind: "invoice",
+      client_id: c.id,
+      issue_date: today(),
+      due_date: today(),
+      items: [
+        { description: "Setup", quantity: "1", rate: "100.00", sku: "SET-1", unit: "job", discount_amount: "10.00" },
+        { description: "Big project", details: para, quantity: "1", rate: "1.00" },
+      ],
+    });
+    const narrowPdf = await f.auth(`/api/documents/${narrow.id}/pdf`);
+    assert.equal(narrowPdf.status, 200);
+    const pages = (
+      Buffer.from(await narrowPdf.arrayBuffer())
+        .toString("latin1")
+        .match(/\/Type \/Page\b/g) || []
+    ).length;
+    assert.ok(pages >= 2, "a long paragraph carries on to the next page");
     assert.ok((await pdf.arrayBuffer()).byteLength > (await plain.arrayBuffer()).byteLength, "the PDF with a description has more in it");
   } finally {
     await f.close();
